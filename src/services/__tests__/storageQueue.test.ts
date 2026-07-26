@@ -65,9 +65,9 @@ describe('Advanced Storage Queue & Schema V5 Migration Suite', () => {
     expect(logs[0].nutrition.proteinGrams).toBe(0); // Sanitized from -10 to 0
   });
 
-  test('runStepByStepMigrations upgrades V1 schema to V5 seamlessly', async () => {
+  test('runStepByStepMigrations upgrades V1 schema to V6 seamlessly', async () => {
     await AsyncStorage.setItem('@habitdiet_schema_version', '1');
-    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({ name: 'Old User', geminiApiKey: 'legacy-key' }));
+    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({ name: 'Old User', geminiApiKey: 'legacy-key', weightKg: 70 }));
 
     await runStepByStepMigrations(1);
 
@@ -77,7 +77,7 @@ describe('Advanced Storage Queue & Schema V5 Migration Suite', () => {
     expect((profile as any).geminiApiKey).toBeUndefined();
 
     const version = await AsyncStorage.getItem('@habitdiet_schema_version');
-    expect(version).toBe('5');
+    expect(version).toBe('6');
   });
 
   test('msUntilMidnight calculates positive milliseconds until midnight local time', () => {

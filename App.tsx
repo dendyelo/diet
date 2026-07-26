@@ -12,6 +12,7 @@ import { LivingTimelineHome } from './src/screens/LivingTimelineHome';
 import { ProgressHubScreen } from './src/screens/ProgressHubScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { LoggerScreen } from './src/screens/LoggerScreen';
+import { QuickAddMealModal } from './src/components/QuickAddMealModal';
 import { AddWeightModal } from './src/components/AddWeightModal';
 import { AICoachChatModal } from './src/components/AICoachChatModal';
 import { RadialMenuModal } from './src/components/RadialMenuModal';
@@ -23,20 +24,20 @@ type TabName = 'home' | 'progress' | 'profile';
 const MainNavigator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabName>('home');
   const [showRadialMenu, setShowRadialMenu] = useState<boolean>(false);
-  const [showFoodLogger, setShowFoodLogger] = useState<boolean>(false);
+  const [showQuickFoodLogger, setShowQuickFoodLogger] = useState<boolean>(false);
   const [showAddWeight, setShowAddWeight] = useState<boolean>(false);
   const [showAICoachChat, setShowAICoachChat] = useState<boolean>(false);
 
   const { profile } = useProfile();
-  const { totalCaloriesIn } = useMeals();
+  const { mealLogs, totalCaloriesIn, addMealLog } = useMeals();
   const { waterGlasses, steps, fastingState, addWaterGlass, resetFastingTimer } = useHealth();
   const { weightLogs, addWeightLog } = useWeight();
-  const { userApiKey } = useAI();
+  const { userApiKey, parseFoodNutrition } = useAI();
 
   const handleSelectRadialAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
     switch (action) {
       case 'food':
-        setShowFoodLogger(true);
+        setShowQuickFoodLogger(true);
         break;
       case 'water':
         addWaterGlass();
@@ -60,7 +61,7 @@ const MainNavigator: React.FC = () => {
       case 'home':
         return (
           <LivingTimelineHome
-            onOpenAddMeal={() => setShowFoodLogger(true)}
+            onOpenAddMeal={() => setShowQuickFoodLogger(true)}
             onOpenAddWeight={() => setShowAddWeight(true)}
             onOpenAICoachChat={() => setShowAICoachChat(true)}
           />
@@ -72,7 +73,7 @@ const MainNavigator: React.FC = () => {
       default:
         return (
           <LivingTimelineHome
-            onOpenAddMeal={() => setShowFoodLogger(true)}
+            onOpenAddMeal={() => setShowQuickFoodLogger(true)}
             onOpenAddWeight={() => setShowAddWeight(true)}
             onOpenAICoachChat={() => setShowAICoachChat(true)}
           />
@@ -115,12 +116,19 @@ const MainNavigator: React.FC = () => {
         onSelectAction={handleSelectRadialAction}
       />
 
-      {/* Food Logger Modal */}
-      <Modal visible={showFoodLogger} animationType="slide" onRequestClose={() => setShowFoodLogger(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#09090B' }}>
-          <LoggerScreen onDone={() => setShowFoodLogger(false)} />
-        </SafeAreaView>
-      </Modal>
+      {/* Quick Add Food Logger Modal (3-second logging) */}
+      <QuickAddMealModal
+        visible={showQuickFoodLogger}
+        onClose={() => setShowQuickFoodLogger(false)}
+        recentMeals={mealLogs}
+        onSaveMeal={(meal) =>
+          addMealLog(meal.name, meal.isSnack, meal.nutrition, meal.trigger, undefined, meal.source, meal.itemsBreakdown)
+        }
+        onParseAI={async (text) => {
+          const res = await parseFoodNutrition(text);
+          return { name: res.name, nutrition: res.nutrition };
+        }}
+      />
 
       {/* Add Weight Modal */}
       <AddWeightModal

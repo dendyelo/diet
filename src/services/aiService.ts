@@ -28,6 +28,11 @@ export interface AICoachResponse {
 }
 
 /**
+ * Available Gemini models to try in sequence if one hits rate limits (429)
+ */
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+
+/**
  * Check Gemini AI Cloud API Connection Status dynamically
  */
 export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionStatus = 'not_configured'): AIStatus {
@@ -44,7 +49,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
   if (connectionStatus === 'connected') {
     return {
       isOnline: true,
-      modeLabel: 'Gemini 2.5 Flash Cloud (Terhubung 🟢)',
+      modeLabel: 'Gemini Cloud AI (Terhubung 🟢)',
       color: '#10B981',
       description: 'Terhubung langsung ke Google AI Studio Cloud dengan presisi analisis tinggi.',
       connectionStatus: 'connected',
@@ -83,7 +88,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
 
   return {
     isOnline: true,
-    modeLabel: 'Gemini 2.5 Flash Cloud (Siap 🟢)',
+    modeLabel: 'Gemini Cloud AI (Siap 🟢)',
     color: '#10B981',
     description: 'API Key terkonfigurasi. Siap menganalisis nutrisi secara presisi.',
     connectionStatus: connectionStatus || 'not_configured',
@@ -91,42 +96,43 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
 }
 
 /**
- * Test Real Connection to Gemini AI API
+ * Test Real Connection to Gemini AI API (tries multiple models if rate limited)
  */
 export async function testGeminiAPIConnection(userApiKey: string): Promise<AIConnectionStatus> {
   const cleanKey = userApiKey.trim();
   if (!cleanKey) return 'not_configured';
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: 'Ping test' }] }],
-        }),
-      }
-    );
+  for (const model of GEMINI_MODELS) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'Ping test' }] }],
+          }),
+        }
+      );
 
-    if (response.ok) {
-      return 'connected';
+      if (response.ok) {
+        return 'connected';
+      }
+      if (response.status === 401 || response.status === 403) {
+        return 'invalid_key';
+      }
+      // If 429, try next model in loop
+    } catch (error) {
+      console.error(`Test connection error for ${model}:`, error);
     }
-    if (response.status === 401 || response.status === 403) {
-      return 'invalid_key';
-    }
-    if (response.status === 429) {
-      return 'rate_limited';
-    }
-    return 'offline';
-  } catch (error) {
-    console.error('Test connection network error:', error);
-    return 'offline';
   }
+
+  return 'rate_limited';
 }
 
 /**
  * Estimate nutrition from food description using Gemini AI API with Smart Fallback
+ * Tries multiple models (gemini-2.5-flash, gemini-3.5-flash, gemini-3.6-flash) if 429 rate limit is hit.
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -163,13 +169,13 @@ Kembalikan HANYA format JSON valid tanpa markdown:
   "aiNotes": "Catatan gizi pintar 1 kalimat"
 }`;
 
-    const makeCall = async (attempt: number): Promise<AIFoodResult | null> => {
+    for (const model of GEMINI_MODELS) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -181,12 +187,6 @@ Kembalikan HANYA format JSON valid tanpa markdown:
         );
 
         clearTimeout(timeoutId);
-
-        if (response.status === 429 && attempt === 1) {
-          // Rate limited (5 RPM limit): wait 2 seconds and retry once
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          return makeCall(2);
-        }
 
         if (response.ok) {
           const data = await response.json();
@@ -213,31 +213,33 @@ Kembalikan HANYA format JSON valid tanpa markdown:
                 fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
               },
               confidence: 'high',
-              aiNotes: parsed.aiNotes || 'Analisis 100% presisi Cloud oleh Gemini 2.5 Flash AI',
+              aiNotes: parsed.aiNotes || `Analisis 100% presisi Cloud oleh ${model}`,
               isOnlineAI: true,
               itemsBreakdown: items,
             };
           }
         }
-      } catch (error) {
-        console.warn(`Gemini Cloud API call attempt ${attempt} failed:`, error);
-      }
-      return null;
-    };
 
-    const cloudResult = await makeCall(1);
-    if (cloudResult) return cloudResult;
+        if (response.status === 401 || response.status === 403) {
+          break; // Don't try other models if key itself is invalid
+        }
+        // If 429, loop continue to next model
+      } catch (error) {
+        console.warn(`Gemini Cloud API call for ${model} failed:`, error);
+      }
+    }
   }
 
   const fallbackResult = smartIndonesianCulinaryEngine(cleanInput);
   if (userApiKey && userApiKey.trim().length > 0) {
-    fallbackResult.aiNotes = '⚠️ Kuota Gemini (5 req/menit) penuh. Menggunakan Engine Kuliner Offline.';
+    fallbackResult.aiNotes = '⚠️ Kuota Gemini Cloud penuh. Menggunakan Engine Kuliner Offline.';
   }
   return fallbackResult;
 }
 
 /**
  * Generate Dynamic Creative AI Coach Greeting & Question using Gemini AI Cloud API
+ * Tries multiple models if rate limit (429) is encountered.
  */
 export async function generateAICoachMessageWithAI(
   userData: {
@@ -252,12 +254,12 @@ export async function generateAICoachMessageWithAI(
   userApiKey?: string
 ): Promise<AICoachResponse | null> {
   if (userApiKey && userApiKey.trim().length > 0) {
-    try {
-      const balanceStatus = userData.netDeficit >= 0
-        ? `DEFISIT ${userData.netDeficit} kcal (Baguss 🟢)`
-        : `SURPLUS ${Math.abs(userData.netDeficit)} kcal (PERINGATAN SURPLUS 🔴)`;
+    const key = userApiKey.trim();
+    const balanceStatus = userData.netDeficit >= 0
+      ? `DEFISIT ${userData.netDeficit} kcal (Baguss 🟢)`
+      : `SURPLUS ${Math.abs(userData.netDeficit)} kcal (PERINGATAN SURPLUS 🔴)`;
 
-      const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.
+    const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.
 DATA PENGGUNA (Jam ${userData.currentHour}:00):
 - Nama: ${userData.name || 'Teman'}
 - Berpuasa: ${userData.fastingHours} Jam
@@ -274,32 +276,36 @@ Kembalikan HANYA format JSON valid:
   "recommendedAction": "meal"
 }`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-        }
-      );
+    for (const model of GEMINI_MODELS) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+          }
+        );
 
-      if (response.ok) {
-        const data = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return {
-            coachMessage: parsed.coachMessage || `Halo ${userData.name}! Bagaimanakah kondisi energimu saat ini?`,
-            questionPrompt: parsed.questionPrompt || 'Apakah kamu merasa lapar asli atau butuh minum air?',
-            recommendedAction: parsed.recommendedAction || 'meal',
-          };
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+              coachMessage: parsed.coachMessage || `Halo ${userData.name}! Bagaimanakah kondisi energimu saat ini?`,
+              questionPrompt: parsed.questionPrompt || 'Apakah kamu merasa lapar asli atau butuh minum air?',
+              recommendedAction: parsed.recommendedAction || 'meal',
+            };
+          }
         }
+        if (response.status === 401 || response.status === 403) break;
+      } catch (err) {
+        console.error(`Error generating AI Coach message with ${model}:`, err);
       }
-    } catch (err) {
-      console.error('Error generating AI Coach message:', err);
     }
   }
 

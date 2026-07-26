@@ -12,7 +12,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { parseFoodNutritionWithAI, getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
-import { Sparkles, Utensils, Sliders, CheckCircle2, Wifi, WifiOff } from 'lucide-react-native';
+import { Sparkles, Utensils, Sliders, CheckCircle2, Wifi, AlertCircle } from 'lucide-react-native';
 
 export const LoggerScreen: React.FC = () => {
   const { profile, addMealLog } = useApp();
@@ -21,6 +21,7 @@ export const LoggerScreen: React.FC = () => {
   const [foodText, setFoodText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   // Manual input state
   const [manualName, setManualName] = useState<string>('');
@@ -37,15 +38,15 @@ export const LoggerScreen: React.FC = () => {
 
     setLoading(true);
     setSuccessMsg('');
+    setErrorMsg('');
     try {
       const result = await parseFoodNutritionWithAI(foodText, profile.geminiApiKey);
-      await addMealLog(result.name, false, result.nutrition, undefined, undefined, 'ai');
+      await addMealLog(result.name, false, result.nutrition, undefined, undefined, 'ai', result.itemsBreakdown);
       setFoodText('');
 
-      const modeBadge = result.isOnlineAI ? '🟢 Cloud AI' : '🟡 Smart Local';
-      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) dicatat via ${modeBadge}!`);
-    } catch (error) {
-      console.error('Error logging meal via AI:', error);
+      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) berhasil dicatat via Gemini 2.5 Flash Cloud AI!`);
+    } catch (error: any) {
+      setErrorMsg(error.message || 'Gagal memproses kalori makanan.');
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export const LoggerScreen: React.FC = () => {
           <View style={[styles.aiStatusBadge, { backgroundColor: aiStatus.color + '18', borderColor: aiStatus.color + '40' }]}>
             <View style={[styles.statusDot, { backgroundColor: aiStatus.color }]} />
             <Text style={[styles.statusBadgeText, { color: aiStatus.color }]}>
-              {aiStatus.isOnline ? 'AI Online' : 'Local AI'}
+              {aiStatus.isOnline ? 'Cloud AI' : 'Belum Set API'}
             </Text>
           </View>
         </View>
@@ -101,7 +102,7 @@ export const LoggerScreen: React.FC = () => {
           >
             <Sparkles size={16} color={inputMode === 'ai' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
             <Text style={[styles.tabText, inputMode === 'ai' && styles.tabTextActive]}>
-              Gemini AI Estimator
+              Gemini AI Cloud
             </Text>
           </TouchableOpacity>
 
@@ -124,15 +125,19 @@ export const LoggerScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Error Message Banner */}
+        {errorMsg !== '' && (
+          <View style={styles.errorBanner}>
+            <AlertCircle size={18} color="#EF4444" />
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        )}
+
         {inputMode === 'ai' ? (
           <GlassCard>
             {/* AI Mode Banner */}
             <View style={[styles.aiModeBar, { backgroundColor: aiStatus.color + '12' }]}>
-              {aiStatus.isOnline ? (
-                <Wifi size={16} color="#10B981" />
-              ) : (
-                <WifiOff size={16} color="#F59E0B" />
-              )}
+              <Wifi size={16} color={aiStatus.color} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.aiModeTitle, { color: aiStatus.color }]}>
                   {aiStatus.modeLabel}
@@ -149,7 +154,10 @@ export const LoggerScreen: React.FC = () => {
               multiline={true}
               numberOfLines={4}
               value={foodText}
-              onChangeText={setFoodText}
+              onChangeText={(text) => {
+                setFoodText(text);
+                if (errorMsg) setErrorMsg('');
+              }}
             />
 
             <TouchableOpacity
@@ -162,7 +170,7 @@ export const LoggerScreen: React.FC = () => {
               ) : (
                 <>
                   <Sparkles size={18} color="#FFFFFF" />
-                  <Text style={styles.submitBtnText}>Hitung Kalori dengan AI</Text>
+                  <Text style={styles.submitBtnText}>Hitung Kalori dengan Gemini AI</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -346,6 +354,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#10B981',
     flex: 1,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#F87171',
+    flex: 1,
+    lineHeight: 16,
   },
   label: {
     fontSize: 10,

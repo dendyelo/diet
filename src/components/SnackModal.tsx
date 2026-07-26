@@ -14,7 +14,7 @@ import {
 import { TRIGGER_OPTIONS } from '../utils/habitAnalytics';
 import { TriggerType, NutritionData, FoodItemBreakdown } from '../types';
 import { parseFoodNutritionWithAI } from '../services/aiService';
-import { X, Droplet, Cookie, Sparkles } from 'lucide-react-native';
+import { X, Droplet, Cookie, Sparkles, AlertCircle } from 'lucide-react-native';
 
 interface SnackModalProps {
   visible: boolean;
@@ -40,13 +40,15 @@ export const SnackModal: React.FC<SnackModalProps> = ({
   const [snackText, setSnackText] = useState<string>('');
   const [waterPrompted, setWaterPrompted] = useState<boolean>(false);
   const [loadingAI, setLoadingAI] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   const handleParseAndSubmit = async () => {
     if (!snackText.trim()) return;
 
     setLoadingAI(true);
+    setErrorMsg('');
     try {
-      // AI automatically determines the calories, macros, and item breakdown!
+      // 100% Gemini AI Cloud Determination
       const result = await parseFoodNutritionWithAI(snackText, userApiKey);
 
       onSubmitSnack(
@@ -57,9 +59,10 @@ export const SnackModal: React.FC<SnackModalProps> = ({
       );
 
       setSnackText('');
+      setErrorMsg('');
       onClose();
-    } catch (error) {
-      console.error('Error parsing snack with AI:', error);
+    } catch (error: any) {
+      setErrorMsg(error.message || 'Gagal menghitung cemilan dengan Gemini AI.');
     } finally {
       setLoadingAI(false);
     }
@@ -81,7 +84,7 @@ export const SnackModal: React.FC<SnackModalProps> = ({
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <Cookie size={20} color="#F59E0B" />
-              <Text style={styles.sheetTitle}>Catat Ngemil (Full AI)</Text>
+              <Text style={styles.sheetTitle}>Catat Ngemil (Gemini AI Cloud)</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <X size={20} color="rgba(255, 255, 255, 0.7)" />
@@ -89,6 +92,13 @@ export const SnackModal: React.FC<SnackModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            {errorMsg !== '' && (
+              <View style={styles.errorBox}>
+                <AlertCircle size={16} color="#EF4444" />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
             {/* Water Check Banner */}
             <View style={styles.waterBanner}>
               <Droplet size={18} color="#3B82F6" />
@@ -151,10 +161,13 @@ export const SnackModal: React.FC<SnackModalProps> = ({
               multiline={true}
               numberOfLines={3}
               value={snackText}
-              onChangeText={setSnackText}
+              onChangeText={(text) => {
+                setSnackText(text);
+                if (errorMsg) setErrorMsg('');
+              }}
             />
             <Text style={styles.hintText}>
-              💡 AI akan otomatis menghitung kalori & nutrisinya. Anda selalu bisa mengeditnya di riwayat nanti!
+              💡 Gemini AI Cloud akan otomatis menghitung kalori & nutrisinya secara presisi. Anda selalu bisa mengeditnya di riwayat nanti!
             </Text>
 
             {/* Submit Button */}
@@ -168,7 +181,7 @@ export const SnackModal: React.FC<SnackModalProps> = ({
               ) : (
                 <>
                   <Sparkles size={18} color="#FFFFFF" />
-                  <Text style={styles.submitBtnText}>Hitung & Simpan dengan AI</Text>
+                  <Text style={styles.submitBtnText}>Hitung & Simpan dengan Gemini AI</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -206,12 +219,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sheetTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   closeBtn: {
     padding: 4,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#F87171',
+    flex: 1,
+    lineHeight: 16,
   },
   waterBanner: {
     flexDirection: 'row',

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { parseFoodNutritionWithAI } from '../services/aiService';
 import { NutritionData, FoodItemBreakdown } from '../types';
-import { X, Sparkles, Clock, Utensils } from 'lucide-react-native';
+import { X, Sparkles, Clock, Utensils, AlertCircle } from 'lucide-react-native';
 
 interface AddMealModalProps {
   visible: boolean;
@@ -43,22 +43,23 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
   const [foodText, setFoodText] = useState<string>('');
   const [selectedTimeOffset, setSelectedTimeOffset] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   const handleParseAndSave = async () => {
     if (!foodText.trim()) return;
 
     setLoading(true);
+    setErrorMsg('');
     try {
       const result = await parseFoodNutritionWithAI(foodText, userApiKey);
-
-      // Calculate timestamp based on back-dating selection
       const timestamp = new Date(Date.now() - selectedTimeOffset * 60 * 1000).toISOString();
 
       onSaveMeal(result.name, result.nutrition, timestamp, result.itemsBreakdown);
       setFoodText('');
+      setErrorMsg('');
       onClose();
-    } catch (error) {
-      console.error('Error parsing meal:', error);
+    } catch (error: any) {
+      setErrorMsg(error.message || 'Gagal menghitung kalori dengan Gemini AI.');
     } finally {
       setLoading(false);
     }
@@ -74,7 +75,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <Utensils size={20} color="#60A5FA" />
-              <Text style={styles.sheetTitle}>Catat Makanan Utama</Text>
+              <Text style={styles.sheetTitle}>Catat Makanan (Gemini AI Cloud)</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <X size={20} color="rgba(255, 255, 255, 0.7)" />
@@ -82,6 +83,13 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            {errorMsg !== '' && (
+              <View style={styles.errorBox}>
+                <AlertCircle size={16} color="#EF4444" />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
             {/* Time Picker Back-Dating */}
             <Text style={styles.sectionLabel}>KAPAN ANDA MAKAN INI?</Text>
             <View style={styles.timeGrid}>
@@ -111,10 +119,13 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
               multiline={true}
               numberOfLines={4}
               value={foodText}
-              onChangeText={setFoodText}
+              onChangeText={(text) => {
+                setFoodText(text);
+                if (errorMsg) setErrorMsg('');
+              }}
             />
             <Text style={styles.hintText}>
-              💡 AI akan otomatis merinci kalori masing-masing item (nasi: x kcal, telur: x kcal, ayam: x kcal).
+              💡 Gemini AI Cloud akan otomatis merinci kalori masing-masing item (nasi: x kcal, telur: x kcal, ayam: x kcal).
             </Text>
 
             {/* Submit Button */}
@@ -128,7 +139,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
               ) : (
                 <>
                   <Sparkles size={18} color="#FFFFFF" />
-                  <Text style={styles.submitBtnText}>Hitung & Simpan dengan AI</Text>
+                  <Text style={styles.submitBtnText}>Hitung & Simpan dengan Gemini AI</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -166,12 +177,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sheetTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   closeBtn: {
     padding: 4,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#F87171',
+    flex: 1,
+    lineHeight: 16,
   },
   sectionLabel: {
     fontSize: 10,

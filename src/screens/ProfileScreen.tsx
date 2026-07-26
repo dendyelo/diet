@@ -7,13 +7,14 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
+  Linking,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { calculateBMR, calculateTDEE, BODY_TYPE_INFO } from '../utils/calorieCalc';
 import { getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
 import { BodyType } from '../types';
-import { Key, Save, CheckCircle2, Wifi, Activity } from 'lucide-react-native';
+import { Key, Save, CheckCircle2, Wifi, Activity, ExternalLink } from 'lucide-react-native';
 
 export const ProfileScreen: React.FC = () => {
   const { profile, updateProfile } = useApp();
@@ -33,6 +34,10 @@ export const ProfileScreen: React.FC = () => {
   const bmr = calculateBMR({ ...profile, weightKg: Number(weight) || 70, heightCm: Number(height) || 170, age: Number(age) || 26, gender, bodyType });
   const tdee = calculateTDEE({ ...profile, weightKg: Number(weight) || 70, heightCm: Number(height) || 170, age: Number(age) || 26, gender, bodyType });
   const aiStatus = getAIStatus(apiKey);
+
+  const handleOpenGoogleAIStudio = () => {
+    Linking.openURL('https://aistudio.google.com/app/apikey');
+  };
 
   const handleSave = async () => {
     const parsedAge = Math.min(100, Math.max(10, parseInt(age, 10) || 26));
@@ -219,8 +224,15 @@ export const ProfileScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* Create Free Gemini API Key Link Button */}
+          <TouchableOpacity style={styles.createKeyLinkBtn} onPress={handleOpenGoogleAIStudio}>
+            <Key size={14} color="#10B981" />
+            <Text style={styles.createKeyLinkText} numberOfLines={1}>🔑 Buat API Key Gratis di Google AI Studio</Text>
+            <ExternalLink size={12} color="#10B981" />
+          </TouchableOpacity>
+
           <Text style={styles.hint}>
-            Masukkan API Key Gemini AI milik Anda (Gratis dari Google AI Studio) untuk mengaktifkan obrolan AI Coach Cloud.
+            Masukkan API Key Gemini AI milik Anda untuk mengaktifkan obrolan AI Coach Cloud.
           </Text>
           <TextInput
             style={styles.input}
@@ -370,6 +382,25 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 1,
     lineHeight: 14,
+  },
+  createKeyLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    marginBottom: 10,
+  },
+  createKeyLinkText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#10B981',
+    flex: 1,
   },
   label: {
     fontSize: 9,

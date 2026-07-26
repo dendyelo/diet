@@ -19,7 +19,7 @@ import {
   getTrendInfo,
   getChangeColor,
 } from '../utils/weightAnalytics';
-import { Scale, Plus, Activity } from 'lucide-react-native';
+import { Scale, Plus, Activity, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react-native';
 
 const MONTH_NAMES_ID = [
   'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des',
@@ -46,9 +46,26 @@ export const WeightScreen: React.FC = () => {
 
   const targetKg = profile?.targetWeightKg ?? 65;
 
+  // Explicit newest-first sorting for list
+  const sortedLogs = useMemo(() => {
+    return [...weightLogs].sort(
+      (a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime()
+    );
+  }, [weightLogs]);
+
   const summary = useMemo(
     () => buildWeightSummary(weightLogs, targetKg),
     [weightLogs, targetKg]
+  );
+
+  const trendInfo = useMemo(
+    () => getTrendInfo(summary.trend, summary.isGainGoal, colors),
+    [summary.trend, summary.isGainGoal, colors]
+  );
+
+  const changeColor = useMemo(
+    () => getChangeColor(summary.changeFromStart, summary.isGainGoal, colors),
+    [summary.changeFromStart, summary.isGainGoal, colors]
   );
 
   const chartData = useMemo(
@@ -77,7 +94,7 @@ export const WeightScreen: React.FC = () => {
           <Text style={{ ...typography.caption, color: colors.textTertiary, marginTop: 2 }}>Pantau progres dan tren berat badan Anda</Text>
         </View>
 
-        {/* Ringkasan Berat */}
+        {/* Ringkasan Berat 2x2 Grid */}
         <Surface style={{ padding: spacing.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md }}>
             <Scale size={16} color={colors.primary} />
@@ -87,6 +104,7 @@ export const WeightScreen: React.FC = () => {
           </View>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
+            {/* Top-Left: Latest Weight */}
             <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
               <Text style={{ ...typography.caption, color: colors.textTertiary }}>BERAT TERBARU</Text>
               <Text style={{ ...typography.h1, color: colors.textPrimary, marginTop: 4 }}>
@@ -94,16 +112,36 @@ export const WeightScreen: React.FC = () => {
               </Text>
             </View>
 
+            {/* Top-Right: Change */}
             <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
               <Text style={{ ...typography.caption, color: colors.textTertiary }}>PERUBAHAN</Text>
-              <Text style={{ ...typography.h1, color: getChangeColor(summary.changeFromStart, true), marginTop: 4 }}>
+              <Text style={{ ...typography.h1, color: changeColor, marginTop: 4 }}>
                 {summary.changeFromStart !== null ? `${summary.changeFromStart > 0 ? '+' : ''}${summary.changeFromStart.toFixed(1)} kg` : '-'}
+              </Text>
+            </View>
+
+            {/* Bottom-Left: MA-7 Hari */}
+            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>MA-7 HARI</Text>
+              <Text style={{ ...typography.h2, color: colors.info, marginTop: 4 }}>
+                {summary.movingAverage7 !== null ? `${summary.movingAverage7.toFixed(1)} kg` : '-'}
+              </Text>
+            </View>
+
+            {/* Bottom-Right: Trend Direction */}
+            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>TREN</Text>
+              <Text style={{ ...typography.h2, color: trendInfo.color, marginTop: 4 }}>
+                {trendInfo.emoji} {trendInfo.label}
               </Text>
             </View>
           </View>
 
-          {/* Progres Target */}
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: 4 }}>Progres Menuju Target ({targetKg} kg)</Text>
+          {/* Progres Target with Percentage Text */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>Progres Menuju Target ({targetKg} kg)</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>{summary.progressPercent}%</Text>
+          </View>
           <View style={{ height: 8, backgroundColor: colors.surfaceElevated, borderRadius: 4, overflow: 'hidden' }}>
             <View style={{ height: '100%', backgroundColor: colors.primary, width: `${Math.min(100, Math.max(0, summary.progressPercent))}%` }} />
           </View>
@@ -121,10 +159,10 @@ export const WeightScreen: React.FC = () => {
               {([7, 30, 90] as const).map((p) => (
                 <TouchableOpacity
                   key={p}
-                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm - 4, backgroundColor: chartPeriod === p ? colors.primary : 'transparent' }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm - 4, backgroundColor: chartPeriod === p ? colors.primary : 'transparent', minHeight: 44, justifyContent: 'center' }}
                   onPress={() => setChartPeriod(p)}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: chartPeriod === p ? '#FFFFFF' : colors.textTertiary }}>{p}H</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: chartPeriod === p ? colors.onPrimary : colors.textTertiary }}>{p}H</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -135,32 +173,53 @@ export const WeightScreen: React.FC = () => {
 
         {/* Catat Berat Button */}
         <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: radius.md }}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: radius.md, minHeight: 44 }}
           onPress={() => setShowAddModal(true)}
         >
-          <Plus size={18} color="#FFFFFF" />
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Catat Berat Badan</Text>
+          <Plus size={18} color={colors.onPrimary} />
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onPrimary }}>Catat Berat Badan</Text>
         </TouchableOpacity>
 
-        {/* Riwayat */}
+        {/* Riwayat Log List */}
         <Surface style={{ padding: spacing.md }}>
           <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
-            Riwayat Pencatatan
+            Riwayat Pencatatan ({sortedLogs.length})
           </Text>
 
-          {weightLogs.slice(0, 20).map((log) => (
-            <TouchableOpacity
-              key={log.id}
-              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider }}
-              onPress={() => handleOpenEdit(log)}
-            >
-              <View>
-                <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>{formatDateID(log.recordedAt)}</Text>
-                {log.note ? <Text style={{ ...typography.caption, color: colors.textTertiary, fontStyle: 'italic', marginTop: 2 }}>{log.note}</Text> : null}
-              </View>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>{log.weightKg.toFixed(1)} kg</Text>
-            </TouchableOpacity>
-          ))}
+          {sortedLogs.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: spacing.md, gap: 8 }}>
+              <Scale size={24} color={colors.textTertiary} />
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Belum ada data berat badan.</Text>
+            </View>
+          ) : (
+            sortedLogs.slice(0, 20).map((log, index) => {
+              const prevLog = sortedLogs[index + 1];
+              const changeDelta = prevLog ? Math.round((log.weightKg - prevLog.weightKg) * 10) / 10 : null;
+              const deltaColor = getChangeColor(changeDelta, summary.isGainGoal, colors);
+
+              return (
+                <TouchableOpacity
+                  key={log.id}
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider, minHeight: 44 }}
+                  onPress={() => handleOpenEdit(log)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>{formatDateID(log.recordedAt)}</Text>
+                    {log.note ? <Text style={{ ...typography.caption, color: colors.textTertiary, fontStyle: 'italic', marginTop: 2 }}>{log.note}</Text> : null}
+                  </View>
+
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>{log.weightKg.toFixed(1)} kg</Text>
+                    {changeDelta !== null ? (
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: deltaColor, marginTop: 2 }}>
+                        {changeDelta > 0 ? `+${changeDelta.toFixed(1)}` : `${changeDelta.toFixed(1)}`} kg
+                      </Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </Surface>
       </ScrollView>
 

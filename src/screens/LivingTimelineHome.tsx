@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,22 @@ import {
   useMeals,
   useWeight,
   useHealth,
+  useAI,
   useTheme,
 } from '../context/AppContext';
 import { Surface } from '../components/Surface';
 import { DailyMissionCard } from '../components/DailyMissionCard';
 import { InlineCoachCard } from '../components/InlineCoachCard';
+import { EatingTimer } from '../components/EatingTimer';
+import { EnergyGauge } from '../components/EnergyGauge';
+import { HabitRings } from '../components/HabitRings';
+import { MealCard } from '../components/MealCard';
+import { SnackModal } from '../components/SnackModal';
+import { EditMealModal } from '../components/EditMealModal';
 import { calculateTargetCalories, calculateTargetProtein } from '../utils/calorieCalc';
-import { MealLog } from '../types';
-import { Utensils, Plus, Droplets, Footprints, Dumbbell } from 'lucide-react-native';
+import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
+import { Utensils, Plus, Droplets, Footprints, Dumbbell, Cookie, Sparkles, AlertCircle } from 'lucide-react-native';
+import { triggerHaptic } from '../utils/haptics';
 
 interface LivingTimelineHomeProps {
   onOpenAddMeal: () => void;
@@ -31,12 +39,17 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
   onOpenAICoachChat,
 }) => {
   const { profile } = useProfile();
-  const { todayLogs, totalCaloriesIn } = useMeals();
-  const { waterGlasses, steps, addWaterGlass } = useHealth();
-  const { weightLogs } = useWeight();
+  const { todayLogs, totalCaloriesIn, snackCount, addMealLog, updateMealLog, deleteMealLog } = useMeals();
+  const { waterGlasses, steps, fastingState, energy, addWaterGlass, resetFastingTimer } = useHealth();
+  const { userApiKey } = useAI();
   const { colors, spacing, radius, typography } = useTheme();
 
+  const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
+  const [editingLog, setEditingLog] = useState<MealLog | null>(null);
+
   const currentHour = new Date().getHours();
+  const elapsedSeconds = fastingState?.elapsedSeconds || 0;
+  const hasMealRecorded = fastingState?.hasMealRecorded ?? true;
 
   // Dynamic Target Calculations
   const targetCalories = useMemo(() => calculateTargetCalories(profile), [profile]);
@@ -50,8 +63,26 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
     return todayLogs.reduce((acc: number, m: MealLog) => acc + (m.nutrition.proteinGrams || 0), 0);
   }, [todayLogs]);
 
+  // Smart Activity Advice Rule
+  const activityAdvice = useMemo(() => {
+    if (steps < 4000 && caloriesIn > 1500) {
+      return `Langkahmu masih ${steps.toLocaleString()} langkah. Luangkan 15 menit jalan santai untuk membantu pencernaan & membakar kalori.`;
+    }
+    return null;
+  }, [steps, caloriesIn]);
+
   // Contextual Coach Advice based on time & user logging state
   const timeState = useMemo(() => {
+    if (activityAdvice) {
+      return {
+        greeting: `Selamat ${currentHour < 12 ? 'Pagi' : currentHour < 18 ? 'Siang' : 'Malam'}, ${profile.name || 'Teman'} ✨`,
+        subtitle: 'Saran aktivitas ringan untuk hari ini.',
+        advice: activityAdvice,
+        actionLabel: '+ Jalan 15 Mnt',
+        onAction: () => triggerHaptic('medium'),
+      };
+    }
+
     if (currentHour >= 5 && currentHour < 12) {
       if (todayLogs.length > 0) {
         return {
@@ -59,7 +90,10 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
           subtitle: 'Sarapanmu sudah tercatat. Siap melangkah hari ini!',
           advice: `Bagus! Proteinmu sudah ${Math.round(proteinGrams)}g pagi ini. Pertahankan hidrasi harian.`,
           actionLabel: '+ Minum Air',
-          onAction: () => addWaterGlass(),
+          onAction: () => {
+            triggerHaptic('light');
+            addWaterGlass();
+          },
         };
       }
       return {
@@ -85,7 +119,10 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         subtitle: 'Berikut ringkasan energimu sejauh ini.',
         advice: `Mantap! Target protein tercapai (${Math.round(proteinGrams)}g). Ingat minum air putih di sela aktivitas.`,
         actionLabel: '+ Minum Air',
-        onAction: () => addWaterGlass(),
+        onAction: () => {
+          triggerHaptic('light');
+          addWaterGlass();
+        },
       };
     } else {
       return {
@@ -98,15 +135,39 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onAction: onOpenAddMeal,
       };
     }
-  }, [currentHour, profile.name, todayLogs.length, proteinGrams, targetProtein, netDeficit, onOpenAddMeal, addWaterGlass]);
+  }, [currentHour, profile.name, todayLogs.length, proteinGrams, targetProtein, netDeficit, activityAdvice, onOpenAddMeal, addWaterGlass]);
+
+  const handleAddSnackSubmit = async (
+    name: string,
+    nutrition: NutritionData,
+    trigger: TriggerType,
+    itemsBreakdown?: FoodItemBreakdown[]
+  ) => {
+    triggerHaptic('success');
+    await addMealLog(name, true, nutrition, trigger, undefined, 'ai', itemsBreakdown);
+  };
+
+  const handleStartFastingNow = async () => {
+    triggerHaptic('medium');
+    await resetFastingTimer(new Date().toISOString());
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: spacing.md, paddingTop: 50, paddingBottom: 100 }}>
-      {/* 1. Greeting Head */}
+      {/* 1. Greeting Head & Cheat Day Badge */}
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ ...typography.h1, color: colors.textPrimary, marginBottom: spacing.xs }}>
-          {timeState.greeting}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+          <Text style={{ ...typography.h1, color: colors.textPrimary, flex: 1 }}>
+            {timeState.greeting}
+          </Text>
+
+          {profile?.isCheatDay && (
+            <View style={{ backgroundColor: colors.warningSubtle, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.warning }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>🍕 CHEAT DAY MODE</Text>
+            </View>
+          )}
+        </View>
+
         <Text style={{ ...typography.caption, color: colors.textTertiary }}>
           {timeState.subtitle}
         </Text>
@@ -164,10 +225,37 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         </Surface>
       </View>
 
-      {/* Breathing Room Spacing */}
-      <View style={{ height: spacing.sm }} />
+      {/* 2. Fasting / Eating Timer Component */}
+      <EatingTimer
+        elapsedSeconds={elapsedSeconds}
+        hasMealRecorded={hasMealRecorded}
+        onEditTimePress={onOpenAddMeal}
+        onStartFastingNow={handleStartFastingNow}
+      />
 
-      {/* 2. Concise Health Coach Card */}
+      {/* 3. Energy Balance Gauge Component */}
+      {energy && (
+        <EnergyGauge
+          caloriesIn={caloriesIn}
+          caloriesOut={energy.totalCaloriesOut}
+          dailyBMR={energy.dailyBMR}
+          elapsedBMR={energy.elapsedBMR}
+          stepCalories={energy.stepCalories}
+          netBalance={energy.netBalance}
+          targetDeficit={energy.targetDeficit}
+          isDeficit={energy.isDeficit}
+          isCheatDay={profile?.isCheatDay}
+        />
+      )}
+
+      {/* 4. Triple Habit Rings Component */}
+      <HabitRings
+        percentageDeficit={energy?.percentageToGoal || 0}
+        snackCount={snackCount || 0}
+        waterGlasses={waterGlasses || 0}
+      />
+
+      {/* 5. Health Coach Advice Card */}
       <InlineCoachCard
         adviceText={timeState.advice}
         actionLabel={timeState.actionLabel}
@@ -175,9 +263,42 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onOpenChatPress={onOpenAICoachChat}
       />
 
-      <View style={{ height: spacing.sm }} />
+      {/* 6. Quick Health Logging Buttons */}
+      <Surface style={{ padding: spacing.md, marginVertical: spacing.xs }}>
+        <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
+          PENCATATAN HARIAN CEPAT
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.xs + 4 }}>
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: colors.infoSubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' }}
+            onPress={() => {
+              triggerHaptic('light');
+              addWaterGlass();
+            }}
+          >
+            <Droplets size={16} color={colors.info} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.info }}>+1 Air</Text>
+          </TouchableOpacity>
 
-      {/* 3. Daily Mission Checklist */}
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: colors.warningSubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' }}
+            onPress={() => setShowSnackModal(true)}
+          >
+            <Cookie size={16} color={colors.warning} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Snack</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: colors.primarySubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' }}
+            onPress={onOpenAddMeal}
+          >
+            <Utensils size={16} color={colors.primary} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>Makanan</Text>
+          </TouchableOpacity>
+        </View>
+      </Surface>
+
+      {/* 7. Daily Mission Checklist */}
       <DailyMissionCard
         waterGlasses={waterGlasses}
         stepCount={steps}
@@ -188,15 +309,13 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onAddWater={() => addWaterGlass()}
       />
 
-      <View style={{ height: spacing.sm }} />
-
-      {/* 4. Section "Makanan Hari Ini" */}
+      {/* 8. Today's Meal Timeline Journal (With Edit & Delete) */}
       <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
         <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: 4 }}>
-          Makanan Hari Ini
+          Makanan Hari Ini ({todayLogs.length})
         </Text>
 
-        {todayLogs.length === 0 && (
+        {todayLogs.length === 0 ? (
           <Surface style={{ alignItems: 'center', paddingVertical: 20, gap: 10 }}>
             <Text style={{ fontSize: 13, color: colors.textTertiary }}>
               Belum ada makanan dicatat hari ini.
@@ -212,6 +331,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
                 borderRadius: radius.sm,
                 borderWidth: 1,
                 borderColor: colors.primarySubtle,
+                minHeight: 44,
               }}
               onPress={onOpenAddMeal}
             >
@@ -221,25 +341,35 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
               </Text>
             </TouchableOpacity>
           </Surface>
+        ) : (
+          todayLogs.map((log: MealLog) => (
+            <MealCard
+              key={log.id}
+              log={log}
+              onEdit={(item) => setEditingLog(item)}
+              onDelete={(id) => deleteMealLog(id)}
+            />
+          ))
         )}
-
-        {todayLogs.map((meal: MealLog) => (
-          <Surface key={meal.id} style={{ padding: 14, marginVertical: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primarySubtle, alignItems: 'center', justifyContent: 'center' }}>
-                <Utensils size={16} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>{meal.name}</Text>
-                <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
-                  {new Date(meal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>{meal.nutrition.calories} kcal</Text>
-            </View>
-          </Surface>
-        ))}
       </View>
+
+      {/* Modals */}
+      <SnackModal
+        visible={showSnackModal}
+        onClose={() => setShowSnackModal(false)}
+        onSubmitSnack={handleAddSnackSubmit}
+        onDrinkWater={() => addWaterGlass()}
+        userApiKey={userApiKey}
+      />
+
+      <EditMealModal
+        visible={editingLog !== null}
+        log={editingLog}
+        onClose={() => setEditingLog(null)}
+        onSaveUpdate={async (id, updatedFields) => {
+          await updateMealLog(id, updatedFields);
+        }}
+      />
     </ScrollView>
   );
 };

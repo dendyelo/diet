@@ -18,6 +18,7 @@ import { AICoachChatModal } from './src/components/AICoachChatModal';
 import { QuickActionMenu } from './src/components/QuickActionMenu';
 import { Home, TrendingUp, Plus, User } from 'lucide-react-native';
 import { triggerHaptic } from './src/utils/haptics';
+import { calculateTargetCalories } from './src/utils/calorieCalc';
 
 type TabName = 'home' | 'progress' | 'profile';
 
@@ -34,6 +35,9 @@ const MainNavigator: React.FC = () => {
   const { weightLogs, addWeightLog } = useWeight();
   const { userApiKey, parseFoodNutrition } = useAI();
   const { colors, isDark } = useTheme();
+
+  const targetCalories = calculateTargetCalories(profile);
+  const calculatedNetDeficit = targetCalories - (totalCaloriesIn || 0);
 
   const handleTabPress = (tab: TabName) => {
     triggerHaptic('light');
@@ -149,6 +153,7 @@ const MainNavigator: React.FC = () => {
         onSave={async (weightKg, note) => {
           triggerHaptic('medium');
           await addWeightLog(weightKg, note);
+          setShowAddWeight(false);
         }}
         lastWeight={latestWeight}
       />
@@ -161,7 +166,7 @@ const MainNavigator: React.FC = () => {
         userContext={{
           fastingHours: Math.floor((fastingState?.elapsedSeconds || 0) / 3600),
           caloriesIn: totalCaloriesIn || 0,
-          netDeficit: 500,
+          netDeficit: calculatedNetDeficit,
           steps: steps || 0,
           waterGlasses: waterGlasses || 0,
         }}

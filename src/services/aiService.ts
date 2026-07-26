@@ -24,16 +24,16 @@ export function getAIStatus(userApiKey?: string): AIStatus {
   if (userApiKey && userApiKey.trim().length > 0) {
     return {
       isOnline: true,
-      modeLabel: 'Gemini AI Cloud (Online)',
+      modeLabel: 'Gemini AI Cloud (Online - Ultra Smart)',
       color: '#10B981',
-      description: 'Presisi tinggi menggunakan model Gemini 2.5 Flash Cloud dengan deteksi kuantitas presisi.',
+      description: 'Presisi tinggi dengan analisis metode memasak, santan, minyak & porsi presisi.',
     };
   }
   return {
     isOnline: false,
-    modeLabel: 'Smart Local Engine (Offline)',
+    modeLabel: 'Smart Local Engine (Offline - Culinary DB)',
     color: '#F59E0B',
-    description: 'Estimasi gizi akurat berbasis deteksi kuantitas & porsi makanan di HP.',
+    description: 'Estimasi gizi akurat berbasis kecerdasan kuliner lokal & porsi makanan di HP.',
   };
 }
 
@@ -43,14 +43,12 @@ export function getAIStatus(userApiKey?: string): AIStatus {
 function parseItemQuantity(text: string): number {
   const lower = text.toLowerCase().trim();
 
-  // Explicit word quantity checks
   if (lower.includes('setengah') || lower.includes('1/2')) return 0.5;
   if (lower.includes('dua') || lower.includes('sepasang') || lower.includes('2x') || lower.includes('2 ')) return 2;
   if (lower.includes('tiga') || lower.includes('3x') || lower.includes('3 ')) return 3;
   if (lower.includes('empat') || lower.includes('4x') || lower.includes('4 ')) return 4;
   if (lower.includes('lima') || lower.includes('5x') || lower.includes('5 ')) return 5;
 
-  // Regex number match at start or before keywords like "butir", "potong", "telur", "biji", "buah", "pcs"
   const numMatch = lower.match(/(\d+)\s*(butir|potong|biji|buah|pcs|porsi|telur|mangkok|centong)?/i);
   if (numMatch && numMatch[1]) {
     const parsed = parseInt(numMatch[1], 10);
@@ -63,9 +61,9 @@ function parseItemQuantity(text: string): number {
 }
 
 /**
- * Smart Fallback Estimator for local Indonesian foods with Quantity-Aware calculation
+ * Ultra-Smart Fallback Estimator for Indonesian & Asian Culinary Items with Cooking Method Analysis
  */
-function heuristicIndonesianFoodEstimator(foodText: string): AIFoodResult {
+function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
   const lower = foodText.toLowerCase();
 
   const items: FoodItemBreakdown[] = [];
@@ -88,63 +86,98 @@ function heuristicIndonesianFoodEstimator(foodText: string): AIFoodResult {
       let unitFat = 5;
       let displayLabel = part;
 
+      // Cooking method modifier
+      let oilFatAdd = 0;
+      if (pLower.includes('goreng') || pLower.includes('crispy') || pLower.includes('tepung')) {
+        oilFatAdd = 6; // Extra fat from deep frying
+      } else if (pLower.includes('santan') || pLower.includes('gulai') || pLower.includes('rendang')) {
+        oilFatAdd = 8; // Extra saturated fat from coconut milk
+      }
+
+      // Sugar modifier for drinks
+      let sugarAdd = 0;
+      if (pLower.includes('less sugar')) {
+        sugarAdd = -15;
+      } else if (pLower.includes('no sugar') || pLower.includes('tawar') || pLower.includes('zero')) {
+        sugarAdd = -30;
+      }
+
       if (pLower.includes('telur')) {
-        unitCal = pLower.includes('goreng') || pLower.includes('dadar') ? 110 : 80;
+        const isFried = pLower.includes('goreng') || pLower.includes('dadar') || pLower.includes('ceplok');
+        unitCal = isFried ? 110 : 78;
         unitProtein = 7;
         unitCarbs = 1;
-        unitFat = unitCal === 110 ? 8 : 5;
+        unitFat = isFried ? 8 : 5;
         displayLabel = `${qty} Butir Telur${pLower.includes('dadar') ? ' Dadar' : pLower.includes('ceplok') ? ' Ceplok' : ' Rebus'}`;
+      } else if (pLower.includes('nasi uduk') || pLower.includes('nasi kuning')) {
+        unitCal = 260; // Coconut rice
+        unitProtein = 5;
+        unitCarbs = 46;
+        unitFat = 7;
+        displayLabel = `${qty > 1 ? qty + ' Centong ' : ''}Nasi Uduk/Kuning`;
       } else if (pLower.includes('nasi')) {
-        unitCal = pLower.includes('setengah') ? 100 : 200;
+        const isHalf = pLower.includes('setengah') || pLower.includes('dikit');
+        unitCal = isHalf ? 100 : 200;
         unitProtein = 4;
-        unitCarbs = 44;
+        unitCarbs = isHalf ? 22 : 44;
         unitFat = 1;
         displayLabel = `${qty > 1 ? qty + ' Centong ' : ''}Nasi Putih`;
       } else if (pLower.includes('ayam')) {
-        unitCal = pLower.includes('bakar') ? 220 : pLower.includes('goreng') ? 250 : 200;
-        unitProtein = 25;
-        unitCarbs = 2;
-        unitFat = 10;
-        displayLabel = `${qty > 1 ? qty + ' Potong ' : ''}Ayam ${pLower.includes('bakar') ? 'Bakar' : 'Goreng'}`;
+        const isBreast = pLower.includes('dada');
+        const isCrispy = pLower.includes('geprek') || pLower.includes('crispy') || pLower.includes('kentucky');
+        unitCal = isCrispy ? 320 : pLower.includes('bakar') ? (isBreast ? 200 : 230) : 260;
+        unitProtein = isBreast ? 32 : 24;
+        unitCarbs = isCrispy ? 15 : 2;
+        unitFat = isCrispy ? 18 : pLower.includes('bakar') ? 8 : 14;
+        displayLabel = `${qty > 1 ? qty + ' Potong ' : ''}Ayam ${pLower.includes('bakar') ? 'Bakar' : isCrispy ? 'Geprek/Crispy' : 'Goreng'}`;
       } else if (pLower.includes('tahu') || pLower.includes('tempe')) {
-        unitCal = 90;
+        const isBacem = pLower.includes('bacem');
+        unitCal = isBacem ? 120 : 90;
         unitProtein = 6;
-        unitCarbs = 8;
+        unitCarbs = isBacem ? 14 : 8;
         unitFat = 5;
-        displayLabel = `${qty > 1 ? qty + ' Potong ' : ''}${pLower.includes('tahu') ? 'Tahu' : 'Tempe'}`;
+        displayLabel = `${qty > 1 ? qty + ' Potong ' : ''}${pLower.includes('tahu') ? 'Tahu' : 'Tempe'}${isBacem ? ' Bacem' : ''}`;
+      } else if (pLower.includes('soto') || pLower.includes('sop')) {
+        const hasSantan = pLower.includes('betawi') || pLower.includes('santan');
+        unitCal = hasSantan ? 450 : 310;
+        unitProtein = 22;
+        unitCarbs = 18;
+        unitFat = hasSantan ? 26 : 10;
+        displayLabel = `Porsi ${pLower.includes('soto') ? 'Soto' : 'Sop'}${hasSantan ? ' Santan' : ' Bening'}`;
+      } else if (pLower.includes('boba') || pLower.includes('kopi manis') || pLower.includes('es teh manis')) {
+        unitCal = Math.max(50, (pLower.includes('boba') ? 380 : 180) + sugarAdd);
+        unitProtein = 2;
+        unitCarbs = Math.max(10, 45 + Math.round(sugarAdd / 4));
+        unitFat = pLower.includes('boba') ? 12 : 4;
+        displayLabel = `Minuman ${part}`;
+      } else if (pLower.includes('gado') || pLower.includes('pecel')) {
+        unitCal = 310;
+        unitProtein = 12;
+        unitCarbs = 30;
+        unitFat = 14;
+        displayLabel = `1 Porsi ${pLower.includes('gado') ? 'Gado-Gado' : 'Pecel'}`;
+      } else if (pLower.includes('rendang')) {
+        unitCal = 250;
+        unitProtein = 20;
+        unitCarbs = 6;
+        unitFat = 17;
+        displayLabel = `${qty > 1 ? qty + ' Potong ' : ''}Rendang Daging`;
       } else if (pLower.includes('sambal')) {
-        unitCal = 35;
+        unitCal = 40;
         unitProtein = 1;
         unitCarbs = 3;
         unitFat = 3;
         displayLabel = 'Sambal';
-      } else if (pLower.includes('sayur') || pLower.includes('sop') || pLower.includes('buncis')) {
-        unitCal = 65;
-        unitProtein = 2;
-        unitCarbs = 8;
-        unitFat = 2;
-        displayLabel = 'Sayuran';
-      } else if (pLower.includes('rendang')) {
-        unitCal = 240;
-        unitProtein = 18;
-        unitCarbs = 6;
-        unitFat = 16;
-        displayLabel = `${qty > 1 ? qty + ' Potong ' : ''}Rendang Daging`;
-      } else if (pLower.includes('kerupuk')) {
-        unitCal = 60;
-        unitProtein = 1;
-        unitCarbs = 8;
-        unitFat = 3;
-        displayLabel = `${qty > 1 ? qty + ' Biji ' : ''}Kerupuk`;
       }
 
-      const itemTotalCal = Math.round(unitCal * qty);
+      // Apply quantity and modifiers
+      const itemTotalCal = Math.round((unitCal + oilFatAdd * 9) * qty);
       items.push({ name: displayLabel, calories: itemTotalCal });
 
       totalCalories += itemTotalCal;
       totalProtein += Math.round(unitProtein * qty);
       totalCarbs += Math.round(unitCarbs * qty);
-      totalFat += Math.round(unitFat * qty);
+      totalFat += Math.round((unitFat + oilFatAdd) * qty);
     });
   }
 
@@ -166,14 +199,14 @@ function heuristicIndonesianFoodEstimator(foodText: string): AIFoodResult {
       fatGrams: totalFat,
     },
     confidence: 'medium',
-    aiNotes: 'Estimasi gizi berbasis deteksi kuantitas & porsi makanan.',
+    aiNotes: `Analisis cerdas metode pengolahan & porsi kuliner lokal.`,
     isOnlineAI: false,
     itemsBreakdown: items,
   };
 }
 
 /**
- * Estimate nutrition from food description using Gemini AI API with Quantity-Aware parsing
+ * Estimate nutrition from food description using Ultra-Smart Gemini AI API
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -186,33 +219,33 @@ export async function parseFoodNutritionWithAI(
 
   // If no Gemini API key provided, use smart Indonesian culinary heuristic estimator
   if (!userApiKey || userApiKey.trim() === '') {
-    return heuristicIndonesianFoodEstimator(cleanInput);
+    return smartIndonesianCulinaryEngine(cleanInput);
   }
 
   try {
-    const prompt = `Anda adalah ahli gizi spesialis kuliner Indonesia & internasional dengan presisi tinggi.
-Analisis deskripsi makanan/cemilan ini: "${cleanInput}".
+    const prompt = `Anda adalah Pakar Gizi & Ahli Kuliner Spesialis Makanan Indonesia & Internasional.
+Tugas Anda adalah melakukan bedah nutrisi ultra-presisi terhadap input pengguna: "${cleanInput}".
 
-PERHATIKAN SANGAT KETAT JUMLAH DAN KUANTITAS:
-- 1 Telur Rebus = 80 kcal, 2 Telur Rebus = 160 kcal, 3 Telur = 240 kcal.
-- 1 Telur Dadar = 110 kcal, 2 Telur Dadar = 220 kcal.
-- 1 Ayam Bakar = 220 kcal, 2 Ayam Bakar = 440 kcal.
-- 1 Centong Nasi = 200 kcal, 2 Centong Nasi = 400 kcal.
+ATURAN ANALISIS PINTAR:
+1. DETEKSI METODE MEMASAK: Bedakan Goreng Deep-Fry (minyak +80 kcal), Bakar/Panggang (rendah lemak), Santan/Gulai (lemak jenuh), Kukus/Rebus.
+2. DETEKSI KUANTITAS: 1 Telur Rebus = 78 kcal, 2 Telur Rebus = 156 kcal, 3 Telur = 234 kcal. 1 Ayam Bakar = 220 kcal, 2 Ayam Bakar = 440 kcal.
+3. DETEKSI MINUMAN & GULA: Bedakan Less Sugar (-30% kalori), Zero Sugar, dan Boba topping.
+4. BEDAH KOMPONEN HIDANGAN: Jika input adalah "Nasi Uduk Komplit", pecah menjadi: Nasi Uduk (Santan), Orek Tempe, Biun Goreng, Telur Suwir, Sambal.
 
-PISAHKAN setiap item makanan beserta JUMLAH KUANTITAS dan KALORI MASING-MASING SECARA AKURAT.
-Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
+Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan luar:
 {
-  "name": "nama gabungan makanan yang rapi",
-  "calories": 440,
+  "name": "Nama hidangan yang rapi dan profesional",
+  "calories": 520,
   "proteinGrams": 32,
   "carbsGrams": 48,
-  "fatGrams": 18,
+  "fatGrams": 16,
   "fiberGrams": 4,
   "itemsBreakdown": [
+    { "name": "1 Centong Nasi Putih", "calories": 200 },
     { "name": "2 Butir Telur Dadar", "calories": 220 },
-    { "name": "1 Centong Nasi Putih", "calories": 200 }
+    { "name": "Sambal Terasi", "calories": 40 }
   ],
-  "aiNotes": "catatan nutrisi presisi kuantitas 1 kalimat"
+  "aiNotes": "Catatan gizi pintar 1 kalimat (misal: 'Tinggi protein (32g), perhatikan kadar lemak dari gorengan.')"
 }`;
 
     const response = await fetch(
@@ -228,7 +261,7 @@ Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
 
     if (!response.ok) {
       console.warn('Gemini API request failed, falling back to local estimator');
-      return heuristicIndonesianFoodEstimator(cleanInput);
+      return smartIndonesianCulinaryEngine(cleanInput);
     }
 
     const data = await response.json();
@@ -258,7 +291,7 @@ Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
           fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
         },
         confidence: 'high',
-        aiNotes: parsed.aiNotes || 'Rincian kuantitas dihitung presisi oleh Gemini AI Cloud',
+        aiNotes: parsed.aiNotes || 'Analisis ultra-presisi oleh Gemini AI Cloud',
         isOnlineAI: true,
         itemsBreakdown: items,
       };
@@ -267,5 +300,5 @@ Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
     console.error('Error calling Gemini AI:', error);
   }
 
-  return heuristicIndonesianFoodEstimator(cleanInput);
+  return smartIndonesianCulinaryEngine(cleanInput);
 }

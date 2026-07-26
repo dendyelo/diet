@@ -20,6 +20,7 @@ import { AICoachChatModal } from '../components/AICoachChatModal';
 import { GlassCard } from '../components/GlassCard';
 import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
 import { Droplet, Footprints, Utensils, Cookie, Sparkles } from 'lucide-react-native';
+import { isSameLocalDay } from '../utils/date';
 
 export const HomeScreen: React.FC = () => {
   const {
@@ -40,8 +41,7 @@ export const HomeScreen: React.FC = () => {
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayLogs = (mealLogs || []).filter((log) => log.timestamp && log.timestamp.startsWith(todayStr));
+  const todayLogs = (mealLogs || []).filter((log) => log.timestamp && isSameLocalDay(log.timestamp));
 
   const totalCaloriesIn = todayLogs.reduce((acc, item) => acc + (item.nutrition?.calories || 0), 0);
   const snackCount = todayLogs.filter((item) => item.isSnack).length;
@@ -95,12 +95,12 @@ export const HomeScreen: React.FC = () => {
         {/* 3. Live Synchronized Energy Balance Gauge */}
         <EnergyGauge
           caloriesIn={totalCaloriesIn}
-          caloriesOut={energy?.totalCaloriesOut || 1600}
-          dailyBMR={energy?.dailyBMR || 1600}
-          elapsedBMR={energy?.elapsedBMR || 800}
-          stepCalories={energy?.stepCalories || 0}
-          netBalance={energy?.netBalance || 0}
-          targetDeficit={energy?.targetDeficit || 500}
+          caloriesOut={energy?.totalCaloriesOut ?? 0}
+          dailyBMR={energy?.dailyBMR ?? 0}
+          elapsedBMR={energy?.elapsedBMR ?? 0}
+          stepCalories={energy?.stepCalories ?? 0}
+          netBalance={energy?.netBalance ?? 0}
+          targetDeficit={energy?.targetDeficit ?? 500}
           isDeficit={energy?.isDeficit ?? true}
           isCheatDay={profile?.isCheatDay}
         />

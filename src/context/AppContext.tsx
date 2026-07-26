@@ -1,293 +1,68 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserProfile, MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
-import {
-  DEFAULT_PROFILE,
-  loadUserProfile,
-  saveUserProfile,
-  loadMealLogs,
-  saveMealLogs,
-  loadWaterGlasses,
-  saveWaterGlasses,
-  loadStepCount,
-  saveStepCount,
-} from '../services/storageService';
-import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
-import { calculateEnergyBalance } from '../utils/calorieCalc';
+import React, { ReactNode } from 'react';
+import { ProfileProvider, useProfile } from './ProfileContext';
+import { MealProvider, useMeals } from './MealContext';
+import { HealthProvider, useHealth } from './HealthContext';
+import { AIProvider, useAI } from './AIContext';
 
-function getTodayString(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-interface AppContextType {
-  profile: UserProfile;
-  mealLogs: MealLog[];
-  waterGlasses: number;
-  steps: number;
-  elapsedSeconds: number;
-  fastingState: {
-    elapsedSeconds: number;
-    fastingHours: number;
-    isFastingTargetReached: boolean;
-  };
-  energy: {
-    dailyBMR: number;
-    elapsedBMR: number;
-    stepCalories: number;
-    totalCaloriesOut: number;
-    totalCaloriesIn: number;
-    netBalance: number;
-    targetDeficit: number;
-    isDeficit: boolean;
-    percentageToGoal: number;
-  };
-  isLoading: boolean;
-  showWelcomeBackModal: boolean;
-  dismissWelcomeBackModal: () => void;
-  updateProfile: (newProfile: Partial<UserProfile>) => Promise<void>;
-  addMealLog: (
-    name: string,
-    isSnack: boolean,
-    nutrition: NutritionData,
-    trigger?: TriggerType,
-    customTimestamp?: string,
-    source?: 'ai' | 'manual',
-    itemsBreakdown?: FoodItemBreakdown[]
-  ) => Promise<void>;
-  updateMealLog: (id: string, updatedFields: Partial<MealLog>) => Promise<void>;
-  deleteMealLog: (id: string) => Promise<void>;
-  addWaterGlass: () => Promise<void>;
-  addStepsManual: (addedSteps: number) => Promise<void>;
-  resetFastingTimer: (timestamp?: string) => Promise<void>;
-  toggleCheatDay: () => Promise<void>;
-  freshStartToday: () => Promise<void>;
-}
-
-const AppContext = createContext<AppContextType | undefined>(undefined);
+export { useProfile, useMeals, useHealth, useAI };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
-  const [mealLogs, setMealLogs] = useState<MealLog[]>([]);
-  const [waterGlasses, setWaterGlasses] = useState<number>(0);
-  const [steps, setSteps] = useState<number>(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [showWelcomeBackModal, setShowWelcomeBackModal] = useState<boolean>(false);
-
-  const todayStr = getTodayString();
-
-  // Load initial data from AsyncStorage
-  useEffect(() => {
-    async function init() {
-      setIsLoading(true);
-      const loadedProfile = await loadUserProfile();
-      const loadedLogs = await loadMealLogs();
-      const loadedWater = await loadWaterGlasses(todayStr);
-      const loadedSteps = await loadStepCount(todayStr);
-
-      // Ensure valid lastMealTimestamp
-      let validProfile = loadedProfile;
-      if (!validProfile.lastMealTimestamp || isNaN(new Date(validProfile.lastMealTimestamp).getTime())) {
-        validProfile = { ...validProfile, lastMealTimestamp: new Date().toISOString() };
-        await saveUserProfile(validProfile);
-      }
-
-      setProfile(validProfile);
-      setMealLogs(loadedLogs);
-      setWaterGlasses(loadedWater);
-      setSteps(loadedSteps);
-
-      // Check if user has been inactive for > 36 hours
-      const lastMealTime = new Date(validProfile.lastMealTimestamp).getTime();
-      const nowTime = new Date().getTime();
-      const hoursDiff = (nowTime - lastMealTime) / (1000 * 60 * 60);
-
-      if (hoursDiff > 36) {
-        setShowWelcomeBackModal(true);
-      }
-
-      setIsLoading(false);
-    }
-
-    init();
-  }, []);
-
-  // Real-time Fasting Clock Timer tick (Every 1 second)
-  useEffect(() => {
-    const updateClock = () => {
-      const lastMealTimeStr = profile.lastMealTimestamp || new Date().toISOString();
-      const lastTime = new Date(lastMealTimeStr).getTime();
-      const now = new Date().getTime();
-      const diffInSec = Math.max(0, Math.floor((now - lastTime) / 1000));
-      setElapsedSeconds(diffInSec);
-    };
-
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-
-    return () => clearInterval(interval);
-  }, [profile.lastMealTimestamp]);
-
-  // Sync Pedometer steps accurately without cumulative exponential sum
-  useEffect(() => {
-    let sub: { remove: () => void } | null = null;
-    let baseSteps = 0;
-
-    async function syncPedometer() {
-      const status = await getTodayStepCount();
-      if (status.isAvailable) {
-        baseSteps = status.stepCount;
-        setSteps(baseSteps);
-        saveStepCount(todayStr, baseSteps);
-
-        sub = subscribeStepCount((sessionSteps) => {
-          const totalSteps = baseSteps + sessionSteps;
-          setSteps(totalSteps);
-          saveStepCount(todayStr, totalSteps);
-        });
-      }
-    }
-
-    syncPedometer();
-
-    return () => {
-      if (sub && sub.remove) sub.remove();
-    };
-  }, [todayStr]);
-
-  const updateProfile = async (newProfile: Partial<UserProfile>) => {
-    const updated = { ...profile, ...newProfile };
-    setProfile(updated);
-    await saveUserProfile(updated);
-  };
-
-  const addMealLog = async (
-    name: string,
-    isSnack: boolean,
-    nutrition: NutritionData,
-    trigger?: TriggerType,
-    customTimestamp?: string,
-    source: 'ai' | 'manual' = 'ai',
-    itemsBreakdown?: FoodItemBreakdown[]
-  ) => {
-    const timestamp = customTimestamp || new Date().toISOString();
-    const newLog: MealLog = {
-      id: Date.now().toString(),
-      timestamp,
-      name,
-      isSnack,
-      trigger,
-      nutrition,
-      source,
-      itemsBreakdown,
-    };
-
-    const updatedLogs = [newLog, ...mealLogs];
-    setMealLogs(updatedLogs);
-    await saveMealLogs(updatedLogs);
-
-    // Update last meal timestamp for fasting timer tick reset
-    const updatedProfile = { ...profile, lastMealTimestamp: timestamp };
-    setProfile(updatedProfile);
-    await saveUserProfile(updatedProfile);
-  };
-
-  const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
-    const updatedLogs = mealLogs.map((log) => {
-      if (log.id === id) {
-        return { ...log, ...updatedFields };
-      }
-      return log;
-    });
-
-    setMealLogs(updatedLogs);
-    await saveMealLogs(updatedLogs);
-  };
-
-  const deleteMealLog = async (id: string) => {
-    const updatedLogs = mealLogs.filter((m) => m.id !== id);
-    setMealLogs(updatedLogs);
-    await saveMealLogs(updatedLogs);
-  };
-
-  const addWaterGlass = async () => {
-    const updated = waterGlasses + 1;
-    setWaterGlasses(updated);
-    await saveWaterGlasses(todayStr, updated);
-  };
-
-  const addStepsManual = async (addedSteps: number) => {
-    const updated = steps + addedSteps;
-    setSteps(updated);
-    await saveStepCount(todayStr, updated);
-  };
-
-  const resetFastingTimer = async (timestamp?: string) => {
-    const newTime = timestamp || new Date().toISOString();
-    const updated = { ...profile, lastMealTimestamp: newTime };
-    setProfile(updated);
-    await saveUserProfile(updated);
-  };
-
-  const toggleCheatDay = async () => {
-    const updated = { ...profile, isCheatDay: !profile.isCheatDay };
-    setProfile(updated);
-    await saveUserProfile(updated);
-  };
-
-  const freshStartToday = async () => {
-    setShowWelcomeBackModal(false);
-    await resetFastingTimer(new Date().toISOString());
-  };
-
-  const dismissWelcomeBackModal = () => {
-    setShowWelcomeBackModal(false);
-  };
-
-  // Compute Fasting State & Energy Balance Realtime
-  const fastingHours = Math.floor(elapsedSeconds / 3600);
-  const fastingState = {
-    elapsedSeconds,
-    fastingHours,
-    isFastingTargetReached: fastingHours >= (profile.fastingTargetHours || 16),
-  };
-
-  const todayLogs = mealLogs.filter((log) => log.timestamp.startsWith(todayStr));
-  const totalCaloriesIn = todayLogs.reduce((acc, log) => acc + log.nutrition.calories, 0);
-  const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps);
-
   return (
-    <AppContext.Provider
-      value={{
-        profile,
-        mealLogs,
-        waterGlasses,
-        steps,
-        elapsedSeconds,
-        fastingState,
-        energy,
-        isLoading,
-        showWelcomeBackModal,
-        dismissWelcomeBackModal,
-        updateProfile,
-        addMealLog,
-        updateMealLog,
-        deleteMealLog,
-        addWaterGlass,
-        addStepsManual,
-        resetFastingTimer,
-        toggleCheatDay,
-        freshStartToday,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+    <ProfileProvider>
+      <MealProvider>
+        <HealthProvider>
+          <AIProvider>{children}</AIProvider>
+        </HealthProvider>
+      </MealProvider>
+    </ProfileProvider>
   );
 };
 
+/**
+ * Backward-compatible facade hook aggregating all 4 modular contexts
+ */
 export const useApp = () => {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return context;
+  const profileCtx = useProfile();
+  const mealCtx = useMeals();
+  const healthCtx = useHealth();
+  const aiCtx = useAI();
+
+  return {
+    // ProfileContext
+    profile: profileCtx.profile,
+    updateProfile: profileCtx.updateProfile,
+    toggleCheatDay: profileCtx.toggleCheatDay,
+
+    // MealContext
+    mealLogs: mealCtx.mealLogs,
+    todayLogs: mealCtx.todayLogs,
+    totalCaloriesIn: mealCtx.totalCaloriesIn,
+    snackCount: mealCtx.snackCount,
+    addMealLog: mealCtx.addMealLog,
+    updateMealLog: mealCtx.updateMealLog,
+    deleteMealLog: mealCtx.deleteMealLog,
+
+    // HealthContext
+    waterGlasses: healthCtx.waterGlasses,
+    steps: healthCtx.steps,
+    sensorSteps: healthCtx.sensorSteps,
+    manualSteps: healthCtx.manualSteps,
+    elapsedSeconds: healthCtx.elapsedSeconds,
+    fastingState: healthCtx.fastingState,
+    energy: healthCtx.energy,
+    showWelcomeBackModal: healthCtx.showWelcomeBackModal,
+    addWaterGlass: healthCtx.addWaterGlass,
+    addStepsManual: healthCtx.addStepsManual,
+    resetFastingTimer: healthCtx.resetFastingTimer,
+    freshStartToday: healthCtx.freshStartToday,
+    dismissWelcomeBackModal: healthCtx.dismissWelcomeBackModal,
+
+    // AIContext
+    aiStatus: aiCtx.aiStatus,
+    parseFoodNutrition: aiCtx.parseFoodNutrition,
+    generateAICoachMessage: aiCtx.generateAICoachMessage,
+
+    // Combined Loading
+    isLoading: profileCtx.isLoading || mealCtx.isLoading,
+  };
 };

@@ -131,6 +131,7 @@ export function calculateEnergyBalance(
     elapsedBMR,
     stepCalories,
     totalCaloriesOut,
+    totalCaloriesIn,
     netBalance,
     isDeficit,
     targetDeficit,

@@ -40,7 +40,7 @@ export async function getTodayStepCount(): Promise<HealthSyncStatus> {
 export function subscribeStepCount(onStepUpdate: (steps: number) => void) {
   try {
     return Pedometer.watchStepCount((result) => {
-      if (result && result.steps) {
+      if (result && typeof result.steps === 'number') {
         onStepUpdate(result.steps);
       }
     });

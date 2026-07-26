@@ -47,6 +47,19 @@ export function getAIStatus(userApiKey?: string): AIStatus {
 }
 
 /**
+ * Handle HTTP Error Status Codes gracefully (401, 403, 429)
+ */
+function handleHTTPErrorStatus(status: number): string {
+  if (status === 401 || status === 403) {
+    return 'Gemini API Key tidak valid atau tidak memiliki izin akses (401/403). Mohon periksa API Key di menu Profil.';
+  }
+  if (status === 429) {
+    return 'Batas penggunaan harian Gemini AI telah tercapai (429 Rate Limit Exceeded). Menggunakan Smart Culinary Engine cadangan.';
+  }
+  return `Gagal terhubung ke Google AI Cloud (HTTP ${status}).`;
+}
+
+/**
  * Estimate nutrition from food description using Gemini AI API with Smart Fallback
  */
 export async function parseFoodNutritionWithAI(
@@ -128,6 +141,8 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan lua
             itemsBreakdown: items,
           };
         }
+      } else {
+        console.warn(handleHTTPErrorStatus(response.status));
       }
     } catch (error) {
       console.warn('Gemini Cloud API call failed, using Smart Culinary Engine:', error);
@@ -201,6 +216,8 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting:
             recommendedAction: parsed.recommendedAction || 'meal',
           };
         }
+      } else {
+        console.warn(handleHTTPErrorStatus(response.status));
       }
     } catch (err) {
       console.error('Error generating AI Coach message:', err);

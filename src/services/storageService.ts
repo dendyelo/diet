@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, MealLog, DailySummary } from '../types';
+import { UserProfile, MealLog } from '../types';
+
+const SCHEMA_VERSION = 2;
 
 const KEYS = {
+  SCHEMA_VERSION: '@habitdiet_schema_version',
   USER_PROFILE: '@habitdiet_user_profile',
   MEAL_LOGS: '@habitdiet_meal_logs',
   WATER_GLASSES: '@habitdiet_water_glasses',
@@ -26,8 +29,37 @@ export const DEFAULT_PROFILE: UserProfile = {
   isCheatDay: false,
 };
 
+/**
+ * Storage Schema Migration Engine (Auto Migration V1 -> V2)
+ */
+export async function migrateStorageIfNeeded(): Promise<void> {
+  try {
+    const currentVersionStr = await AsyncStorage.getItem(KEYS.SCHEMA_VERSION);
+    const currentVersion = currentVersionStr ? parseInt(currentVersionStr, 10) : 1;
+
+    if (currentVersion < SCHEMA_VERSION) {
+      console.log(`Migrating AsyncStorage from Schema V${currentVersion} to V${SCHEMA_VERSION}...`);
+
+      // Migration V1 -> V2: Ensure bodyType and fastingTargetHours exist
+      const profileData = await AsyncStorage.getItem(KEYS.USER_PROFILE);
+      if (profileData) {
+        const parsed = JSON.parse(profileData);
+        if (!parsed.bodyType) parsed.bodyType = 'normal';
+        if (!parsed.fastingTargetHours) parsed.fastingTargetHours = 16;
+        await AsyncStorage.setItem(KEYS.USER_PROFILE, JSON.stringify(parsed));
+      }
+
+      await AsyncStorage.setItem(KEYS.SCHEMA_VERSION, SCHEMA_VERSION.toString());
+      console.log(`AsyncStorage Schema Migration to V${SCHEMA_VERSION} Complete.`);
+    }
+  } catch (error) {
+    console.error('Error during storage migration:', error);
+  }
+}
+
 export async function loadUserProfile(): Promise<UserProfile> {
   try {
+    await migrateStorageIfNeeded();
     const data = await AsyncStorage.getItem(KEYS.USER_PROFILE);
     if (data) {
       const parsed = JSON.parse(data);

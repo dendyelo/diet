@@ -1,19 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { calculateTriggerStats } from '../utils/habitAnalytics';
+import { calculateTriggerStats, getTopTrigger } from '../utils/habitAnalytics';
+import { isSameLocalDay } from '../utils/date';
 import { GlassCard } from '../components/GlassCard';
 import { PieChart, TrendingUp, Sparkles, Award } from 'lucide-react-native';
 
 export const AnalyticsScreen: React.FC = () => {
   const { mealLogs = [], fastingState, profile } = useApp();
 
-  const triggerStats = calculateTriggerStats(mealLogs || []);
+  const todayLogs = (mealLogs || []).filter((log) => isSameLocalDay(log.timestamp));
+  const triggerStats = calculateTriggerStats(todayLogs);
 
-  const totalMealCalories = (mealLogs || []).reduce((acc, log) => acc + (log.nutrition?.calories || 0), 0);
-  const snackLogsCount = (mealLogs || []).filter((m) => m.isSnack).length;
+  const totalMealCalories = todayLogs.reduce((acc, log) => acc + (log.nutrition?.calories || 0), 0);
+  const snackLogsCount = todayLogs.filter((m) => m.isSnack).length;
 
-  const topTrigger = triggerStats.breakdown.length > 0 ? triggerStats.breakdown[0] : null;
+  const topTrigger = getTopTrigger(todayLogs);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -32,7 +34,7 @@ export const AnalyticsScreen: React.FC = () => {
             <Text style={[styles.miniValue, { color: '#60A5FA' }]} numberOfLines={1}>
               {totalMealCalories} kcal
             </Text>
-            <Text style={styles.miniSub} numberOfLines={1}>{(mealLogs || []).length} Kali Makan/Cemil</Text>
+            <Text style={styles.miniSub} numberOfLines={1}>{todayLogs.length} Kali Makan/Cemil</Text>
           </GlassCard>
 
           <GlassCard style={styles.miniCard}>

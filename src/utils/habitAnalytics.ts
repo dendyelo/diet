@@ -150,3 +150,9 @@ export function calculateTriggerStats(mealLogs: MealLog[]) {
     breakdown,
   };
 }
+
+export function getTopTrigger(mealLogs: MealLog[]) {
+  const stats = calculateTriggerStats(mealLogs);
+  const top = [...stats.breakdown].sort((a, b) => b.count - a.count)[0];
+  return top && top.count > 0 ? top : null;
+}

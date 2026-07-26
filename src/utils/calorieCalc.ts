@@ -9,9 +9,9 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
 };
 
 export const BODY_TYPE_MULTIPLIERS: Record<BodyType, number> = {
-  easy_gain: 0.93, // Slow metabolism / Endomorph (-7% adjustment)
-  normal: 1.0,    // Normal metabolism / Mesomorph
-  hard_gain: 1.07, // Fast metabolism / Ectomorph (+7% adjustment)
+  easy_gain: 0.93,
+  normal: 1.0,
+  hard_gain: 1.07,
 };
 
 export const BODY_TYPE_INFO: Record<BodyType, { label: string; emoji: string; desc: string; color: string }> = {
@@ -59,7 +59,6 @@ export function calculateBMR(profile: UserProfile): number {
   const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
   const rawBMR = Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
 
-  // Apply Body Type Metabolic Multiplier
   const bodyMultiplier = BODY_TYPE_MULTIPLIERS[profile.bodyType || 'normal'] || 1.0;
   const adjustedBMR = Math.round(rawBMR * bodyMultiplier);
 
@@ -114,21 +113,25 @@ export function calculateEnergyBalance(
 ) {
   const dailyBMR = calculateBMR(profile);
   const elapsedBMR = calculateElapsedBMR(dailyBMR, dateObj);
+  const dailyTDEE = calculateTDEE(profile);
+  const elapsedTDEE = calculateElapsedBMR(dailyTDEE, dateObj);
+  const activityCalories = Math.max(0, elapsedTDEE - elapsedBMR);
   const stepCalories = calculateStepCalories(steps, profile.weightKg);
 
-  const totalCaloriesOut = elapsedBMR + stepCalories;
+  const totalCaloriesOut = elapsedBMR + activityCalories + stepCalories;
   const netBalance = totalCaloriesOut - totalCaloriesIn;
   const targetDeficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
 
   const isDeficit = netBalance >= 0;
-  const percentageToGoal = Math.min(
-    100,
-    Math.max(0, Math.round((netBalance / (targetDeficit || 500)) * 100))
-  );
+  const percentageToGoal = targetDeficit <= 0
+    ? 100
+    : Math.min(100, Math.max(0, Math.round((netBalance / targetDeficit) * 100)));
 
   return {
     dailyBMR,
+    dailyTDEE,
     elapsedBMR,
+    activityCalories,
     stepCalories,
     totalCaloriesOut,
     totalCaloriesIn,

@@ -1,17 +1,28 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import { useProfile } from './ProfileContext';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import {
   parseFoodNutritionWithAI,
   generateAICoachMessageWithAI,
   getAIStatus,
+  testGeminiAPIConnection,
   AIFoodResult,
   AICoachResponse,
   AIStatus,
 } from '../services/aiService';
+import {
+  getGeminiApiKey,
+  saveGeminiApiKey,
+  deleteGeminiApiKey,
+  migrateApiKeyFromAsyncStorage,
+} from '../services/secretStorageService';
+import { AIConnectionStatus } from '../types';
 
 interface AIContextType {
   aiStatus: AIStatus;
   userApiKey: string;
+  connectionStatus: AIConnectionStatus;
+  updateApiKey: (key: string) => Promise<void>;
+  deleteApiKey: () => Promise<void>;
+  testConnection: () => Promise<AIConnectionStatus>;
   parseFoodNutrition: (foodInput: string) => Promise<AIFoodResult>;
   generateAICoachMessage: (userData: {
     name: string;
@@ -27,9 +38,57 @@ interface AIContextType {
 const AIContext = createContext<AIContextType | undefined>(undefined);
 
 export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { profile } = useProfile();
-  const userApiKey = profile.geminiApiKey || '';
-  const aiStatus = getAIStatus(userApiKey);
+  const [userApiKey, setUserApiKey] = useState<string>('');
+  const [connectionStatus, setConnectionStatus] = useState<AIConnectionStatus>('not_configured');
+
+  useEffect(() => {
+    async function initApiKey() {
+      // Auto-migrate legacy key from AsyncStorage if present
+      const migratedKey = await migrateApiKeyFromAsyncStorage();
+      if (migratedKey) {
+        setUserApiKey(migratedKey);
+        setConnectionStatus('connected');
+      } else {
+        const key = await getGeminiApiKey();
+        setUserApiKey(key);
+        setConnectionStatus(key ? 'connected' : 'not_configured');
+      }
+    }
+    initApiKey();
+  }, []);
+
+  const updateApiKey = async (newKey: string) => {
+    const cleanKey = newKey.trim();
+    setUserApiKey(cleanKey);
+    await saveGeminiApiKey(cleanKey);
+
+    if (cleanKey) {
+      setConnectionStatus('checking');
+      const result = await testGeminiAPIConnection(cleanKey);
+      setConnectionStatus(result);
+    } else {
+      setConnectionStatus('not_configured');
+    }
+  };
+
+  const deleteApiKey = async () => {
+    setUserApiKey('');
+    setConnectionStatus('not_configured');
+    await deleteGeminiApiKey();
+  };
+
+  const testConnection = async (): Promise<AIConnectionStatus> => {
+    if (!userApiKey) {
+      setConnectionStatus('not_configured');
+      return 'not_configured';
+    }
+    setConnectionStatus('checking');
+    const status = await testGeminiAPIConnection(userApiKey);
+    setConnectionStatus(status);
+    return status;
+  };
+
+  const aiStatus = getAIStatus(userApiKey, connectionStatus);
 
   const parseFoodNutrition = async (foodInput: string): Promise<AIFoodResult> => {
     return parseFoodNutritionWithAI(foodInput, userApiKey);
@@ -52,6 +111,10 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       value={{
         aiStatus,
         userApiKey,
+        connectionStatus,
+        updateApiKey,
+        deleteApiKey,
+        testConnection,
         parseFoodNutrition,
         generateAICoachMessage,
       }}

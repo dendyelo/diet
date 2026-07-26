@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { useApp } from '../context/AppContext';
+import { useProfile, useMeals, useHealth, useAI } from '../context/AppContext';
 import { EatingTimer } from '../components/EatingTimer';
 import { EnergyGauge } from '../components/EnergyGauge';
 import { HabitRings } from '../components/HabitRings';
@@ -23,18 +23,10 @@ import { Droplet, Footprints, Utensils, Cookie, Sparkles } from 'lucide-react-na
 import { isSameLocalDay } from '../utils/date';
 
 export const HomeScreen: React.FC = () => {
-  const {
-    profile,
-    mealLogs = [],
-    fastingState,
-    steps = 0,
-    waterGlasses = 0,
-    energy,
-    addMealLog,
-    updateMealLog,
-    deleteMealLog,
-    addWaterGlass,
-  } = useApp();
+  const { profile } = useProfile();
+  const { mealLogs = [], totalCaloriesIn, snackCount, addMealLog, updateMealLog, deleteMealLog } = useMeals();
+  const { fastingState, steps = 0, waterGlasses = 0, energy, addWaterGlass, resetFastingTimer } = useHealth();
+  const { userApiKey } = useAI();
 
   const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
   const [showAddMealModal, setShowAddMealModal] = useState<boolean>(false);
@@ -42,11 +34,8 @@ export const HomeScreen: React.FC = () => {
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
 
   const todayLogs = (mealLogs || []).filter((log) => log.timestamp && isSameLocalDay(log.timestamp));
-
-  const totalCaloriesIn = todayLogs.reduce((acc, item) => acc + (item.nutrition?.calories || 0), 0);
-  const snackCount = todayLogs.filter((item) => item.isSnack).length;
-
   const elapsedSeconds = fastingState?.elapsedSeconds || 0;
+  const hasMealRecorded = fastingState?.hasMealRecorded ?? true;
 
   const handleAddSnackSubmit = async (
     name: string,
@@ -55,6 +44,10 @@ export const HomeScreen: React.FC = () => {
     itemsBreakdown?: FoodItemBreakdown[]
   ) => {
     await addMealLog(name, true, nutrition, trigger, undefined, 'ai', itemsBreakdown);
+  };
+
+  const handleStartFastingNow = async () => {
+    await resetFastingTimer(new Date().toISOString());
   };
 
   return (
@@ -77,7 +70,9 @@ export const HomeScreen: React.FC = () => {
         {/* 1. Fasting Timer */}
         <EatingTimer
           elapsedSeconds={elapsedSeconds}
+          hasMealRecorded={hasMealRecorded}
           onEditTimePress={() => setShowAddMealModal(true)}
+          onStartFastingNow={handleStartFastingNow}
         />
 
         {/* 2. Sleek Minimalist AI Health Coach Banner */}
@@ -88,7 +83,7 @@ export const HomeScreen: React.FC = () => {
           steps={steps}
           waterGlasses={waterGlasses}
           userName={profile?.name || 'Teman Diet'}
-          userApiKey={profile?.geminiApiKey}
+          userApiKey={userApiKey}
           onOpenChat={() => setShowChatModal(true)}
         />
 
@@ -188,7 +183,7 @@ export const HomeScreen: React.FC = () => {
         visible={showChatModal}
         onClose={() => setShowChatModal(false)}
         userName={profile?.name || 'Teman Diet'}
-        userApiKey={profile?.geminiApiKey}
+        userApiKey={userApiKey}
         userContext={{
           fastingHours: Math.floor(elapsedSeconds / 3600),
           caloriesIn: totalCaloriesIn,
@@ -203,7 +198,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setShowSnackModal(false)}
         onSubmitSnack={handleAddSnackSubmit}
         onDrinkWater={addWaterGlass}
-        userApiKey={profile?.geminiApiKey}
+        userApiKey={userApiKey}
       />
 
       <AddMealModal
@@ -212,7 +207,7 @@ export const HomeScreen: React.FC = () => {
         onSaveMeal={(name, nutrition, customTimestamp, itemsBreakdown) =>
           addMealLog(name, false, nutrition, undefined, customTimestamp, 'ai', itemsBreakdown)
         }
-        userApiKey={profile?.geminiApiKey}
+        userApiKey={userApiKey}
       />
 
       <EditMealModal

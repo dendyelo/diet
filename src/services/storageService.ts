@@ -8,9 +8,14 @@ const KEYS = {
   USER_PROFILE: '@habitdiet_user_profile',
   MEAL_LOGS: '@habitdiet_meal_logs',
   WATER_GLASSES: '@habitdiet_water_glasses',
-  STEP_COUNT: '@habitdiet_step_count',
-  LAST_LOGGED_DATE: '@habitdiet_last_date',
+  STEP_RECORD: '@habitdiet_step_record',
+  LEGACY_STEP_COUNT: '@habitdiet_step_count',
 };
+
+export interface StepRecord {
+  sensorSteps: number;
+  manualSteps: number;
+}
 
 export const DEFAULT_PROFILE: UserProfile = {
   name: 'Teman Diet',
@@ -25,7 +30,6 @@ export const DEFAULT_PROFILE: UserProfile = {
   bedtimeHour: 23,
   fastingTargetHours: 16,
   lastMealTimestamp: new Date().toISOString(),
-  geminiApiKey: '',
   isCheatDay: false,
 };
 
@@ -40,12 +44,12 @@ export async function migrateStorageIfNeeded(): Promise<void> {
     if (currentVersion < SCHEMA_VERSION) {
       console.log(`Migrating AsyncStorage from Schema V${currentVersion} to V${SCHEMA_VERSION}...`);
 
-      // Migration V1 -> V2: Ensure bodyType and fastingTargetHours exist
       const profileData = await AsyncStorage.getItem(KEYS.USER_PROFILE);
       if (profileData) {
         const parsed = JSON.parse(profileData);
         if (!parsed.bodyType) parsed.bodyType = 'normal';
         if (!parsed.fastingTargetHours) parsed.fastingTargetHours = 16;
+        delete parsed.geminiApiKey; // Stripped for SecureStore
         await AsyncStorage.setItem(KEYS.USER_PROFILE, JSON.stringify(parsed));
       }
 
@@ -99,7 +103,17 @@ export async function loadMealLogs(): Promise<MealLog[]> {
   try {
     const data = await AsyncStorage.getItem(KEYS.MEAL_LOGS);
     if (data) {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        // Sanitize & filter valid meal logs
+        return parsed.filter(
+          (log) =>
+            log &&
+            typeof log.id === 'string' &&
+            log.nutrition &&
+            typeof log.nutrition.calories === 'number'
+        );
+      }
     }
   } catch (error) {
     console.error('Error loading meal logs:', error);
@@ -135,22 +149,41 @@ export async function saveWaterGlasses(dateStr: string, count: number): Promise<
   }
 }
 
-export async function loadStepCount(dateStr: string): Promise<number> {
+/**
+ * Load Step Record (sensor & manual steps) with legacy fallback migration
+ */
+export async function loadStepRecord(dateStr: string): Promise<StepRecord> {
   try {
-    const key = `${KEYS.STEP_COUNT}_${dateStr}`;
+    const key = `${KEYS.STEP_RECORD}_${dateStr}`;
     const data = await AsyncStorage.getItem(key);
-    return data ? parseInt(data, 10) : 0;
+    if (data) {
+      return JSON.parse(data);
+    }
+
+    // Legacy Fallback Migration
+    const legacyKey = `${KEYS.LEGACY_STEP_COUNT}_${dateStr}`;
+    const legacyData = await AsyncStorage.getItem(legacyKey);
+    if (legacyData) {
+      const legacyCount = parseInt(legacyData, 10) || 0;
+      const newRecord: StepRecord = { sensorSteps: legacyCount, manualSteps: 0 };
+      await AsyncStorage.setItem(key, JSON.stringify(newRecord));
+      await AsyncStorage.removeItem(legacyKey);
+      return newRecord;
+    }
   } catch (error) {
-    console.error('Error loading step count:', error);
-    return 0;
+    console.error('Error loading step record:', error);
   }
+  return { sensorSteps: 0, manualSteps: 0 };
 }
 
-export async function saveStepCount(dateStr: string, count: number): Promise<void> {
+/**
+ * Save Step Record (sensor & manual steps)
+ */
+export async function saveStepRecord(dateStr: string, record: StepRecord): Promise<void> {
   try {
-    const key = `${KEYS.STEP_COUNT}_${dateStr}`;
-    await AsyncStorage.setItem(key, count.toString());
+    const key = `${KEYS.STEP_RECORD}_${dateStr}`;
+    await AsyncStorage.setItem(key, JSON.stringify(record));
   } catch (error) {
-    console.error('Error saving step count:', error);
+    console.error('Error saving step record:', error);
   }
 }

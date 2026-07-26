@@ -1,108 +1,123 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
-import { useApp } from '../context/AppContext';
-import { calculateTriggerStats, getTopTrigger } from '../utils/habitAnalytics';
-import { isSameLocalDay } from '../utils/date';
+import { useProfile, useMeals, useHealth } from '../context/AppContext';
+import { calculateTriggerStats, TRIGGER_OPTIONS } from '../utils/habitAnalytics';
 import { GlassCard } from '../components/GlassCard';
-import { PieChart, TrendingUp, Sparkles, Award } from 'lucide-react-native';
+import { TriggerOption } from '../types';
+import { Flame, AlertTriangle, ShieldCheck } from 'lucide-react-native';
 
 export const AnalyticsScreen: React.FC = () => {
-  const { mealLogs = [], fastingState, profile } = useApp();
+  const { profile } = useProfile();
+  const { mealLogs, snackCount } = useMeals();
+  const { waterGlasses, steps, fastingState } = useHealth();
 
-  const todayLogs = (mealLogs || []).filter((log) => isSameLocalDay(log.timestamp));
-  const triggerStats = calculateTriggerStats(todayLogs);
-
-  const totalMealCalories = todayLogs.reduce((acc, log) => acc + (log.nutrition?.calories || 0), 0);
-  const snackLogsCount = todayLogs.filter((m) => m.isSnack).length;
-
-  const topTrigger = getTopTrigger(todayLogs);
+  const triggerStats = calculateTriggerStats(mealLogs || []);
+  const fastingTargetHours = profile?.fastingTargetHours || 16;
+  const isTargetFastingReached = (fastingState?.fastingHours || 0) >= fastingTargetHours;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         {/* Screen Header */}
-        <Text style={styles.screenTitle} numberOfLines={1}>ANALISIS KEBIASAAN & PEMICU</Text>
+        <Text style={styles.screenTitle} numberOfLines={1}>ANALISIS HABIT & PEMICU NGEMIL</Text>
         <Text style={styles.screenSub}>
-          Memahami pemicu emosional di balik keinginan ngemil dan efisiensi defisit kalori Anda.
+          Ketahui pemicu emosional dan stabilitas habit puasa Anda.
         </Text>
 
-        {/* Daily Calorie Summary Cards */}
-        <View style={styles.grid2}>
-          <GlassCard style={styles.miniCard}>
-            <TrendingUp size={16} color="#60A5FA" />
-            <Text style={styles.miniLabel} numberOfLines={1}>TOTAL KALORI HARI INI</Text>
-            <Text style={[styles.miniValue, { color: '#60A5FA' }]} numberOfLines={1}>
-              {totalMealCalories} kcal
-            </Text>
-            <Text style={styles.miniSub} numberOfLines={1}>{todayLogs.length} Kali Makan/Cemil</Text>
-          </GlassCard>
-
-          <GlassCard style={styles.miniCard}>
-            <Award size={16} color="#10B981" />
-            <Text style={styles.miniLabel} numberOfLines={1}>PUASA TERLAKSANA</Text>
-            <Text style={[styles.miniValue, { color: '#10B981' }]} numberOfLines={1}>
-              {fastingState?.fastingHours || 0} Jam
-            </Text>
-            <Text style={styles.miniSub} numberOfLines={1}>Target: {profile?.fastingTargetHours || 16} Jam</Text>
-          </GlassCard>
-        </View>
-
-        {/* Snacking Heatmap Breakdown */}
-        <GlassCard style={{ marginVertical: 8 }}>
-          <View style={styles.cardHeader}>
-            <PieChart size={18} color="#F59E0B" />
-            <Text style={styles.cardTitle} numberOfLines={1}>PETA PEMICU NGEMIL (HEATMAP)</Text>
+        {/* Fasting & Consistency Overview */}
+        <GlassCard>
+          <View style={styles.sectionHeaderRow}>
+            <Flame size={16} color="#F59E0B" />
+            <Text style={styles.sectionTitle} numberOfLines={1}>TARGET HARIAN & KONSISTENSI</Text>
           </View>
 
-          <Text style={styles.totalSnacksText} numberOfLines={1}>
-            Total Cemilan Tercatat: <Text style={{ color: '#F59E0B', fontWeight: 'bold' }}>{snackLogsCount}</Text>
+          <View style={styles.grid2}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel} numberOfLines={1}>PUASA SAAT INI</Text>
+              <Text style={[styles.statValue, { color: '#60A5FA' }]} numberOfLines={1}>
+                {fastingState?.fastingHours || 0} / {fastingTargetHours} Jam
+              </Text>
+              <Text style={styles.statSub} numberOfLines={1}>
+                {isTargetFastingReached ? '✓ Target Tercapai' : 'Sedang Berjalan'}
+              </Text>
+            </View>
+
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel} numberOfLines={1}>TOTAL SNACKING</Text>
+              <Text style={[styles.statValue, { color: snackCount > 2 ? '#EF4444' : '#10B981' }]} numberOfLines={1}>
+                {snackCount} Kali
+              </Text>
+              <Text style={styles.statSub} numberOfLines={1}>Hari Ini</Text>
+            </View>
+          </View>
+
+          <View style={styles.grid2}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel} numberOfLines={1}>LANGKAH KAKI</Text>
+              <Text style={[styles.statValue, { color: '#34D399' }]} numberOfLines={1}>{steps || 0}</Text>
+              <Text style={styles.statSub} numberOfLines={1}>Langkah</Text>
+            </View>
+
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel} numberOfLines={1}>AIR MINUM</Text>
+              <Text style={[styles.statValue, { color: '#3B82F6' }]} numberOfLines={1}>{waterGlasses || 0} / 8</Text>
+              <Text style={styles.statSub} numberOfLines={1}>Gelas</Text>
+            </View>
+          </View>
+        </GlassCard>
+
+        {/* Emotional Snacking Trigger Heatmap */}
+        <GlassCard>
+          <View style={styles.sectionHeaderRow}>
+            <AlertTriangle size={16} color="#EF4444" />
+            <Text style={styles.sectionTitle} numberOfLines={1}>PEMICU NGEMIL EMOSIONAL (HEATMAP)</Text>
+          </View>
+          <Text style={styles.cardSubText}>
+            Pola alasan utama Anda ngemil (Bosan, Stres, Nongkrong, dll).
           </Text>
 
           {triggerStats.totalSnacks === 0 ? (
-            <Text style={styles.emptyText}>Belum ada cemilan dengan pemicu emosional tercatat hari ini.</Text>
+            <View style={styles.emptyState}>
+              <ShieldCheck size={28} color="#10B981" />
+              <Text style={styles.emptyText} numberOfLines={1}>Belum ada data ngemil terdeteksi.</Text>
+              <Text style={styles.emptySubText}>
+                Pertahankan habit baik ini!
+              </Text>
+            </View>
           ) : (
-            triggerStats.breakdown.map((item) => (
-              <View key={item.type} style={styles.triggerRow}>
-                <View style={styles.triggerLeft}>
-                  <Text style={styles.emoji}>{item.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.triggerHeaderRow}>
-                      <Text style={styles.triggerName} numberOfLines={1}>{item.label}</Text>
+            <View style={styles.triggerList}>
+              {TRIGGER_OPTIONS.map((option: TriggerOption) => {
+                const stat = triggerStats.breakdown.find((b) => b.type === option.type);
+                const count = stat ? stat.count : 0;
+                const percentage = stat ? stat.percentage : 0;
+
+                return (
+                  <View key={option.type} style={styles.triggerRow}>
+                    <View style={styles.triggerLabelRow}>
+                      <Text style={styles.triggerEmoji}>{option.emoji}</Text>
+                      <Text style={styles.triggerName} numberOfLines={1}>{option.label}</Text>
                       <Text style={styles.triggerCount} numberOfLines={1}>
-                        {item.count}x ({item.percentage}%)
+                        {count} kali ({percentage}%)
                       </Text>
                     </View>
 
-                    {/* Progress Bar */}
-                    <View style={styles.barTrack}>
+                    {/* Progress Bar Heatmap */}
+                    <View style={styles.progressTrack}>
                       <View
                         style={[
-                          styles.barFill,
-                          { width: `${Math.max(5, item.percentage)}%`, backgroundColor: item.color },
+                          styles.progressFill,
+                          {
+                            width: `${percentage}%`,
+                            backgroundColor: option.color,
+                          },
                         ]}
                       />
                     </View>
                   </View>
-                </View>
-              </View>
-            ))
+                );
+              })}
+            </View>
           )}
-        </GlassCard>
-
-        {/* Smart Habit Advice based on Top Trigger */}
-        <GlassCard style={styles.adviceCard}>
-          <View style={styles.cardHeader}>
-            <Sparkles size={18} color="#10B981" />
-            <Text style={[styles.cardTitle, { color: '#10B981' }]} numberOfLines={1}>REKOMENDASI PINTAR HABIT</Text>
-          </View>
-
-          <Text style={styles.adviceText}>
-            💡 {topTrigger ? (
-              <>Sebagian besar cemilan Anda dipicu oleh <Text style={{ fontWeight: 'bold', color: '#F59E0B' }}>{topTrigger.label} ({topTrigger.emoji})</Text>. Cobalah minum 1 gelas air hangat atau teh tanpa gula terlebih dahulu untuk mengecek apakah haus terselubung!</>
-            ) : (
-              <>Pola ngemil Anda hari ini sangat terkontrol! Pertahankan hidrasi 8 gelas air putih dan jaga jendela makan puasa Anda tetap hijau 🟢.</>
-            )}
-          </Text>
         </GlassCard>
       </ScrollView>
     </SafeAreaView>
@@ -119,7 +134,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#09090B',
   },
   scrollContent: {
-    padding: 14,
+    padding: 16,
     paddingBottom: 40,
   },
   screenTitle: {
@@ -129,107 +144,107 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   screenSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.7)',
+    letterSpacing: 0.8,
+  },
+  cardSubText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginBottom: 14,
     lineHeight: 16,
   },
   grid2: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
+    gap: 12,
+    marginBottom: 12,
   },
-  miniCard: {
+  statBox: {
     flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
     padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  miniLabel: {
+  statLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 0.8,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 6,
-    marginBottom: 2,
+    letterSpacing: 0.8,
   },
-  miniValue: {
+  statValue: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginTop: 4,
   },
-  miniSub: {
-    fontSize: 9,
+  statSub: {
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.4)',
     marginTop: 2,
   },
-  cardHeader: {
-    flexDirection: 'row',
+  emptyState: {
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  cardTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: 'rgba(255, 255, 255, 0.7)',
-    letterSpacing: 1,
-    flex: 1,
-  },
-  totalSnacksText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 12,
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 6,
   },
   emptyText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  emptySubText: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontStyle: 'italic',
-    paddingVertical: 10,
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  triggerList: {
+    gap: 12,
   },
   triggerRow: {
-    marginVertical: 6,
-  },
-  triggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  emoji: {
-    fontSize: 22,
-  },
-  triggerHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 4,
+  },
+  triggerLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  triggerEmoji: {
+    fontSize: 14,
+    marginRight: 6,
   },
   triggerName: {
     fontSize: 12,
-    fontWeight: 'bold',
     color: '#FFFFFF',
     flex: 1,
   },
   triggerCount: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '600',
   },
-  barTrack: {
-    height: 6,
+  progressTrack: {
+    height: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
-    marginTop: 2,
   },
-  barFill: {
+  progressFill: {
     height: '100%',
-    borderRadius: 3,
-  },
-  adviceCard: {
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    marginVertical: 8,
-  },
-  adviceText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    lineHeight: 18,
+    borderRadius: 4,
   },
 });

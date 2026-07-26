@@ -9,13 +9,13 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { useApp } from '../context/AppContext';
-import { parseFoodNutritionWithAI, getAIStatus } from '../services/aiService';
+import { useMeals, useAI } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { Sparkles, Utensils, Sliders, CheckCircle2, Wifi, AlertCircle } from 'lucide-react-native';
 
 export const LoggerScreen: React.FC = () => {
-  const { profile, addMealLog } = useApp();
+  const { addMealLog } = useMeals();
+  const { parseFoodNutrition, aiStatus, userApiKey } = useAI();
 
   const [inputMode, setInputMode] = useState<'ai' | 'manual'>('ai');
   const [foodText, setFoodText] = useState<string>('');
@@ -30,9 +30,6 @@ export const LoggerScreen: React.FC = () => {
   const [carbs, setCarbs] = useState<string>('50');
   const [fat, setFat] = useState<string>('15');
 
-  // AI Status Check
-  const aiStatus = getAIStatus(profile.geminiApiKey);
-
   const handleAILog = async () => {
     if (!foodText.trim()) return;
 
@@ -40,11 +37,12 @@ export const LoggerScreen: React.FC = () => {
     setSuccessMsg('');
     setErrorMsg('');
     try {
-      const result = await parseFoodNutritionWithAI(foodText, profile.geminiApiKey);
+      const result = await parseFoodNutrition(foodText);
       await addMealLog(result.name, false, result.nutrition, undefined, undefined, 'ai', result.itemsBreakdown);
       setFoodText('');
 
-      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) berhasil dicatat via Gemini 2.5 Flash Cloud AI!`);
+      const sourceLabel = result.isOnlineAI ? 'Gemini AI' : 'Smart Culinary Engine lokal';
+      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) berhasil dicatat melalui ${sourceLabel}.`);
     } catch (error: any) {
       setErrorMsg(error.message || 'Gagal memproses kalori makanan.');
     } finally {
@@ -79,7 +77,7 @@ export const LoggerScreen: React.FC = () => {
         {/* Screen Header */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.screenTitle}>PENCATAT NUTRISI & AI</Text>
+            <Text style={styles.screenTitle} numberOfLines={1}>PENCATAT NUTRISI & AI</Text>
             <Text style={styles.screenSub}>
               Hitung kalori makanan dari deskripsi santai atau manual.
             </Text>
@@ -88,8 +86,8 @@ export const LoggerScreen: React.FC = () => {
           {/* AI Status Indicator Badge */}
           <View style={[styles.aiStatusBadge, { backgroundColor: aiStatus.color + '18', borderColor: aiStatus.color + '40' }]}>
             <View style={[styles.statusDot, { backgroundColor: aiStatus.color }]} />
-            <Text style={[styles.statusBadgeText, { color: aiStatus.color }]}>
-              {aiStatus.isOnline ? 'Cloud AI' : 'Belum Set API'}
+            <Text style={[styles.statusBadgeText, { color: aiStatus.color }]} numberOfLines={1}>
+              {aiStatus.isOnline ? 'Cloud AI' : 'Engine Lokal'}
             </Text>
           </View>
         </View>
@@ -101,7 +99,7 @@ export const LoggerScreen: React.FC = () => {
             onPress={() => setInputMode('ai')}
           >
             <Sparkles size={16} color={inputMode === 'ai' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
-            <Text style={[styles.tabText, inputMode === 'ai' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, inputMode === 'ai' && styles.tabTextActive]} numberOfLines={1}>
               Gemini AI Cloud
             </Text>
           </TouchableOpacity>
@@ -111,7 +109,7 @@ export const LoggerScreen: React.FC = () => {
             onPress={() => setInputMode('manual')}
           >
             <Sliders size={16} color={inputMode === 'manual' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
-            <Text style={[styles.tabText, inputMode === 'manual' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, inputMode === 'manual' && styles.tabTextActive]} numberOfLines={1}>
               Manual Input
             </Text>
           </TouchableOpacity>
@@ -121,7 +119,7 @@ export const LoggerScreen: React.FC = () => {
         {successMsg !== '' && (
           <View style={styles.successBanner}>
             <CheckCircle2 size={18} color="#10B981" />
-            <Text style={styles.successText}>{successMsg}</Text>
+            <Text style={styles.successText} numberOfLines={1}>{successMsg}</Text>
           </View>
         )}
 
@@ -139,14 +137,14 @@ export const LoggerScreen: React.FC = () => {
             <View style={[styles.aiModeBar, { backgroundColor: aiStatus.color + '12' }]}>
               <Wifi size={16} color={aiStatus.color} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.aiModeTitle, { color: aiStatus.color }]}>
+                <Text style={[styles.aiModeTitle, { color: aiStatus.color }]} numberOfLines={1}>
                   {aiStatus.modeLabel}
                 </Text>
                 <Text style={styles.aiModeDesc}>{aiStatus.description}</Text>
               </View>
             </View>
 
-            <Text style={styles.label}>DESKRIPSI MAKANAN (BAHASA INDONESIA)</Text>
+            <Text style={styles.label} numberOfLines={1}>DESKRIPSI MAKANAN (BAHASA INDONESIA)</Text>
             <TextInput
               style={styles.textArea}
               placeholder="Contoh: Makan siang Nasi Padang rendang, perkedel 1, daun singkong, dan es teh manis"
@@ -170,14 +168,14 @@ export const LoggerScreen: React.FC = () => {
               ) : (
                 <>
                   <Sparkles size={18} color="#FFFFFF" />
-                  <Text style={styles.submitBtnText}>Hitung Kalori dengan Gemini AI</Text>
+                  <Text style={styles.submitBtnText} numberOfLines={1}>Hitung Kalori dengan Gemini AI</Text>
                 </>
               )}
             </TouchableOpacity>
           </GlassCard>
         ) : (
           <GlassCard>
-            <Text style={styles.label}>NAMA MAKANAN</Text>
+            <Text style={styles.label} numberOfLines={1}>NAMA MAKANAN</Text>
             <TextInput
               style={styles.input}
               placeholder="Contoh: Dada Ayam Bakar + Nasi Merah"
@@ -188,7 +186,7 @@ export const LoggerScreen: React.FC = () => {
 
             <View style={styles.grid2}>
               <View style={styles.gridItem}>
-                <Text style={styles.label}>KALORI (KCAL)</Text>
+                <Text style={styles.label} numberOfLines={1}>KALORI (KCAL)</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="450"
@@ -199,7 +197,7 @@ export const LoggerScreen: React.FC = () => {
               </View>
 
               <View style={styles.gridItem}>
-                <Text style={styles.label}>PROTEIN (GRAM)</Text>
+                <Text style={styles.label} numberOfLines={1}>PROTEIN (GRAM)</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="25"
@@ -212,7 +210,7 @@ export const LoggerScreen: React.FC = () => {
 
             <View style={styles.grid2}>
               <View style={styles.gridItem}>
-                <Text style={styles.label}>KARBOHIDRAT (GRAM)</Text>
+                <Text style={styles.label} numberOfLines={1}>KARBOHIDRAT (GRAM)</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="50"
@@ -223,7 +221,7 @@ export const LoggerScreen: React.FC = () => {
               </View>
 
               <View style={styles.gridItem}>
-                <Text style={styles.label}>LEMAK (GRAM)</Text>
+                <Text style={styles.label} numberOfLines={1}>LEMAK (GRAM)</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="15"
@@ -236,7 +234,7 @@ export const LoggerScreen: React.FC = () => {
 
             <TouchableOpacity style={styles.submitBtn} onPress={handleManualLog}>
               <Utensils size={18} color="#FFFFFF" />
-              <Text style={styles.submitBtnText}>Simpan Log Makanan</Text>
+              <Text style={styles.submitBtnText} numberOfLines={1}>Simpan Log Makanan</Text>
             </TouchableOpacity>
           </GlassCard>
         )}

@@ -4,8 +4,9 @@ import { useMeals } from './MealContext';
 import {
   loadWaterGlasses,
   saveWaterGlasses,
-  loadStepCount,
-  saveStepCount,
+  loadStepRecord,
+  saveStepRecord,
+  StepRecord,
 } from '../services/storageService';
 import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
 import { calculateEnergyBalance } from '../utils/calorieCalc';
@@ -14,6 +15,7 @@ interface FastingState {
   elapsedSeconds: number;
   fastingHours: number;
   isFastingTargetReached: boolean;
+  hasMealRecorded: boolean;
 }
 
 interface EnergyState {
@@ -39,7 +41,7 @@ interface HealthContextType {
   showWelcomeBackModal: boolean;
   addWaterGlass: () => Promise<void>;
   addStepsManual: (addedSteps: number) => Promise<void>;
-  resetFastingTimer: (timestamp?: string) => Promise<void>;
+  resetFastingTimer: (timestamp?: string | null) => Promise<void>;
   freshStartToday: () => Promise<void>;
   dismissWelcomeBackModal: () => void;
 }
@@ -58,23 +60,24 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Initial load for water glasses & step count
+  // Initial load for water glasses & step record
   useEffect(() => {
     async function initHealthData() {
       const loadedWater = await loadWaterGlasses(todayStr);
-      const loadedSteps = await loadStepCount(todayStr);
+      const stepRecord = await loadStepRecord(todayStr);
 
       setWaterGlasses(loadedWater);
-      setSensorSteps(loadedSteps);
+      setSensorSteps(stepRecord.sensorSteps);
+      setManualSteps(stepRecord.manualSteps);
 
-      // Check inactive > 36 hours
-      const lastMealTimeStr = profile.lastMealTimestamp || new Date().toISOString();
-      const lastMealTime = new Date(lastMealTimeStr).getTime();
-      const nowTime = new Date().getTime();
-      const hoursDiff = (nowTime - lastMealTime) / (1000 * 60 * 60);
+      if (profile.lastMealTimestamp) {
+        const lastMealTime = new Date(profile.lastMealTimestamp).getTime();
+        const nowTime = new Date().getTime();
+        const hoursDiff = (nowTime - lastMealTime) / (1000 * 60 * 60);
 
-      if (hoursDiff > 36) {
-        setShowWelcomeBackModal(true);
+        if (hoursDiff > 36) {
+          setShowWelcomeBackModal(true);
+        }
       }
     }
     initHealthData();
@@ -83,8 +86,11 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Real-time Fasting Clock Timer tick (Every 1 second)
   useEffect(() => {
     const updateClock = () => {
-      const lastMealTimeStr = profile.lastMealTimestamp || new Date().toISOString();
-      const lastTime = new Date(lastMealTimeStr).getTime();
+      if (!profile.lastMealTimestamp) {
+        setElapsedSeconds(0);
+        return;
+      }
+      const lastTime = new Date(profile.lastMealTimestamp).getTime();
       const now = new Date().getTime();
       const diffInSec = Math.max(0, Math.floor((now - lastTime) / 1000));
       setElapsedSeconds(diffInSec);
@@ -96,7 +102,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => clearInterval(interval);
   }, [profile.lastMealTimestamp]);
 
-  // Sync Pedometer sensor steps
+  // Sync Pedometer sensor steps with StepRecord persistence
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
     let baseSteps = 0;
@@ -106,12 +112,12 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (status.isAvailable) {
         baseSteps = status.stepCount;
         setSensorSteps(baseSteps);
-        saveStepCount(todayStr, baseSteps + manualSteps);
+        saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps });
 
         sub = subscribeStepCount((sessionSteps) => {
           const totalSensor = baseSteps + sessionSteps;
           setSensorSteps(totalSensor);
-          saveStepCount(todayStr, totalSensor + manualSteps);
+          saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps });
         });
       }
     }
@@ -124,19 +130,24 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [todayStr, manualSteps]);
 
   const addWaterGlass = async () => {
-    const updated = waterGlasses + 1;
-    setWaterGlasses(updated);
-    await saveWaterGlasses(todayStr, updated);
+    setWaterGlasses((prevWater) => {
+      const updated = prevWater + 1;
+      saveWaterGlasses(todayStr, updated);
+      return updated;
+    });
   };
 
   const addStepsManual = async (addedSteps: number) => {
-    const updatedManual = manualSteps + Math.max(0, addedSteps);
-    setManualSteps(updatedManual);
-    await saveStepCount(todayStr, sensorSteps + updatedManual);
+    const validAdded = Math.max(0, addedSteps);
+    setManualSteps((prevManual) => {
+      const updatedManual = prevManual + validAdded;
+      saveStepRecord(todayStr, { sensorSteps, manualSteps: updatedManual });
+      return updatedManual;
+    });
   };
 
-  const resetFastingTimer = async (timestamp?: string) => {
-    const newTime = timestamp || new Date().toISOString();
+  const resetFastingTimer = async (timestamp?: string | null) => {
+    const newTime = timestamp === null ? null : timestamp || new Date().toISOString();
     await updateProfile({ lastMealTimestamp: newTime });
   };
 
@@ -150,11 +161,13 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const steps = sensorSteps + manualSteps;
-  const fastingHours = Math.floor(elapsedSeconds / 3600);
+  const hasMealRecorded = profile.lastMealTimestamp !== null && profile.lastMealTimestamp !== undefined;
+  const fastingHours = hasMealRecorded ? Math.floor(elapsedSeconds / 3600) : 0;
   const fastingState: FastingState = {
-    elapsedSeconds,
+    elapsedSeconds: hasMealRecorded ? elapsedSeconds : 0,
     fastingHours,
-    isFastingTargetReached: fastingHours >= (profile.fastingTargetHours || 16),
+    isFastingTargetReached: hasMealRecorded && fastingHours >= (profile.fastingTargetHours || 16),
+    hasMealRecorded,
   };
 
   const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps);

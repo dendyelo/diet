@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,17 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
-import { useApp } from '../context/AppContext';
+import { useProfile, useAI } from '../context/AppContext';
 import { calculateBMR, calculateTDEE, BODY_TYPE_INFO } from '../utils/calorieCalc';
-import { getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
 import { BodyType } from '../types';
-import { Key, Save, CheckCircle2, Wifi, Activity, ExternalLink } from 'lucide-react-native';
+import { Key, Save, CheckCircle2, Wifi, Activity, ExternalLink, RefreshCw, Trash2 } from 'lucide-react-native';
 
 export const ProfileScreen: React.FC = () => {
-  const { profile, updateProfile } = useApp();
+  const { profile, updateProfile } = useProfile();
+  const { userApiKey, aiStatus, connectionStatus, updateApiKey, deleteApiKey, testConnection } = useAI();
 
   const [name, setName] = useState<string>(profile.name);
   const [age, setAge] = useState<string>(profile.age.toString());
@@ -28,15 +29,32 @@ export const ProfileScreen: React.FC = () => {
   const [bodyType, setBodyType] = useState<BodyType>(profile.bodyType || 'normal');
   const [targetDeficit, setTargetDeficit] = useState<string>(profile.targetDeficitKcal.toString());
   const [fastingTarget, setFastingTarget] = useState<string>((profile.fastingTargetHours || 16).toString());
-  const [apiKey, setApiKey] = useState<string>(profile.geminiApiKey || '');
+  const [apiKeyInput, setApiKeyInput] = useState<string>(userApiKey);
+  const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
   const [savedMsg, setSavedMsg] = useState<string>('');
+
+  useEffect(() => {
+    setApiKeyInput(userApiKey);
+  }, [userApiKey]);
 
   const bmr = calculateBMR({ ...profile, weightKg: Number(weight) || 70, heightCm: Number(height) || 170, age: Number(age) || 26, gender, bodyType });
   const tdee = calculateTDEE({ ...profile, weightKg: Number(weight) || 70, heightCm: Number(height) || 170, age: Number(age) || 26, gender, bodyType });
-  const aiStatus = getAIStatus(apiKey);
 
   const handleOpenGoogleAIStudio = () => {
     Linking.openURL('https://aistudio.google.com/app/apikey');
+  };
+
+  const handleTestConnection = async () => {
+    setIsTestingKey(true);
+    await testConnection();
+    setIsTestingKey(false);
+  };
+
+  const handleDeleteApiKey = async () => {
+    await deleteApiKey();
+    setApiKeyInput('');
+    setSavedMsg('✓ API Key berhasil dihapus!');
+    setTimeout(() => setSavedMsg(''), 3000);
   };
 
   const handleSave = async () => {
@@ -57,10 +75,13 @@ export const ProfileScreen: React.FC = () => {
       bodyType,
       targetDeficitKcal: parsedDeficit,
       fastingTargetHours: parsedFastingTarget,
-      geminiApiKey: apiKey.trim(),
     });
 
-    setSavedMsg('✓ Pengaturan profil & metabolisme berhasil diperbarui!');
+    if (apiKeyInput.trim() !== userApiKey) {
+      await updateApiKey(apiKeyInput.trim());
+    }
+
+    setSavedMsg('✓ Pengaturan profil & SecureStore API key berhasil disimpan!');
     setTimeout(() => setSavedMsg(''), 3000);
   };
 
@@ -206,11 +227,11 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        {/* Gemini API Key */}
+        {/* Gemini API Key (Encrypted SecureStore) */}
         <GlassCard>
           <View style={styles.headerRow}>
             <Key size={16} color="#F59E0B" />
-            <Text style={styles.sectionHeader} numberOfLines={1}>GEMINI AI API KEY</Text>
+            <Text style={styles.sectionHeader} numberOfLines={1}>GEMINI AI API KEY (SECURE STORE)</Text>
           </View>
 
           {/* AI Status Banner Container */}
@@ -232,16 +253,37 @@ export const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
 
           <Text style={styles.hint}>
-            Masukkan API Key Gemini AI milik Anda untuk mengaktifkan obrolan AI Coach Cloud.
+            API Key Anda tersimpan terenkripsi di SecureStore OS.
           </Text>
           <TextInput
             style={styles.input}
             placeholder="AIzaSy..."
             placeholderTextColor="rgba(255, 255, 255, 0.3)"
-            value={apiKey}
-            onChangeText={setApiKey}
+            value={apiKeyInput}
+            onChangeText={setApiKeyInput}
             secureTextEntry={true}
           />
+
+          {/* Test & Delete Buttons */}
+          <View style={styles.keyActionsRow}>
+            {userApiKey !== '' && (
+              <>
+                <TouchableOpacity style={styles.testBtn} onPress={handleTestConnection} disabled={isTestingKey}>
+                  {isTestingKey ? (
+                    <ActivityIndicator size="small" color="#60A5FA" />
+                  ) : (
+                    <RefreshCw size={13} color="#60A5FA" />
+                  )}
+                  <Text style={styles.testBtnText} numberOfLines={1}>Tes Koneksi API</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.deleteKeyBtn} onPress={handleDeleteApiKey}>
+                  <Trash2 size={13} color="#EF4444" />
+                  <Text style={styles.deleteKeyText} numberOfLines={1}>Hapus Key</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </GlassCard>
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
@@ -401,6 +443,45 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#10B981',
     flex: 1,
+  },
+  keyActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  testBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(96, 165, 250, 0.15)',
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+  },
+  testBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#60A5FA',
+  },
+  deleteKeyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  deleteKeyText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#EF4444',
   },
   label: {
     fontSize: 9,

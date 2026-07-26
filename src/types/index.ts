@@ -24,8 +24,7 @@ export interface UserProfile {
   targetDeficitKcal: number; // e.g. 500 kcal
   bedtimeHour: number; // 24-hr format, e.g. 23 (11 PM)
   fastingTargetHours: number; // e.g. 16 hours
-  lastMealTimestamp: string; // ISO String
-  geminiApiKey: string;
+  lastMealTimestamp?: string | null; // ISO String or null if no meals recorded
   isCheatDay: boolean;
 }
 
@@ -74,3 +73,11 @@ export interface DailySummary {
   isCheatDay: boolean;
   snackCount: number;
 }
+
+export type AIConnectionStatus =
+  | 'not_configured'
+  | 'checking'
+  | 'connected'
+  | 'invalid_key'
+  | 'rate_limited'
+  | 'offline';

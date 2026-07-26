@@ -2,22 +2,52 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { GlassCard } from './GlassCard';
 import { getFastingStage, formatElapsedTime } from '../utils/habitAnalytics';
-import { Flame, Clock, RefreshCw, Zap, Sparkles, Utensils } from 'lucide-react-native';
+import { Flame, Clock, RefreshCw, Zap, Sparkles, Utensils, PlayCircle } from 'lucide-react-native';
 
 interface EatingTimerProps {
   elapsedSeconds: number;
+  hasMealRecorded?: boolean;
   onEditTimePress: () => void;
+  onStartFastingNow?: () => void;
 }
 
 export const EatingTimer: React.FC<EatingTimerProps> = ({
   elapsedSeconds,
+  hasMealRecorded = true,
   onEditTimePress,
+  onStartFastingNow,
 }) => {
+  if (!hasMealRecorded) {
+    return (
+      <GlassCard style={styles.container}>
+        <View style={styles.headerRow}>
+          <View style={styles.timerTitleRow}>
+            <Clock size={16} color="rgba(255, 255, 255, 0.7)" />
+            <Text style={styles.title} numberOfLines={1}>STATUS PUASA</Text>
+          </View>
+        </View>
+
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle} numberOfLines={1}>Belum Ada Sesi Makan Tercatat</Text>
+          <Text style={styles.emptyDesc}>
+            Catat makanan pertama hari ini atau tekan tombol di bawah untuk memulai hitungan waktu puasa sekarang.
+          </Text>
+
+          {onStartFastingNow && (
+            <TouchableOpacity style={styles.startBtn} onPress={onStartFastingNow}>
+              <PlayCircle size={16} color="#FFFFFF" />
+              <Text style={styles.startBtnText} numberOfLines={1}>Mulai Puasa Sekarang</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </GlassCard>
+    );
+  }
+
   const elapsedHours = elapsedSeconds / 3600;
   const stage = getFastingStage(elapsedHours);
   const time = formatElapsedTime(elapsedSeconds);
 
-  // Render stage icon
   const renderStageIcon = () => {
     switch (stage.id) {
       case 'digesting':
@@ -40,24 +70,24 @@ export const EatingTimer: React.FC<EatingTimerProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.timerTitleRow}>
           <Clock size={16} color="rgba(255, 255, 255, 0.7)" />
-          <Text style={styles.title}>WAKTU SEJAK MAKAN TERAKHIR</Text>
+          <Text style={styles.title} numberOfLines={1}>WAKTU SEJAK MAKAN TERAKHIR</Text>
         </View>
 
         <TouchableOpacity style={styles.editBtn} onPress={onEditTimePress}>
           <RefreshCw size={12} color="#60A5FA" />
-          <Text style={styles.editText}>Edit Jam</Text>
+          <Text style={styles.editText} numberOfLines={1}>Edit Jam</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.clockRow}>
         <Text style={styles.clockText}>{time.formatted}</Text>
-        <Text style={styles.clockSub}>Jam : Menit : Detik</Text>
+        <Text style={styles.clockSub} numberOfLines={1}>Jam : Menit : Detik</Text>
       </View>
 
       <View style={[styles.stageBadgeContainer, { backgroundColor: stage.color + '18' }]}>
         <View style={styles.stageTitleRow}>
           {renderStageIcon()}
-          <Text style={[styles.stageName, { color: stage.color }]}>{stage.name}</Text>
+          <Text style={[styles.stageName, { color: stage.color }]} numberOfLines={1}>{stage.name}</Text>
         </View>
         <Text style={styles.stageDesc}>{stage.description}</Text>
       </View>
@@ -99,6 +129,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#60A5FA',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  emptyDesc: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  startBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  startBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   clockRow: {
     alignItems: 'center',

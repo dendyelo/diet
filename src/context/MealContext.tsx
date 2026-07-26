@@ -25,7 +25,7 @@ interface MealContextType {
 const MealContext = createContext<MealContextType | undefined>(undefined);
 
 export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { profile, updateProfile } = useProfile();
+  const { updateProfile } = useProfile();
   const [mealLogs, setMealLogs] = useState<MealLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -62,30 +62,51 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       itemsBreakdown,
     };
 
-    const updatedLogs = [newLog, ...mealLogs];
-    setMealLogs(updatedLogs);
-    await saveMealLogs(updatedLogs);
+    setMealLogs((prevLogs) => {
+      const updatedLogs = [newLog, ...prevLogs];
+      saveMealLogs(updatedLogs);
+      return updatedLogs;
+    });
 
     // Update last meal timestamp for fasting timer reset
     await updateProfile({ lastMealTimestamp: timestamp });
   };
 
   const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
-    const updatedLogs = mealLogs.map((log) => {
-      if (log.id === id) {
-        return { ...log, ...updatedFields };
-      }
-      return log;
+    setMealLogs((prevLogs) => {
+      const updatedLogs = prevLogs.map((log) => {
+        if (log.id === id) {
+          return { ...log, ...updatedFields };
+        }
+        return log;
+      });
+      saveMealLogs(updatedLogs);
+      return updatedLogs;
     });
-
-    setMealLogs(updatedLogs);
-    await saveMealLogs(updatedLogs);
   };
 
   const deleteMealLog = async (id: string) => {
-    const updatedLogs = mealLogs.filter((m) => m.id !== id);
-    setMealLogs(updatedLogs);
-    await saveMealLogs(updatedLogs);
+    let latestTimestampAfterDelete: string | null = null;
+
+    setMealLogs((prevLogs) => {
+      const updatedLogs = prevLogs.filter((m) => m.id !== id);
+      saveMealLogs(updatedLogs);
+
+      if (updatedLogs.length > 0) {
+        // Find latest remaining meal timestamp
+        const sorted = [...updatedLogs].sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        latestTimestampAfterDelete = sorted[0].timestamp;
+      } else {
+        latestTimestampAfterDelete = null;
+      }
+
+      return updatedLogs;
+    });
+
+    // Update profile lastMealTimestamp (null if all meals deleted)
+    await updateProfile({ lastMealTimestamp: latestTimestampAfterDelete });
   };
 
   const todayLogs = mealLogs.filter((log) => log.timestamp && log.timestamp.startsWith(todayStr));

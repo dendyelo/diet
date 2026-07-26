@@ -1,4 +1,4 @@
-import { NutritionData, FoodItemBreakdown } from '../types';
+import { NutritionData, FoodItemBreakdown, AIConnectionStatus } from '../types';
 import { smartIndonesianCulinaryEngine } from './aiServiceFallback';
 
 export { smartIndonesianCulinaryEngine };
@@ -18,6 +18,7 @@ export interface AIStatus {
   modeLabel: string;
   color: string;
   description: string;
+  connectionStatus: AIConnectionStatus;
 }
 
 export interface AICoachResponse {
@@ -27,36 +28,101 @@ export interface AICoachResponse {
 }
 
 /**
- * Check Gemini AI Cloud API Status
+ * Check Gemini AI Cloud API Connection Status dynamically
  */
-export function getAIStatus(userApiKey?: string): AIStatus {
-  if (userApiKey && userApiKey.trim().length > 0) {
+export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionStatus = 'not_configured'): AIStatus {
+  if (!userApiKey || userApiKey.trim().length === 0) {
     return {
-      isOnline: true,
-      modeLabel: 'Gemini 2.5 Flash Cloud (Aktif 🟢)',
+      isOnline: false,
+      modeLabel: 'Smart Culinary Engine (Aktif 🟢)',
       color: '#10B981',
-      description: 'Presisi Cloud tinggi dengan bedah metode memasak, santan, minyak & porsi presisi.',
+      description: 'Engine kuliner presisi internal berbasis tabel gizi makanan Indonesia.',
+      connectionStatus: 'not_configured',
     };
   }
+
+  if (connectionStatus === 'connected') {
+    return {
+      isOnline: true,
+      modeLabel: 'Gemini 2.5 Flash Cloud (Terhubung 🟢)',
+      color: '#10B981',
+      description: 'Terhubung langsung ke Google AI Studio Cloud dengan presisi analisis tinggi.',
+      connectionStatus: 'connected',
+    };
+  }
+
+  if (connectionStatus === 'invalid_key') {
+    return {
+      isOnline: false,
+      modeLabel: 'API Key Tidak Valid (Error 🔴)',
+      color: '#EF4444',
+      description: 'API Key ditolak oleh Google AI Cloud (401/403). Menggunakan Engine cadangan.',
+      connectionStatus: 'invalid_key',
+    };
+  }
+
+  if (connectionStatus === 'rate_limited') {
+    return {
+      isOnline: false,
+      modeLabel: 'Quota Terlampaui (429 🟠)',
+      color: '#F59E0B',
+      description: 'Batas kuota harian tercapai. Menggunakan Smart Culinary Engine cadangan.',
+      connectionStatus: 'rate_limited',
+    };
+  }
+
+  if (connectionStatus === 'checking') {
+    return {
+      isOnline: false,
+      modeLabel: 'Memeriksa Koneksi (Checking 🟡)',
+      color: '#F59E0B',
+      description: 'Sedang menguji respon server Google AI Cloud...',
+      connectionStatus: 'checking',
+    };
+  }
+
   return {
-    isOnline: false,
-    modeLabel: 'Smart Culinary Engine (Aktif 🟢)',
+    isOnline: true,
+    modeLabel: 'Gemini 2.5 Flash Cloud (Siap 🟢)',
     color: '#10B981',
-    description: 'Engine kuliner presisi internal berbasis tabel gizi makanan Indonesia.',
+    description: 'API Key terkonfigurasi. Siap menganalisis nutrisi secara presisi.',
+    connectionStatus: connectionStatus || 'not_configured',
   };
 }
 
 /**
- * Handle HTTP Error Status Codes gracefully (401, 403, 429)
+ * Test Real Connection to Gemini AI API
  */
-function handleHTTPErrorStatus(status: number): string {
-  if (status === 401 || status === 403) {
-    return 'Gemini API Key tidak valid atau tidak memiliki izin akses (401/403). Mohon periksa API Key di menu Profil.';
+export async function testGeminiAPIConnection(userApiKey: string): Promise<AIConnectionStatus> {
+  const cleanKey = userApiKey.trim();
+  if (!cleanKey) return 'not_configured';
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cleanKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Ping test' }] }],
+        }),
+      }
+    );
+
+    if (response.ok) {
+      return 'connected';
+    }
+    if (response.status === 401 || response.status === 403) {
+      return 'invalid_key';
+    }
+    if (response.status === 429) {
+      return 'rate_limited';
+    }
+    return 'offline';
+  } catch (error) {
+    console.error('Test connection network error:', error);
+    return 'offline';
   }
-  if (status === 429) {
-    return 'Batas penggunaan harian Gemini AI telah tercapai (429 Rate Limit Exceeded). Menggunakan Smart Culinary Engine cadangan.';
-  }
-  return `Gagal terhubung ke Google AI Cloud (HTTP ${status}).`;
 }
 
 /**
@@ -71,7 +137,6 @@ export async function parseFoodNutritionWithAI(
     throw new Error('Deskripsi makanan tidak boleh kosong.');
   }
 
-  // If user provided a Gemini API Key, try cloud API first
   if (userApiKey && userApiKey.trim().length > 0) {
     try {
       const prompt = `Anda adalah Pakar Gizi & Ahli Kuliner Spesialis Makanan Indonesia & Internasional dengan presisi tinggi.
@@ -79,11 +144,11 @@ Tugas Anda adalah melakukan bedah nutrisi ultra-presisi terhadap input pengguna:
 
 ATURAN ANALISIS PINTAR:
 1. DETEKSI METODE MEMASAK: Bedakan Goreng Deep-Fry (minyak +80 kcal), Bakar/Panggang (rendah lemak), Santan/Gulai (lemak jenuh), Kukus/Rebus.
-2. DETEKSI KUANTITAS: 1 Telur Rebus = 78 kcal, 2 Telur Rebus = 156 kcal, 3 Telur = 234 kcal. 1 Ayam Bakar = 220 kcal, 2 Ayam Bakar = 440 kcal.
-3. DETEKSI MINUMAN & GULA: Bedakan Less Sugar (-30% kalori), Zero Sugar, dan Boba topping.
-4. BEDAH KOMPONEN HIDANGAN: Jika input adalah "Nasi Uduk Komplit", pecah menjadi: Nasi Uduk (Santan), Orek Tempe, Biun Goreng, Telur Suwir, Sambal.
+2. DETEKSI KUANTITAS: 1 Telur Rebus = 78 kcal, 2 Telur Rebus = 156 kcal.
+3. DETEKSI MINUMAN & GULA: Bedakan Less Sugar (-30% kalori), Zero Sugar.
+4. BEDAH KOMPONEN HIDANGAN: Jika input adalah "Nasi Uduk Komplit", pecah menjadi komponennya.
 
-Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan luar:
+Kembalikan HANYA format JSON valid tanpa markdown:
 {
   "name": "Nama hidangan yang rapi dan profesional",
   "calories": 520,
@@ -93,10 +158,9 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan lua
   "fiberGrams": 4,
   "itemsBreakdown": [
     { "name": "1 Centong Nasi Putih", "calories": 200 },
-    { "name": "2 Butir Telur Dadar", "calories": 220 },
-    { "name": "Sambal Terasi", "calories": 40 }
+    { "name": "2 Butir Telur Dadar", "calories": 220 }
   ],
-  "aiNotes": "Catatan gizi pintar 1 kalimat (misal: 'Tinggi protein (32g), perhatikan kadar lemak dari gorengan.')"
+  "aiNotes": "Catatan gizi pintar 1 kalimat"
 }`;
 
       const response = await fetch(
@@ -116,7 +180,6 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan lua
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
-
           const items: FoodItemBreakdown[] = Array.isArray(parsed.itemsBreakdown)
             ? parsed.itemsBreakdown.map((it: any) => ({
                 name: it.name || 'Item',
@@ -141,15 +204,12 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan lua
             itemsBreakdown: items,
           };
         }
-      } else {
-        console.warn(handleHTTPErrorStatus(response.status));
       }
     } catch (error) {
       console.warn('Gemini Cloud API call failed, using Smart Culinary Engine:', error);
     }
   }
 
-  // Smart Built-in Engine Fallback
   return smartIndonesianCulinaryEngine(cleanInput);
 }
 
@@ -172,21 +232,19 @@ export async function generateAICoachMessageWithAI(
     try {
       const balanceStatus = userData.netDeficit >= 0
         ? `DEFISIT ${userData.netDeficit} kcal (Baguss 🟢)`
-        : `SURPLUS ${Math.abs(userData.netDeficit)} kcal (PERINGATAN SURPLUS 🔴 - Kalori Masuk ${userData.caloriesIn} kcal lebih besar dari Kalori Keluar!)`;
+        : `SURPLUS ${Math.abs(userData.netDeficit)} kcal (PERINGATAN SURPLUS 🔴)`;
 
-      const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach yang hangat, peduli, empati, ramah, dan agak humoris santai.
-
-DATA PENGGUNA SAAT INI (Jam ${userData.currentHour}:00):
+      const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.
+DATA PENGGUNA (Jam ${userData.currentHour}:00):
 - Nama: ${userData.name || 'Teman'}
 - Berpuasa: ${userData.fastingHours} Jam
-- Total Kalori Masuk (Dimakan): ${userData.caloriesIn} kcal
+- Total Kalori Masuk: ${userData.caloriesIn} kcal
 - Status Keseimbangan Energi: ${balanceStatus}
-- Jumlah Langkah: ${userData.steps} steps
+- Langkah: ${userData.steps} steps
 - Air Minum: ${userData.waterGlasses} / 8 gelas
 
 TUGAS:
-Buatkan 1 dialog sapaan & pertanyaan interaktif yang kreatif, alami, dan bebas menyesuaikan data ini! Jika status energi SURPLUS, beri peringatan empati bahwa kalori masuk melebihi kalori keluar saat ini.
-Kembalikan HANYA format JSON valid tanpa markdown formatting:
+Kembalikan HANYA format JSON valid:
 {
   "coachMessage": "kalimat sapaan empati & saran gizi kreatif 1-2 kalimat",
   "questionPrompt": "pertanyaan interaktif santai",
@@ -216,8 +274,6 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting:
             recommendedAction: parsed.recommendedAction || 'meal',
           };
         }
-      } else {
-        console.warn(handleHTTPErrorStatus(response.status));
       }
     } catch (err) {
       console.error('Error generating AI Coach message:', err);

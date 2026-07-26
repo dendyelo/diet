@@ -6,12 +6,12 @@ import { GlassCard } from '../components/GlassCard';
 import { PieChart, TrendingUp, Sparkles, Award } from 'lucide-react-native';
 
 export const AnalyticsScreen: React.FC = () => {
-  const { mealLogs, fastingState, profile } = useApp();
+  const { mealLogs = [], fastingState, profile } = useApp();
 
-  const triggerStats = calculateTriggerStats(mealLogs);
+  const triggerStats = calculateTriggerStats(mealLogs || []);
 
-  const totalMealCalories = mealLogs.reduce((acc, log) => acc + log.nutrition.calories, 0);
-  const snackLogsCount = mealLogs.filter((m) => m.isSnack).length;
+  const totalMealCalories = (mealLogs || []).reduce((acc, log) => acc + (log.nutrition?.calories || 0), 0);
+  const snackLogsCount = (mealLogs || []).filter((m) => m.isSnack).length;
 
   const topTrigger = triggerStats.breakdown.length > 0 ? triggerStats.breakdown[0] : null;
 
@@ -32,16 +32,16 @@ export const AnalyticsScreen: React.FC = () => {
             <Text style={[styles.miniValue, { color: '#60A5FA' }]} numberOfLines={1}>
               {totalMealCalories} kcal
             </Text>
-            <Text style={styles.miniSub} numberOfLines={1}>{mealLogs.length} Kali Makan/Cemil</Text>
+            <Text style={styles.miniSub} numberOfLines={1}>{(mealLogs || []).length} Kali Makan/Cemil</Text>
           </GlassCard>
 
           <GlassCard style={styles.miniCard}>
             <Award size={16} color="#10B981" />
             <Text style={styles.miniLabel} numberOfLines={1}>PUASA TERLAKSANA</Text>
             <Text style={[styles.miniValue, { color: '#10B981' }]} numberOfLines={1}>
-              {fastingState.fastingHours} Jam
+              {fastingState?.fastingHours || 0} Jam
             </Text>
-            <Text style={styles.miniSub} numberOfLines={1}>Target: {profile.fastingTargetHours} Jam</Text>
+            <Text style={styles.miniSub} numberOfLines={1}>Target: {profile?.fastingTargetHours || 16} Jam</Text>
           </GlassCard>
         </View>
 

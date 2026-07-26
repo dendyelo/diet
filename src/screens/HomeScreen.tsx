@@ -39,7 +39,6 @@ export const HomeScreen: React.FC = () => {
     addMealLog,
     deleteMealLog,
     addWaterGlass,
-    addStepsManual,
     resetFastingTimer,
     toggleCheatDay,
     freshStartToday,
@@ -125,7 +124,7 @@ export const HomeScreen: React.FC = () => {
           targetWaterGlasses={8}
         />
 
-        {/* 4. Hydration & Steps Quick Widget Row */}
+        {/* 4. Hydration & Automatic Sensor Steps Widget Row */}
         <View style={styles.widgetRow}>
           {/* Water Widget */}
           <GlassCard style={styles.widgetCard}>
@@ -139,16 +138,17 @@ export const HomeScreen: React.FC = () => {
             </TouchableOpacity>
           </GlassCard>
 
-          {/* Steps Widget */}
+          {/* Steps Widget (100% Automated Sensor Sync) */}
           <GlassCard style={styles.widgetCard}>
             <View style={styles.widgetHeader}>
               <Footprints size={18} color="#10B981" />
-              <Text style={styles.widgetTitle}>LANGKAH KAKI</Text>
+              <Text style={styles.widgetTitle}>LANGKAH (PEDOMETER)</Text>
             </View>
             <Text style={styles.widgetValue}>{steps.toLocaleString()} Steps</Text>
-            <TouchableOpacity style={styles.widgetBtn} onPress={() => addStepsManual(1000)}>
-              <Text style={styles.widgetBtnText}>+ 1.000 Steps</Text>
-            </TouchableOpacity>
+            <View style={styles.autoSensorBadge}>
+              <View style={styles.sensorDot} />
+              <Text style={styles.autoSensorText}>Otomatis Sensor HP</Text>
+            </View>
           </GlassCard>
         </View>
 
@@ -324,6 +324,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  autoSensorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  sensorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  autoSensorText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#10B981',
   },
   adviceCard: {
     borderColor: 'rgba(245, 158, 11, 0.3)',

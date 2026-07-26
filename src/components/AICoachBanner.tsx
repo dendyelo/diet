@@ -76,29 +76,28 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
     fetchAICoachGreeting();
   }, [userApiKey, caloriesIn, waterGlasses]);
 
-  // Fallback Local Engine Messages if no API Key or offline
-  let localMessage = aiMessage;
-  let localQuestion = aiQuestion;
+  let displayMessage = aiMessage;
+  let displayQuestion = aiQuestion;
 
-  if (!isCloudAI || !localMessage) {
+  if (!isCloudAI || !displayMessage) {
     if (caloriesIn === 0 && currentHour >= 12) {
-      localMessage = `Halo ${userName}! Sudah jam ${currentHour}:00 dan kamu belum mencatat makanan hari ini.`;
-      localQuestion = 'Apakah kamu sudah lapar dan mau makan siang sekarang?';
+      displayMessage = `Halo ${userName}! Sudah jam ${currentHour}:00 dan kamu belum mencatat makanan hari ini.`;
+      displayQuestion = 'Apakah kamu sudah lapar dan mau makan siang sekarang?';
     } else if (netDeficit > 700 && caloriesIn < 800 && currentHour >= 13) {
-      localMessage = `Defisit kalorimu saat ini cukup besar (${netDeficit} kcal). Jagalah tenaga tubuhmu agar tidak terlalu lemas!`;
-      localQuestion = 'Apakah perutmu mulai menyuarakan lapar asli?';
+      displayMessage = `Defisit kalorimu saat ini cukup besar (${netDeficit} kcal). Jagalah tenaga tubuhmu agar tidak terlalu lemas!`;
+      displayQuestion = 'Apakah perutmu mulai menyuarakan lapar asli?';
     } else if (fastingHours >= 14 && fastingHours < 18) {
-      localMessage = `Luar biasa! Kamu sudah berpuasa selama ${fastingHours} jam. Tubuhmu sedang aktif dalam fase Pembakaran Lemak (Fat Adaptation)! 🔥`;
-      localQuestion = 'Bagaimana rasanya? Masih merasa segar atau ingin membatalkan puasa?';
+      displayMessage = `Luar biasa! Kamu sudah berpuasa selama ${fastingHours} jam. Tubuhmu sedang aktif dalam fase Pembakaran Lemak (Fat Adaptation)! 🔥`;
+      displayQuestion = 'Bagaimana rasanya? Masih merasa segar atau ingin membatalkan puasa?';
     } else if (waterGlasses < 4 && currentHour >= 14) {
-      localMessage = `Asupan air minummu baru ${waterGlasses} gelas hari ini. Seringkali rasa 'ngemil' sebenarnya adalah sinyal haus dari otak.`;
-      localQuestion = 'Yuk, minum 1 gelas air putih dingin sekarang?';
+      displayMessage = `Asupan air minummu baru ${waterGlasses} gelas hari ini. Seringkali rasa 'ngemil' sebenarnya adalah sinyal haus dari otak.`;
+      displayQuestion = 'Yuk, minum 1 gelas air putih dingin sekarang?';
     } else if (steps < 2000 && currentHour >= 16) {
-      localMessage = `Langkah kakimu baru ${steps} steps hari ini.`;
-      localQuestion = 'Mau luangkan 10-15 menit jalan santai sore ini untuk membakar lemak lebih lancar?';
+      displayMessage = `Langkah kakimu baru ${steps} steps hari ini.`;
+      displayQuestion = 'Mau luangkan 10-15 menit jalan santai sore ini untuk membakar lemak lebih lancar?';
     } else {
-      localMessage = `Hebat ${userName}! Pola habit dan defisit kalorimu berjalan sangat rapi hari ini.`;
-      localQuestion = 'Bagaimana kondisi tubuh dan energi perasaanmu saat ini?';
+      displayMessage = `Hebat ${userName}! Pola habit dan defisit kalorimu berjalan sangat rapi hari ini.`;
+      displayQuestion = 'Bagaimana kondisi tubuh dan energi perasaanmu saat ini?';
     }
   }
 
@@ -107,9 +106,7 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.aiBadge}>
           <Sparkles size={14} color="#10B981" />
-          <Text style={styles.aiBadgeText}>
-            {isCloudAI ? 'GEMINI AI COACH CLOUD 🟢' : 'AI HEALTH COACH INTERAKTIF 🟡'}
-          </Text>
+          <Text style={styles.aiBadgeText}>GEMINI AI HEALTH COACH 🟢</Text>
         </View>
 
         <View style={styles.rightIcons}>
@@ -130,8 +127,8 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
         </View>
       </View>
 
-      <Text style={styles.coachMessage}>{localMessage}</Text>
-      <Text style={styles.questionPrompt}>{localQuestion}</Text>
+      <Text style={styles.coachMessage}>{displayMessage}</Text>
+      <Text style={styles.questionPrompt}>{displayQuestion}</Text>
 
       {/* Interactive Quick Answer Buttons */}
       <View style={styles.actionGrid}>

@@ -12,6 +12,7 @@ import { useApp } from '../context/AppContext';
 import { calculateEnergyBalance } from '../utils/calorieCalc';
 import { EnergyGauge } from '../components/EnergyGauge';
 import { EatingTimer } from '../components/EatingTimer';
+import { AICoachBanner } from '../components/AICoachBanner';
 import { HabitRings } from '../components/HabitRings';
 import { MealCard } from '../components/MealCard';
 import { SnackModal } from '../components/SnackModal';
@@ -100,7 +101,20 @@ export const HomeScreen: React.FC = () => {
           onEditTimePress={() => setShowAddMealModal(true)}
         />
 
-        {/* 2. Live Synchronized Energy Balance Gauge (Gradual Pro-Rated BMR) */}
+        {/* 2. Interactive AI Health Coach Proactive Banner */}
+        <AICoachBanner
+          elapsedSeconds={elapsedSeconds}
+          caloriesIn={totalCaloriesIn}
+          netDeficit={energy.netBalance}
+          steps={steps}
+          waterGlasses={waterGlasses}
+          userName={profile.name}
+          onOpenAddMeal={() => setShowAddMealModal(true)}
+          onOpenSnack={() => setShowSnackModal(true)}
+          onAddWater={addWaterGlass}
+        />
+
+        {/* 3. Live Synchronized Energy Balance Gauge */}
         <EnergyGauge
           caloriesIn={totalCaloriesIn}
           caloriesOut={energy.totalCaloriesOut}
@@ -126,7 +140,7 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* 3. Daily Habit Rings */}
+        {/* 4. Daily Habit Rings */}
         <HabitRings
           percentageDeficit={energy.percentageToGoal}
           snackCount={snackCount}
@@ -135,7 +149,7 @@ export const HomeScreen: React.FC = () => {
           targetWaterGlasses={8}
         />
 
-        {/* 4. Hydration & Automatic Sensor Steps Widget Row */}
+        {/* 5. Hydration & Automatic Sensor Steps Widget Row */}
         <View style={styles.widgetRow}>
           {/* Water Widget */}
           <GlassCard style={styles.widgetCard}>

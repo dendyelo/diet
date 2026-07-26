@@ -32,14 +32,17 @@ export interface AICoachResponse {
  * Provides combined daily free quota across all model buckets.
  */
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',       // Primary model (fresh keys & daily reset quota)
-  'gemini-3.5-flash',       // Active fallback 1
-  'gemini-3.6-flash',       // Active fallback 2
-  'gemini-3.5-flash-lite',  // Active fallback 3
-  'gemini-3.1-flash-lite',  // Active fallback 4
-  'gemini-flash-latest',    // Active fallback 5
-  'gemma-4-31b-it',         // Active fallback 6 (1500 RPD)
-  'gemma-4-26b-a4b-it',     // Active fallback 7 (1500 RPD)
+  'gemini-2.5-flash',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3-flash-preview',
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+  'gemma-4-31b-it',
+  'gemma-4-26b-a4b-it',
 ];
 
 /**

@@ -43,5 +43,17 @@ describe('AI Service & Error Status Code Suite', () => {
     expect(result.isOnlineAI).toBe(false);
     expect(result.nutrition.calories).toBeGreaterThan(0);
     expect(result.itemsBreakdown.length).toBeGreaterThan(0);
+    expect(result.aiNotes).toContain('Koneksi ke Gemini Cloud terputus');
+  });
+
+  test('parseFoodNutritionWithAI provides specific error note on rate limiting', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+    } as any);
+
+    const result = await parseFoodNutritionWithAI('Sate Ayam', 'valid-key');
+    expect(result.isOnlineAI).toBe(false);
+    expect(result.aiNotes).toContain('Kuota Gemini Cloud terlampaui');
   });
 });

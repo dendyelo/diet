@@ -207,8 +207,8 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
 
       // --- 1. Try Gemini Cloud first if API key is configured ---
       if (userApiKey && userApiKey.trim() !== '') {
-        try {
-          const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
+        const key = userApiKey.trim();
+        const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.
 Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
 
 KONTEKS REAL-TIME PENGGUNA SAAT INI:
@@ -221,32 +221,36 @@ KONTEKS REAL-TIME PENGGUNA SAAT INI:
 
 PERTANYAAN PENGGUNA: "${query}"
 
-Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), SEBUTKAN KALORI DAN NUTRISI SPESIFIK MAKANAN TERSEBUT SECARA AKURAT. Jika pengguna menanyakan data pribadinya (langkah, kalori, air, puasa), JAWAB BERDASARKAN KONTEKS REAL-TIME DI ATAS. Berikan saran praktis 2-3 paragraf singkat.`;
+Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), berikan estimasi kalori dan nutrisinya. Jika pengguna menanyakan data pribadinya (langkah, kalori, air, puasa), jawab berdasarkan konteks real-time di atas. Berikan saran praktis 2-3 paragraf singkat.`;
 
+        const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash'];
+        for (const model of modelsToTry) {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000);
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          try {
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                }),
+                signal: controller.signal,
+              }
+            );
 
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-              }),
-              signal: controller.signal,
+            if (response.ok) {
+              const data = await response.json();
+              replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (replyText) break;
             }
-          );
-
-          clearTimeout(timeoutId);
-
-          if (response.ok) {
-            const data = await response.json();
-            replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (response.status === 401 || response.status === 403) break;
+          } catch (fetchErr) {
+            console.warn(`Gemini Cloud chat for ${model} failed:`, fetchErr);
+          } finally {
+            clearTimeout(timeoutId);
           }
-        } catch (fetchErr) {
-          // Gemini failed (network, timeout, etc.) — continue to offline fallback
-          console.warn('Gemini Cloud chat failed, using offline fallback:', fetchErr);
         }
       }
 

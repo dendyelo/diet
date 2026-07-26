@@ -164,7 +164,7 @@ export function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
       fatGrams: totalFat,
     },
     confidence: 'medium',
-    aiNotes: `Analisis presisi metode pengolahan & porsi kuliner.`,
+    aiNotes: 'Estimasi nutrisi kuliner berdasarkan metode pengolahan & porsi standar.',
     isOnlineAI: false,
     itemsBreakdown: items,
   };

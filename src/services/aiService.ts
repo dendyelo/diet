@@ -28,9 +28,9 @@ export interface AICoachResponse {
 }
 
 /**
- * Available Gemini models to try in sequence if one hits rate limits (429)
+ * Gemini models for automatic fallback
  */
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.6-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash'];
 
 /**
  * Check Gemini AI Cloud API Connection Status dynamically
@@ -41,7 +41,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
       isOnline: false,
       modeLabel: 'Smart Culinary Engine (Aktif 🟢)',
       color: '#10B981',
-      description: 'Engine kuliner presisi internal berbasis tabel gizi makanan Indonesia.',
+      description: 'Engine kuliner internal berbasis estimasi tabel gizi makanan Indonesia.',
       connectionStatus: 'not_configured',
     };
   }
@@ -51,7 +51,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
       isOnline: true,
       modeLabel: 'Gemini Cloud AI (Terhubung 🟢)',
       color: '#10B981',
-      description: 'Terhubung langsung ke Google AI Studio Cloud dengan presisi analisis tinggi.',
+      description: 'Terhubung langsung ke Google AI Studio Cloud untuk estimasi gizi cerdas.',
       connectionStatus: 'connected',
     };
   }
@@ -69,9 +69,9 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
   if (connectionStatus === 'rate_limited') {
     return {
       isOnline: false,
-      modeLabel: 'Quota Terlampaui (429 🟠)',
+      modeLabel: 'Kuota Terlampaui (429 🟠)',
       color: '#F59E0B',
-      description: 'Batas kuota harian tercapai. Menggunakan Smart Culinary Engine cadangan.',
+      description: 'Batas kuota terlampaui. Menggunakan Engine Kuliner cadangan.',
       connectionStatus: 'rate_limited',
     };
   }
@@ -90,19 +90,21 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
     isOnline: true,
     modeLabel: 'Gemini Cloud AI (Siap 🟢)',
     color: '#10B981',
-    description: 'API Key terkonfigurasi. Siap menganalisis nutrisi secara presisi.',
+    description: 'API Key terkonfigurasi. Siap membantu estimasi nutrisi.',
     connectionStatus: connectionStatus || 'not_configured',
   };
 }
 
 /**
- * Test Real Connection to Gemini AI API (tries multiple models if rate limited)
+ * Test Real Connection to Gemini AI API
  */
 export async function testGeminiAPIConnection(userApiKey: string): Promise<AIConnectionStatus> {
   const cleanKey = userApiKey.trim();
   if (!cleanKey) return 'not_configured';
 
   for (const model of GEMINI_MODELS) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`,
@@ -112,6 +114,7 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
           body: JSON.stringify({
             contents: [{ parts: [{ text: 'Ping test' }] }],
           }),
+          signal: controller.signal,
         }
       );
 
@@ -121,9 +124,10 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
       if (response.status === 401 || response.status === 403) {
         return 'invalid_key';
       }
-      // If 429, try next model in loop
     } catch (error) {
-      console.error(`Test connection error for ${model}:`, error);
+      console.warn(`Test connection error for ${model}:`, error);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -132,7 +136,6 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
 
 /**
  * Estimate nutrition from food description using Gemini AI API with Smart Fallback
- * Tries multiple models (gemini-2.5-flash, gemini-3.5-flash, gemini-3.6-flash) if 429 rate limit is hit.
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -143,20 +146,22 @@ export async function parseFoodNutritionWithAI(
     throw new Error('Deskripsi makanan tidak boleh kosong.');
   }
 
+  let lastErrorReason: 'invalid_key' | 'rate_limited' | 'network_error' | null = null;
+
   if (userApiKey && userApiKey.trim().length > 0) {
     const key = userApiKey.trim();
-    const prompt = `Anda adalah Pakar Gizi & Ahli Kuliner Spesialis Makanan Indonesia & Internasional dengan presisi tinggi.
-Tugas Anda adalah melakukan bedah nutrisi ultra-presisi terhadap input pengguna: "${cleanInput}".
+    const prompt = `Anda adalah Pakar Gizi & Ahli Kuliner Spesialis Makanan Indonesia & Internasional.
+Tugas Anda adalah melakukan estimasi nutrisi makanan terhadap input pengguna: "${cleanInput}".
 
-ATURAN ANALISIS PINTAR:
-1. DETEKSI METODE MEMASAK: Bedakan Goreng Deep-Fry (minyak +80 kcal), Bakar/Panggang (rendah lemak), Santan/Gulai (lemak jenuh), Kukus/Rebus.
+ATURAN ANALISIS:
+1. DETEKSI METODE MEMASAK: Bedakan Goreng (minyak +80 kcal), Bakar/Panggang (rendah lemak), Santan/Gulai (lemak jenuh), Kukus/Rebus.
 2. DETEKSI KUANTITAS: 1 Telur Rebus = 78 kcal, 2 Telur Rebus = 156 kcal.
 3. DETEKSI MINUMAN & GULA: Bedakan Less Sugar (-30% kalori), Zero Sugar.
 4. BEDAH KOMPONEN HIDANGAN: Jika input adalah "Nasi Uduk Komplit", pecah menjadi komponennya.
 
 Kembalikan HANYA format JSON valid tanpa markdown:
 {
-  "name": "Nama hidangan yang rapi dan profesional",
+  "name": "Nama hidangan yang rapi",
   "calories": 520,
   "proteinGrams": 32,
   "carbsGrams": 48,
@@ -166,14 +171,14 @@ Kembalikan HANYA format JSON valid tanpa markdown:
     { "name": "1 Centong Nasi Putih", "calories": 200 },
     { "name": "2 Butir Telur Dadar", "calories": 220 }
   ],
-  "aiNotes": "Catatan gizi pintar 1 kalimat"
+  "aiNotes": "Catatan gizi ringkas 1 kalimat"
 }`;
 
     for (const model of GEMINI_MODELS) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+      try {
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
           {
@@ -185,8 +190,6 @@ Kembalikan HANYA format JSON valid tanpa markdown:
             signal: controller.signal,
           }
         );
-
-        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
@@ -213,7 +216,7 @@ Kembalikan HANYA format JSON valid tanpa markdown:
                 fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
               },
               confidence: 'high',
-              aiNotes: parsed.aiNotes || `Analisis 100% presisi Cloud oleh ${model}`,
+              aiNotes: parsed.aiNotes || `Estimasi nutrisi oleh Gemini Cloud AI (${model})`,
               isOnlineAI: true,
               itemsBreakdown: items,
             };
@@ -221,25 +224,36 @@ Kembalikan HANYA format JSON valid tanpa markdown:
         }
 
         if (response.status === 401 || response.status === 403) {
-          break; // Don't try other models if key itself is invalid
+          lastErrorReason = 'invalid_key';
+          break;
         }
-        // If 429, loop continue to next model
+        if (response.status === 429) {
+          lastErrorReason = 'rate_limited';
+        }
       } catch (error) {
+        lastErrorReason = 'network_error';
         console.warn(`Gemini Cloud API call for ${model} failed:`, error);
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
   }
 
   const fallbackResult = smartIndonesianCulinaryEngine(cleanInput);
   if (userApiKey && userApiKey.trim().length > 0) {
-    fallbackResult.aiNotes = '⚠️ Kuota Gemini Cloud penuh. Menggunakan Engine Kuliner Offline.';
+    if (lastErrorReason === 'invalid_key') {
+      fallbackResult.aiNotes = '⚠️ API Key tidak valid (401/403). Menggunakan estimasi offline.';
+    } else if (lastErrorReason === 'rate_limited') {
+      fallbackResult.aiNotes = '⚠️ Kuota Gemini Cloud terlampaui. Menggunakan estimasi offline.';
+    } else {
+      fallbackResult.aiNotes = '⚠️ Koneksi ke Gemini Cloud terputus. Menggunakan estimasi offline.';
+    }
   }
   return fallbackResult;
 }
 
 /**
  * Generate Dynamic Creative AI Coach Greeting & Question using Gemini AI Cloud API
- * Tries multiple models if rate limit (429) is encountered.
  */
 export async function generateAICoachMessageWithAI(
   userData: {
@@ -277,6 +291,9 @@ Kembalikan HANYA format JSON valid:
 }`;
 
     for (const model of GEMINI_MODELS) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       try {
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -286,6 +303,7 @@ Kembalikan HANYA format JSON valid:
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
             }),
+            signal: controller.signal,
           }
         );
 
@@ -305,6 +323,8 @@ Kembalikan HANYA format JSON valid:
         if (response.status === 401 || response.status === 403) break;
       } catch (err) {
         console.error(`Error generating AI Coach message with ${model}:`, err);
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
   }

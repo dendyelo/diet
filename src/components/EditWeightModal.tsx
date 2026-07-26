@@ -16,8 +16,10 @@ interface EditWeightModalProps {
   visible: boolean;
   onClose: () => void;
   onSave: (id: string, updatedFields: { weightKg?: number; note?: string }) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<boolean>;
   weightLog: WeightLog | null;
+  /** When true, the delete button is disabled (e.g. only one log remaining) */
+  isOnlyLog?: boolean;
 }
 
 export const EditWeightModal: React.FC<EditWeightModalProps> = ({
@@ -26,6 +28,7 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
   onSave,
   onDelete,
   weightLog,
+  isOnlyLog = false,
 }) => {
   const [weight, setWeight] = useState('');
   const [note, setNote] = useState('');
@@ -41,13 +44,13 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
 
   const handleSave = () => {
     if (!weightLog) return;
-    
+
     const parsedWeight = parseFloat(weight.replace(',', '.'));
     if (isNaN(parsedWeight) || parsedWeight < 20 || parsedWeight > 300) {
       setError('Berat badan harus antara 20 dan 300 kg');
       return;
     }
-    
+
     onSave(weightLog.id, {
       weightKg: parsedWeight,
       note: note.trim() !== '' ? note.trim() : undefined,
@@ -56,20 +59,24 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
   };
 
   const handleDelete = () => {
-    if (!weightLog) return;
-    
+    if (!weightLog || isOnlyLog) return;
+
     Alert.alert(
       'Hapus Data',
       'Apakah Anda yakin ingin menghapus catatan berat badan ini?',
       [
         { text: 'Batal', style: 'cancel' },
-        { 
-          text: 'Hapus', 
+        {
+          text: 'Hapus',
           style: 'destructive',
-          onPress: () => {
-            onDelete(weightLog.id);
-            onClose();
-          }
+          onPress: async () => {
+            const deleted = await onDelete(weightLog.id);
+            if (deleted) {
+              onClose();
+            } else {
+              setError('Tidak bisa menghapus satu-satunya catatan berat badan');
+            }
+          },
         },
       ]
     );
@@ -86,7 +93,7 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
         <View style={styles.overlay}>
           <View style={styles.container}>
             <Text style={styles.title}>✏️ Edit Berat Badan</Text>
-            
+
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.weightInput}
@@ -101,9 +108,9 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
               />
               <Text style={styles.unitText}>kg</Text>
             </View>
-            
+
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            
+
             <TextInput
               style={styles.noteInput}
               value={note}
@@ -112,22 +119,23 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
               placeholderTextColor="rgba(255,255,255,0.4)"
               multiline
             />
-            
+
             <View style={styles.buttonContainer}>
               <TouchableOpacity
-                style={[styles.button, styles.deleteButton]}
+                style={[styles.button, styles.deleteButton, isOnlyLog && styles.buttonDisabled]}
                 onPress={handleDelete}
+                disabled={isOnlyLog}
               >
-                <Text style={styles.deleteButtonText}>Hapus</Text>
+                <Text style={[styles.deleteButtonText, isOnlyLog && styles.textDisabled]}>Hapus</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
                 onPress={onClose}
               >
                 <Text style={styles.cancelButtonText}>Batal</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.button, styles.saveButton]}
                 onPress={handleSave}
@@ -221,6 +229,9 @@ const styles = StyleSheet.create({
   saveButton: {
     backgroundColor: '#3B82F6',
   },
+  buttonDisabled: {
+    opacity: 0.3,
+  },
   deleteButtonText: {
     color: '#EF4444',
     fontSize: 14,
@@ -235,5 +246,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  textDisabled: {
+    color: 'rgba(239,68,68,0.4)',
   },
 });

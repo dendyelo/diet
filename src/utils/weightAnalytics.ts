@@ -13,6 +13,8 @@ export interface WeightSummary {
   progressPercent: number;
   movingAverage7: number | null;
   trend: WeightTrend;
+  /** true when target weight > start weight (user wants to gain) */
+  isGainGoal: boolean;
 }
 
 /**
@@ -22,6 +24,28 @@ function sortByDate(logs: WeightLog[]): WeightLog[] {
   return [...logs].sort(
     (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
   );
+}
+
+/**
+ * Group logs by local calendar day, keeping only the latest entry per day.
+ * Returns daily weights sorted ascending by date.
+ */
+export function groupByDay(logs: WeightLog[]): { dateStr: string; weightKg: number }[] {
+  const sorted = sortByDate(logs);
+  const dayMap = new Map<string, { dateStr: string; weightKg: number; time: number }>();
+
+  for (const log of sorted) {
+    const dateStr = getLocalDateString(new Date(log.recordedAt));
+    const time = new Date(log.recordedAt).getTime();
+    const existing = dayMap.get(dateStr);
+    if (!existing || time > existing.time) {
+      dayMap.set(dateStr, { dateStr, weightKg: log.weightKg, time });
+    }
+  }
+
+  return Array.from(dayMap.values())
+    .sort((a, b) => a.dateStr.localeCompare(b.dateStr))
+    .map(({ dateStr, weightKg }) => ({ dateStr, weightKg }));
 }
 
 /**
@@ -73,33 +97,46 @@ export function getProgressToTarget(logs: WeightLog[], targetKg: number): number
 }
 
 /**
- * Calculate N-day moving average from the most recent logs
+ * Determine if the user's goal is weight gain (target > start weight)
+ */
+export function isGainGoal(logs: WeightLog[], targetKg: number): boolean {
+  const start = getStartWeight(logs);
+  if (start === null) return false;
+  return targetKg > start;
+}
+
+/**
+ * Calculate N-day moving average using one representative weight per day.
+ * Groups multiple logs per day to the latest entry for that day,
+ * then averages the last N daily values.
  */
 export function getMovingAverage(logs: WeightLog[], days: number = 7): number | null {
   if (logs.length === 0) return null;
-  const sorted = sortByDate(logs);
+
+  const dailyWeights = groupByDay(logs);
+  if (dailyWeights.length === 0) return null;
 
   const now = new Date();
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = getLocalDateString(cutoff);
 
-  const recentLogs = sorted.filter(
-    (log) => new Date(log.recordedAt).getTime() >= cutoff.getTime()
-  );
+  const recentDays = dailyWeights.filter((d) => d.dateStr >= cutoffStr);
 
-  if (recentLogs.length === 0) {
-    // Fallback: use last N entries if no logs within date window
-    const lastN = sorted.slice(-days);
-    const sum = lastN.reduce((acc, log) => acc + log.weightKg, 0);
+  if (recentDays.length === 0) {
+    // Fallback: use last N daily entries if no days within window
+    const lastN = dailyWeights.slice(-days);
+    const sum = lastN.reduce((acc, d) => acc + d.weightKg, 0);
     return Math.round((sum / lastN.length) * 10) / 10;
   }
 
-  const sum = recentLogs.reduce((acc, log) => acc + log.weightKg, 0);
-  return Math.round((sum / recentLogs.length) * 10) / 10;
+  const sum = recentDays.reduce((acc, d) => acc + d.weightKg, 0);
+  return Math.round((sum / recentDays.length) * 10) / 10;
 }
 
 /**
  * Detect weight trend by comparing short-term MA (3 days) vs longer-term MA (7 days)
+ * Both MAs use daily-grouped data to avoid per-entry bias.
  * - down: MA-3 < MA-7 by more than 0.2 kg
  * - up: MA-3 > MA-7 by more than 0.2 kg
  * - stable: within ±0.2 kg
@@ -125,56 +162,38 @@ export function detectTrend(logs: WeightLog[]): WeightTrend {
 export function prepareChartData(logs: WeightLog[], days: number = 7): ChartDataPoint[] {
   if (logs.length === 0) return [];
 
-  const sorted = sortByDate(logs);
   const now = new Date();
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = getLocalDateString(cutoff);
 
-  const filteredLogs = sorted.filter(
-    (log) => new Date(log.recordedAt).getTime() >= cutoff.getTime()
-  );
+  const dailyWeights = groupByDay(logs).filter((d) => d.dateStr >= cutoffStr);
 
-  // Group by date, take the latest entry per day
-  const dayMap = new Map<string, WeightLog>();
-  for (const log of filteredLogs) {
-    const dateStr = getLocalDateString(new Date(log.recordedAt));
-    const existing = dayMap.get(dateStr);
-    if (!existing || new Date(log.recordedAt).getTime() > new Date(existing.recordedAt).getTime()) {
-      dayMap.set(dateStr, log);
-    }
-  }
-
-  // Convert to sorted array of data points
-  const entries = Array.from(dayMap.entries()).sort(
-    ([a], [b]) => a.localeCompare(b)
-  );
-
-  return entries.map(([dateStr, log]) => {
+  return dailyWeights.map(({ dateStr, weightKg }) => {
     const [, month, day] = dateStr.split('-');
     return {
       dateLabel: `${day}/${month}`,
       dateStr,
-      weightKg: log.weightKg,
+      weightKg,
     };
   });
 }
 
 /**
- * Prepare moving average line data for chart overlay
+ * Prepare moving average line data for chart overlay.
+ * Uses daily-grouped weights and rolling N-day window.
  */
 export function prepareMAChartData(logs: WeightLog[], days: number = 7, maWindow: number = 7): ChartDataPoint[] {
   const chartData = prepareChartData(logs, days);
   if (chartData.length < 2) return [];
 
-  const sorted = sortByDate(logs);
+  const allDailyWeights = groupByDay(logs);
 
   return chartData.map((point) => {
-    // Get all logs up to and including this date
-    const logsUpTo = sorted.filter(
-      (log) => getLocalDateString(new Date(log.recordedAt)) <= point.dateStr
-    );
-    const windowLogs = logsUpTo.slice(-maWindow);
-    const avg = windowLogs.reduce((sum, l) => sum + l.weightKg, 0) / windowLogs.length;
+    // Get all daily weights up to and including this date
+    const dailiesUpTo = allDailyWeights.filter((d) => d.dateStr <= point.dateStr);
+    const windowDays = dailiesUpTo.slice(-maWindow);
+    const avg = windowDays.reduce((sum, d) => sum + d.weightKg, 0) / windowDays.length;
 
     return {
       dateLabel: point.dateLabel,
@@ -194,11 +213,56 @@ export function buildWeightSummary(logs: WeightLog[], targetKg: number): WeightS
     progressPercent: getProgressToTarget(logs, targetKg),
     movingAverage7: getMovingAverage(logs, 7),
     trend: detectTrend(logs),
+    isGainGoal: isGainGoal(logs, targetKg),
   };
 }
 
 /**
- * Trend display info
+ * Get context-aware trend display info.
+ * Colors reflect whether the trend direction is favorable for the user's goal.
+ */
+export function getTrendInfo(
+  trend: WeightTrend,
+  gainGoal: boolean
+): { label: string; emoji: string; color: string } {
+  const labels: Record<WeightTrend, { label: string; emoji: string }> = {
+    down: { label: 'Turun', emoji: '⬇️' },
+    stable: { label: 'Stabil', emoji: '➡️' },
+    up: { label: 'Naik', emoji: '⬆️' },
+  };
+
+  const { label, emoji } = labels[trend];
+
+  // Determine if trend is favorable based on goal direction
+  let color: string;
+  if (trend === 'stable') {
+    color = '#F59E0B'; // amber for stable
+  } else if (gainGoal) {
+    // Goal is to gain weight
+    color = trend === 'up' ? '#10B981' : '#EF4444'; // up=good(green), down=bad(red)
+  } else {
+    // Goal is to lose weight (default)
+    color = trend === 'down' ? '#10B981' : '#EF4444'; // down=good(green), up=bad(red)
+  }
+
+  return { label, emoji, color };
+}
+
+/**
+ * Get context-aware color for weight change.
+ * Positive change is green when gaining is the goal, red when losing is the goal.
+ */
+export function getChangeColor(change: number | null, gainGoal: boolean): string {
+  if (change === null || change === 0) return '#F59E0B'; // amber
+  if (gainGoal) {
+    return change > 0 ? '#10B981' : '#EF4444'; // gain goal: + is good, - is bad
+  }
+  return change < 0 ? '#10B981' : '#EF4444'; // loss goal: - is good, + is bad
+}
+
+/**
+ * @deprecated Use getTrendInfo() for context-aware colors instead.
+ * Kept for backward compatibility but should not be used in new code.
  */
 export const TREND_INFO: Record<WeightTrend, { label: string; emoji: string; color: string }> = {
   down: { label: 'Turun', emoji: '⬇️', color: '#10B981' },

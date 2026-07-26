@@ -5,15 +5,40 @@ import { useProfile } from './ProfileContext';
 import { createLocalId } from '../utils/id';
 import { getLatestWeight } from '../utils/weightAnalytics';
 
+/**
+ * Restricted update type — prevents ID mutation and enforces explicit fields
+ */
+export interface WeightLogUpdate {
+  weightKg?: number;
+  recordedAt?: string;
+  note?: string;
+}
+
 interface WeightContextType {
   weightLogs: WeightLog[];
   isLoading: boolean;
   addWeightLog: (weightKg: number, note?: string, recordedAt?: string) => Promise<void>;
-  updateWeightLog: (id: string, updatedFields: Partial<WeightLog>) => Promise<void>;
-  deleteWeightLog: (id: string) => Promise<void>;
+  updateWeightLog: (id: string, updatedFields: WeightLogUpdate) => Promise<void>;
+  /** Returns false and does nothing if this is the only remaining log */
+  deleteWeightLog: (id: string) => Promise<boolean>;
 }
 
 const WeightContext = createContext<WeightContextType | undefined>(undefined);
+
+/**
+ * Sanitize weight value: round to 1 decimal, clamp 20-300
+ */
+function sanitizeWeight(value: number): number {
+  const rounded = Math.round(value * 10) / 10;
+  return Math.max(20, Math.min(300, rounded));
+}
+
+/**
+ * Validate an ISO timestamp string
+ */
+function isValidTimestamp(ts: string): boolean {
+  return !Number.isNaN(new Date(ts).getTime());
+}
 
 export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { updateProfile } = useProfile();
@@ -40,8 +65,8 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const addWeightLog = async (weightKg: number, note?: string, recordedAt?: string) => {
     const newLog: WeightLog = {
       id: createLocalId('weight'),
-      weightKg: Math.round(weightKg * 10) / 10,
-      recordedAt: recordedAt || new Date().toISOString(),
+      weightKg: sanitizeWeight(weightKg),
+      recordedAt: (recordedAt && isValidTimestamp(recordedAt)) ? recordedAt : new Date().toISOString(),
       note: note?.trim() || undefined,
     };
 
@@ -55,14 +80,29 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     await syncProfileWeight(nextLogs);
   };
 
-  const updateWeightLog = async (id: string, updatedFields: Partial<WeightLog>) => {
+  const updateWeightLog = async (id: string, updatedFields: WeightLogUpdate) => {
     let nextLogs: WeightLog[] = [];
     setWeightLogs((prevLogs) => {
       nextLogs = prevLogs.map((log) => {
-        if (log.id === id) {
-          return { ...log, ...updatedFields };
+        if (log.id !== id) return log;
+
+        const updated = { ...log };
+
+        // Sanitize each field individually
+        if (updatedFields.weightKg !== undefined) {
+          updated.weightKg = sanitizeWeight(updatedFields.weightKg);
         }
-        return log;
+        if (updatedFields.recordedAt !== undefined) {
+          if (isValidTimestamp(updatedFields.recordedAt)) {
+            updated.recordedAt = updatedFields.recordedAt;
+          }
+          // silently ignore invalid timestamp
+        }
+        if (updatedFields.note !== undefined) {
+          updated.note = updatedFields.note.trim() || undefined;
+        }
+
+        return updated;
       });
       return nextLogs;
     });
@@ -71,17 +111,29 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     await syncProfileWeight(nextLogs);
   };
 
-  const deleteWeightLog = async (id: string) => {
+  /**
+   * Delete a weight log. Returns false if deletion is blocked
+   * (cannot delete the only remaining log).
+   */
+  const deleteWeightLog = async (id: string): Promise<boolean> => {
+    // Read current state synchronously via a ref-like check
+    let blocked = false;
     let nextLogs: WeightLog[] = [];
+
     setWeightLogs((prevLogs) => {
+      if (prevLogs.length <= 1) {
+        blocked = true;
+        return prevLogs; // no state change
+      }
       nextLogs = prevLogs.filter((log) => log.id !== id);
       return nextLogs;
     });
 
+    if (blocked) return false;
+
     await saveWeightLogs(nextLogs);
-    if (nextLogs.length > 0) {
-      await syncProfileWeight(nextLogs);
-    }
+    await syncProfileWeight(nextLogs);
+    return true;
   };
 
   return (

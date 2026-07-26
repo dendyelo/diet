@@ -112,10 +112,10 @@ export async function runStepByStepMigrations(currentVersion: number): Promise<v
         const parsed = JSON.parse(profileData);
         if (parsed.weightKg && typeof parsed.weightKg === 'number' && parsed.weightKg >= 20 && parsed.weightKg <= 300) {
           const seedLog: WeightLog = {
-            id: `weight_seed_${Date.now()}`,
+            id: 'weight-profile-seed-v6',
             weightKg: parsed.weightKg,
             recordedAt: new Date().toISOString(),
-            note: 'Berat awal dari profil',
+            note: 'Berat dari profil saat fitur Weight Tracking diaktifkan',
           };
           await AsyncStorage.setItem(KEYS.WEIGHT_LOGS, JSON.stringify([seedLog]));
         }

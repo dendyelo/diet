@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadStepRecord, loadMealLogs } from '../storageService';
+import { loadStepRecord, loadMealLogs, loadWeightLogs, migrateStorageIfNeeded } from '../storageService';
 import { getLocalDateString, isSameLocalDay, getLatestMealTimestamp } from '../../utils/date';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -59,5 +59,87 @@ describe('Storage Service & Date Utility Suite', () => {
     expect(logs.length).toBe(1);
     expect(logs[0].id).toBe('1');
     expect(logs[0].name).toBe('Nasi Goreng');
+  });
+});
+
+describe('Schema V6 Migration Suite', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  test('migration from V1 to V6 sets correct schema version', async () => {
+    await AsyncStorage.setItem('@habitdiet_schema_version', '1');
+    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({
+      name: 'Test',
+      weightKg: 70,
+    }));
+
+    await migrateStorageIfNeeded();
+
+    const version = await AsyncStorage.getItem('@habitdiet_schema_version');
+    expect(version).toBe('6');
+  });
+
+  test('V6 migration seeds weight log from profile when no weight logs exist', async () => {
+    await AsyncStorage.setItem('@habitdiet_schema_version', '5');
+    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({
+      name: 'Test',
+      weightKg: 72.5,
+    }));
+
+    await migrateStorageIfNeeded();
+
+    const weightLogs = await loadWeightLogs();
+    expect(weightLogs.length).toBe(1);
+    expect(weightLogs[0].id).toBe('weight-profile-seed-v6');
+    expect(weightLogs[0].weightKg).toBe(72.5);
+    expect(weightLogs[0].note).toContain('profil saat fitur Weight Tracking diaktifkan');
+  });
+
+  test('V6 migration does not overwrite existing weight logs', async () => {
+    await AsyncStorage.setItem('@habitdiet_schema_version', '5');
+    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({
+      name: 'Test',
+      weightKg: 70,
+    }));
+    await AsyncStorage.setItem('@habitdiet_weight_logs', JSON.stringify([
+      { id: 'existing_1', weightKg: 68, recordedAt: '2026-07-20T10:00:00.000Z' },
+    ]));
+
+    await migrateStorageIfNeeded();
+
+    const weightLogs = await loadWeightLogs();
+    expect(weightLogs.length).toBe(1);
+    expect(weightLogs[0].id).toBe('existing_1');
+    expect(weightLogs[0].weightKg).toBe(68);
+  });
+
+  test('V6 migration skips seed when profile weight is out of range', async () => {
+    await AsyncStorage.setItem('@habitdiet_schema_version', '5');
+    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({
+      name: 'Test',
+      weightKg: 10, // below 20, invalid
+    }));
+
+    await migrateStorageIfNeeded();
+
+    const weightLogs = await loadWeightLogs();
+    expect(weightLogs.length).toBe(0);
+  });
+
+  test('loadWeightLogs filters out invalid entries', async () => {
+    const rawData = JSON.stringify([
+      { id: 'w1', weightKg: 70, recordedAt: '2026-07-26T12:00:00.000Z' },
+      { id: '', weightKg: 65, recordedAt: '2026-07-25T12:00:00.000Z' }, // empty ID
+      { id: 'w3', weightKg: 500, recordedAt: '2026-07-24T12:00:00.000Z' }, // over 300
+      { id: 'w4', weightKg: 68, recordedAt: 'invalid-date' }, // bad date
+      null,
+    ]);
+
+    await AsyncStorage.setItem('@habitdiet_weight_logs', rawData);
+
+    const logs = await loadWeightLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].id).toBe('w1');
   });
 });

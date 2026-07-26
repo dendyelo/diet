@@ -13,7 +13,14 @@ import { WeightChart } from '../components/WeightChart';
 import { AddWeightModal } from '../components/AddWeightModal';
 import { EditWeightModal } from '../components/EditWeightModal';
 import { WeightLog } from '../types';
-import { buildWeightSummary, prepareChartData, prepareMAChartData, TREND_INFO, getLatestWeight } from '../utils/weightAnalytics';
+import {
+  buildWeightSummary,
+  prepareChartData,
+  prepareMAChartData,
+  getLatestWeight,
+  getTrendInfo,
+  getChangeColor,
+} from '../utils/weightAnalytics';
 import { Scale, Plus, Activity } from 'lucide-react-native';
 
 const MONTH_NAMES_ID = [
@@ -63,29 +70,43 @@ export const WeightScreen: React.FC = () => {
     [weightLogs]
   );
 
-  const trendInfo = TREND_INFO[summary.trend];
+  // Context-aware display info
+  const trendInfo = useMemo(
+    () => getTrendInfo(summary.trend, summary.isGainGoal),
+    [summary.trend, summary.isGainGoal]
+  );
+
+  const changeColor = useMemo(
+    () => getChangeColor(summary.changeFromStart, summary.isGainGoal),
+    [summary.changeFromStart, summary.isGainGoal]
+  );
+
   const lastWeight = getLatestWeight(weightLogs);
+  const isOnlyLog = weightLogs.length <= 1;
 
   const handleEdit = (log: WeightLog) => {
     setSelectedLog(log);
     setShowEditModal(true);
   };
 
-  const handleAddSave = (weightKg: number, note?: string) => {
-    addWeightLog(weightKg, note);
+  const handleAddSave = async (weightKg: number, note?: string) => {
+    await addWeightLog(weightKg, note);
     setShowAddModal(false);
   };
 
-  const handleEditSave = (id: string, updatedFields: { weightKg?: number; note?: string }) => {
-    updateWeightLog(id, updatedFields);
+  const handleEditSave = async (id: string, updatedFields: { weightKg?: number; note?: string }) => {
+    await updateWeightLog(id, updatedFields);
     setShowEditModal(false);
     setSelectedLog(null);
   };
 
-  const handleDelete = (id: string) => {
-    deleteWeightLog(id);
-    setShowEditModal(false);
-    setSelectedLog(null);
+  const handleDelete = async (id: string): Promise<boolean> => {
+    const deleted = await deleteWeightLog(id);
+    if (deleted) {
+      setShowEditModal(false);
+      setSelectedLog(null);
+    }
+    return deleted;
   };
 
   const renderHistoryDiff = (index: number) => {
@@ -94,15 +115,10 @@ export const WeightScreen: React.FC = () => {
     const previous = sortedLogs[index + 1].weightKg;
     const diff = Math.round((current - previous) * 10) / 10;
 
+    const diffColor = getChangeColor(diff, summary.isGainGoal);
+
     return (
-      <Text
-        style={[
-          styles.diffText,
-          diff > 0 && styles.textRed,
-          diff < 0 && styles.textGreen,
-          diff === 0 && styles.textGray,
-        ]}
-      >
+      <Text style={[styles.diffText, { color: diff === 0 ? 'rgba(255,255,255,0.4)' : diffColor }]}>
         {diff > 0 ? '+' : ''}{diff === 0 ? '0' : diff.toFixed(1)} kg
       </Text>
     );
@@ -132,14 +148,7 @@ export const WeightScreen: React.FC = () => {
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>PERUBAHAN</Text>
-              <Text
-                style={[
-                  styles.statValue,
-                  summary.changeFromStart !== null && summary.changeFromStart < 0 && styles.textGreen,
-                  summary.changeFromStart !== null && summary.changeFromStart > 0 && styles.textRed,
-                  (summary.changeFromStart === null || summary.changeFromStart === 0) && styles.textYellow,
-                ]}
-              >
+              <Text style={[styles.statValue, { color: changeColor }]}>
                 {summary.changeFromStart !== null
                   ? `${summary.changeFromStart > 0 ? '+' : ''}${summary.changeFromStart.toFixed(1)}`
                   : '-'}
@@ -265,6 +274,7 @@ export const WeightScreen: React.FC = () => {
         onSave={handleEditSave}
         onDelete={handleDelete}
         weightLog={selectedLog}
+        isOnlyLog={isOnlyLog}
       />
     </SafeAreaView>
   );
@@ -338,10 +348,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.4)',
     marginTop: 2,
   },
-  textGreen: { color: '#10B981' },
-  textRed: { color: '#EF4444' },
-  textYellow: { color: '#F59E0B' },
-  textGray: { color: 'rgba(255,255,255,0.4)' },
   progressContainer: {
     marginTop: 4,
     paddingTop: 12,

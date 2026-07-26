@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { parseFoodNutritionWithAI } from '../services/aiService';
 import { X, Send, Sparkles, User, Bot } from 'lucide-react-native';
+import { createLocalId } from '../utils/id';
 
 export interface ChatMessage {
   id: string;
@@ -71,7 +72,7 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     const query = textToSend || inputText.trim();
     if (!query || loading) return;
 
-    const userMsgId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const userMsgId = createLocalId('chat');
     const userMsg: ChatMessage = {
       id: userMsgId,
       sender: 'user',
@@ -124,7 +125,7 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
         replyText = `1 Porsi **${foodResult.name}** diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. Sisa target defisit kalori harianmu sangat terjaga 🟢!`;
       }
 
-      const aiMsgId = `${Date.now() + 1}-${Math.random().toString(36).slice(2, 10)}`;
+      const aiMsgId = createLocalId('chat');
       const aiMsg: ChatMessage = {
         id: aiMsgId,
         sender: 'ai',
@@ -134,7 +135,7 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
 
       setMessages((prev) => [...prev, aiMsg]);
     } catch (error: any) {
-      const errMsgId = `${Date.now() + 1}-${Math.random().toString(36).slice(2, 10)}`;
+      const errMsgId = createLocalId('chat');
       const errBubble: ChatMessage = {
         id: errMsgId,
         sender: 'ai',

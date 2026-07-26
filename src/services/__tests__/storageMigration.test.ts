@@ -47,7 +47,7 @@ describe('Storage Service & Date Utility Suite', () => {
 
   test('loadMealLogs filters out corrupted or invalid meal log entries safely', async () => {
     const rawCorruptedData = JSON.stringify([
-      { id: '1', name: 'Nasi Goreng', nutrition: { calories: 450 } },
+      { id: '1', name: 'Nasi Goreng', isSnack: false, timestamp: '2026-07-26T12:00:00.000Z', nutrition: { calories: 450 } },
       { id: null, name: 'Invalid Log' },
       null,
       { id: '3', name: 'Ayam Bakar' },

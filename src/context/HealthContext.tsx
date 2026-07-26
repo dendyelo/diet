@@ -131,12 +131,12 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (status.isAvailable) {
         baseSteps = status.stepCount;
         setSensorSteps(baseSteps);
-        await saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps: manualStepsRef.current });
+        saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps: manualStepsRef.current });
 
-        sub = subscribeStepCount(async (sessionSteps) => {
+        sub = subscribeStepCount((sessionSteps) => {
           const totalSensor = baseSteps + sessionSteps;
           setSensorSteps(totalSensor);
-          await saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps: manualStepsRef.current });
+          saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps: manualStepsRef.current });
         });
       }
     }
@@ -149,16 +149,20 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [todayStr]);
 
   const addWaterGlass = async () => {
-    const updated = waterGlasses + 1;
-    setWaterGlasses(updated);
-    await saveWaterGlasses(todayStr, updated);
+    setWaterGlasses((prevWater) => {
+      const updated = prevWater + 1;
+      saveWaterGlasses(todayStr, updated);
+      return updated;
+    });
   };
 
   const addStepsManual = async (addedSteps: number) => {
     const validAdded = Math.max(0, addedSteps);
-    const updatedManual = manualSteps + validAdded;
-    setManualSteps(updatedManual);
-    await saveStepRecord(todayStr, { sensorSteps, manualSteps: updatedManual });
+    setManualSteps((prevManual) => {
+      const updatedManual = prevManual + validAdded;
+      saveStepRecord(todayStr, { sensorSteps, manualSteps: updatedManual });
+      return updatedManual;
+    });
   };
 
   const resetFastingTimer = async (timestamp?: string | null) => {

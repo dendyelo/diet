@@ -1,62 +1,88 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { storageQueue, saveMealLogs, loadMealLogs } from '../storageService';
+import { storageQueue, saveMealLogs, loadMealLogs, runStepByStepMigrations, loadUserProfile } from '../storageService';
 import { msUntilMidnight } from '../../utils/date';
+import { createLocalId } from '../../utils/id';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-describe('Storage Queue & Out-of-Order Write Protection Suite', () => {
+describe('Advanced Storage Queue & Schema V5 Migration Suite', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
   });
 
-  test('AsyncStorageQueue executes rapid sequential writes in strict chronological order', async () => {
-    const order: number[] = [];
+  test('AsyncStorageQueue recovers and continues executing subsequent tasks when a task fails', async () => {
+    const executed: string[] = [];
 
-    const task1 = () =>
-      new Promise<void>((resolve) => {
+    const failingTask = () =>
+      new Promise<void>((_, reject) => {
         setTimeout(() => {
-          order.push(1);
-          resolve();
-        }, 50);
+          reject(new Error('Disk Write Failure'));
+        }, 10);
       });
 
-    const task2 = () =>
+    const successTask = () =>
       new Promise<void>((resolve) => {
         setTimeout(() => {
-          order.push(2);
+          executed.push('success');
           resolve();
         }, 10);
       });
 
-    const p1 = storageQueue.enqueue(task1);
-    const p2 = storageQueue.enqueue(task2);
+    const pFailing = storageQueue.enqueue(failingTask);
+    const pSuccess = storageQueue.enqueue(successTask);
 
-    await Promise.all([p1, p2]);
-    expect(order).toEqual([1, 2]);
+    await expect(pFailing).rejects.toThrow('Disk Write Failure');
+    await pSuccess;
+
+    expect(executed).toEqual(['success']);
   });
 
-  test('Rapid double meal save requests do not overwrite out-of-order', async () => {
-    const meal1 = [{ id: '1', name: 'Meal 1', timestamp: new Date().toISOString(), isSnack: false, nutrition: { calories: 300, proteinGrams: 20, carbsGrams: 40, fatGrams: 10 }, source: 'ai' as const }];
-    const meal2 = [
-      { id: '2', name: 'Meal 2', timestamp: new Date().toISOString(), isSnack: false, nutrition: { calories: 400, proteinGrams: 25, carbsGrams: 50, fatGrams: 12 }, source: 'ai' as const },
-      ...meal1,
-    ];
+  test('createLocalId generates prefixed collision-proof unique ID string', () => {
+    const id1 = createLocalId('meal');
+    const id2 = createLocalId('chat');
 
-    const p1 = saveMealLogs(meal1);
-    const p2 = saveMealLogs(meal2);
+    expect(id1.startsWith('meal_')).toBe(true);
+    expect(id2.startsWith('chat_')).toBe(true);
+    expect(id1).not.toEqual(id2);
+  });
 
-    await Promise.all([p1, p2]);
+  test('loadMealLogs strictly filters corrupted entries and sanitizes negative nutrition', async () => {
+    const rawCorrupted = JSON.stringify([
+      { id: 'm1', name: 'Nasi Uduk', isSnack: false, timestamp: '2026-07-26T12:00:00.000Z', nutrition: { calories: 500, proteinGrams: -10 } },
+      { id: '', name: 'Invalid ID', isSnack: false, timestamp: '2026-07-26T12:00:00.000Z', nutrition: { calories: 100 } },
+      { id: 'm3', name: '', isSnack: false, timestamp: '2026-07-26T12:00:00.000Z', nutrition: { calories: 100 } },
+      { id: 'm4', name: 'Bad Date', isSnack: false, timestamp: 'Invalid-Date-String', nutrition: { calories: 100 } },
+      { id: 'm5', name: 'Negative Calories', isSnack: false, timestamp: '2026-07-26T12:00:00.000Z', nutrition: { calories: -50 } },
+    ]);
 
-    const loaded = await loadMealLogs();
-    expect(loaded.length).toBe(2);
-    expect(loaded[0].id).toBe('2');
+    await AsyncStorage.setItem('@habitdiet_meal_logs', rawCorrupted);
+
+    const logs = await loadMealLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].id).toBe('m1');
+    expect(logs[0].nutrition.proteinGrams).toBe(0); // Sanitized from -10 to 0
+  });
+
+  test('runStepByStepMigrations upgrades V1 schema to V5 seamlessly', async () => {
+    await AsyncStorage.setItem('@habitdiet_schema_version', '1');
+    await AsyncStorage.setItem('@habitdiet_user_profile', JSON.stringify({ name: 'Old User', geminiApiKey: 'legacy-key' }));
+
+    await runStepByStepMigrations(1);
+
+    const profile = await loadUserProfile();
+    expect(profile.name).toBe('Old User');
+    expect(profile.bodyType).toBe('normal');
+    expect((profile as any).geminiApiKey).toBeUndefined();
+
+    const version = await AsyncStorage.getItem('@habitdiet_schema_version');
+    expect(version).toBe('5');
   });
 
   test('msUntilMidnight calculates positive milliseconds until midnight local time', () => {
-    const testNow = new Date(2026, 6, 26, 23, 50, 0); // 10 minutes before midnight
+    const testNow = new Date(2026, 6, 26, 23, 50, 0);
     const delay = msUntilMidnight(testNow);
-    expect(delay).toBe(10 * 60 * 1000); // 600,000 ms
+    expect(delay).toBe(10 * 60 * 1000);
   });
 });

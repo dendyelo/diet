@@ -3,6 +3,7 @@ import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types
 import { loadMealLogs, saveMealLogs } from '../services/storageService';
 import { useProfile } from './ProfileContext';
 import { getLocalDateString, isSameLocalDay, getLatestMealTimestamp, msUntilMidnight } from '../utils/date';
+import { createLocalId } from '../utils/id';
 
 interface MealContextType {
   mealLogs: MealLog[];
@@ -66,7 +67,7 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     itemsBreakdown?: FoodItemBreakdown[]
   ) => {
     const timestamp = customTimestamp || new Date().toISOString();
-    const collisionProofId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const collisionProofId = createLocalId('meal');
 
     const newLog: MealLog = {
       id: collisionProofId,
@@ -79,35 +80,46 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       itemsBreakdown,
     };
 
-    const updatedLogs = [newLog, ...mealLogs];
-    setMealLogs(updatedLogs);
+    let latestTimestamp: string | null = null;
 
-    const latestTimestamp = getLatestMealTimestamp(updatedLogs);
-    await saveMealLogs(updatedLogs);
+    setMealLogs((prevLogs) => {
+      const updatedLogs = [newLog, ...prevLogs];
+      latestTimestamp = getLatestMealTimestamp(updatedLogs);
+      saveMealLogs(updatedLogs);
+      return updatedLogs;
+    });
+
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
   const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
-    const updatedLogs = mealLogs.map((log) => {
-      if (log.id === id) {
-        return { ...log, ...updatedFields };
-      }
-      return log;
+    let latestTimestamp: string | null = null;
+
+    setMealLogs((prevLogs) => {
+      const updatedLogs = prevLogs.map((log) => {
+        if (log.id === id) {
+          return { ...log, ...updatedFields };
+        }
+        return log;
+      });
+      latestTimestamp = getLatestMealTimestamp(updatedLogs);
+      saveMealLogs(updatedLogs);
+      return updatedLogs;
     });
 
-    setMealLogs(updatedLogs);
-
-    const latestTimestamp = getLatestMealTimestamp(updatedLogs);
-    await saveMealLogs(updatedLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
   const deleteMealLog = async (id: string) => {
-    const updatedLogs = mealLogs.filter((m) => m.id !== id);
-    setMealLogs(updatedLogs);
+    let latestTimestamp: string | null = null;
 
-    const latestTimestamp = getLatestMealTimestamp(updatedLogs);
-    await saveMealLogs(updatedLogs);
+    setMealLogs((prevLogs) => {
+      const updatedLogs = prevLogs.filter((m) => m.id !== id);
+      latestTimestamp = getLatestMealTimestamp(updatedLogs);
+      saveMealLogs(updatedLogs);
+      return updatedLogs;
+    });
+
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 

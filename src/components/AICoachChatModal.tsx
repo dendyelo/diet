@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { parseFoodNutritionWithAI } from '../services/aiService';
+import { parseFoodNutritionWithAI, sendAICoachChatQuery, UserContextData } from '../services/aiService';
 import { X, Send, Sparkles, User, Bot } from 'lucide-react-native';
 import { createLocalId } from '../utils/id';
 
@@ -27,13 +27,7 @@ interface AICoachChatModalProps {
   onClose: () => void;
   userName: string;
   userApiKey?: string;
-  userContext: {
-    fastingHours: number;
-    caloriesIn: number;
-    netDeficit: number;
-    steps: number;
-    waterGlasses: number;
-  };
+  userContext: UserContextData;
 }
 
 const QUICK_PROMPTS = [
@@ -66,37 +60,24 @@ const FOOD_KEYWORDS = [
 function classifyIntent(query: string): ChatIntent {
   const lower = query.toLowerCase();
 
-  // Data queries: user asking about their own stats
   const isDataQuery = DATA_KEYWORDS.some((kw) => lower.includes(kw));
   const isQuestion = lower.includes('?') || lower.startsWith('berapa') || lower.startsWith('sudah') ||
     lower.startsWith('apa') || lower.startsWith('gimana') || lower.startsWith('bagaimana') ||
     lower.startsWith('kapan');
 
-  // If asking about personal data (e.g. "berapa langkah saya")
   if (isDataQuery && isQuestion && !FOOD_KEYWORDS.some((kw) => lower.includes(kw))) {
     return 'data_query';
   }
-  // Also catch "berapa langkah" without question mark
   if (isDataQuery && (lower.includes('saya') || lower.includes('ku') || lower.includes('aku'))) {
     return 'data_query';
   }
 
-  // Food queries: mentions specific food items or asks about calories of food
   const isFoodQuery = FOOD_KEYWORDS.some((kw) => lower.includes(kw));
   if (isFoodQuery) {
     return 'food_query';
   }
 
-  // Default: general conversation/question
   return 'general';
-}
-
-interface UserContextData {
-  fastingHours: number;
-  caloriesIn: number;
-  netDeficit: number;
-  steps: number;
-  waterGlasses: number;
 }
 
 function generateDataResponse(query: string, userName: string, ctx: UserContextData): string {
@@ -122,7 +103,7 @@ function generateDataResponse(query: string, userName: string, ctx: UserContextD
 
   if (lower.includes('puasa') || lower.includes('fasting') || lower.includes('berpuasa')) {
     if (ctx.fastingHours > 0) {
-      return `⏱️ Kamu sudah berpuasa selama **${ctx.fastingHours} jam**, ${name}!\n\n${ctx.fastingHours >= 16 ? 'Kamu sudah melewati jendela 16 jam — fase autophagy aktif 🔥. Pertahankan jika nyaman!' : ctx.fastingHours >= 12 ? 'Sudah melewati 12 jam — pembakaran lemak mulai meningkat. Kuat terus! 💪' : 'Teruskan puasamu. Pembakaran lemak biasanya dimulai setelah 12 jam.'}`;
+      return `⏱️ Kamu sudah berpuasa selama **${ctx.fastingHours} jam**, ${name}!\n\n${ctx.fastingHours >= 16 ? 'Kamu sudah melewati jendela 16 jam. Tubuh dapat mulai meningkatkan penggunaan cadangan energi, tetapi respon setiap orang bisa berbeda.' : ctx.fastingHours >= 12 ? 'Sudah melewati 12 jam. Banyak orang merasa penggunaan energi lebih terasa setelah 12 jam, namun tetap dengarkan kondisi tubuhmu.' : 'Teruskan puasamu jika terasa nyaman. Tetap perhatikan sinyal dari tubuhmu.'}`;
     }
     return `⏱️ Kamu tidak sedang berpuasa saat ini, ${name}. Jika ingin memulai intermittent fasting, waktu terbaik biasanya dimulai setelah makan malam terakhir.`;
   }
@@ -134,7 +115,6 @@ function generateDataResponse(query: string, userName: string, ctx: UserContextD
     return `📊 Status energi hari ini: **Surplus ${Math.abs(ctx.netDeficit)} kcal** 🟠.\n\nKalori masuk: ${ctx.caloriesIn} kcal. Tidak perlu panik — tambahkan aktivitas fisik atau kurangi sedikit porsi di makan berikutnya.`;
   }
 
-  // General data summary
   return `📋 Ringkasan harimu, ${name}:\n\n🔥 Kalori masuk: **${ctx.caloriesIn} kcal**\n📊 Status: **${ctx.netDeficit >= 0 ? `Defisit ${ctx.netDeficit}` : `Surplus ${Math.abs(ctx.netDeficit)}`} kcal**\n🏃 Langkah: **${ctx.steps.toLocaleString()}**\n💧 Air: **${ctx.waterGlasses}/8 gelas**\n⏱️ Puasa: **${ctx.fastingHours} jam**\n\nTerus pantau dan konsisten! 💪`;
 }
 
@@ -144,21 +124,20 @@ function generateOfflineCoachResponse(query: string, userName: string, ctx: User
 
   if (lower.includes('lapar') || lower.includes('hungry')) {
     if (ctx.fastingHours > 0) {
-      return `Aku paham rasa lapar saat puasa bisa mengganggu, ${name}. Coba minum air putih dulu — sering kali tubuh bingung antara lapar dan haus.\n\nJika sudah melewati ${ctx.fastingHours} jam puasa dan merasa lemas, tidak apa-apa untuk memulai eating window-mu. Dengarkan tubuhmu! 🙏`;
+      return `Aku paham rasa lapar saat puasa bisa mengganggu, ${name}. Coba minum air putih dulu — sering kali tubuh bingung antara lapar dan haus.\n\nJika sudah melewati ${ctx.fastingHours} jam puasa dan merasa lemas atau tidak nyaman, tidak apa-apa untuk mengakhiri puasa. Kesehatanmu adalah prioritas utama! 🙏`;
     }
-    return `Lapar itu wajar, ${name}! Coba cemilan sehat seperti buah, kacang almond, atau yoghurt rendah lemak.\n\nKalori masukmu saat ini ${ctx.caloriesIn} kcal. ${ctx.netDeficit >= 0 ? 'Masih ada ruang untuk cemilan sehat!' : 'Pilih cemilan rendah kalori agar tetap seimbang.'}`;
+    return `Lapar itu respon alami tubuh, ${name}! Coba cemilan sehat seperti buah segar, kacang almond, atau yoghurt rendah lemak.\n\nKalori masukmu saat ini ${ctx.caloriesIn} kcal. ${ctx.netDeficit >= 0 ? 'Masih ada ruang untuk cemilan sehat!' : 'Pilih cemilan rendah kalori agar tetap seimbang.'}`;
   }
 
   if (lower.includes('pusing') || lower.includes('lemas') || lower.includes('capek') || lower.includes('lelah')) {
-    return `Pusing atau lemas bisa disebabkan beberapa hal, ${name}:\n\n1. **Dehidrasi** — kamu baru minum ${ctx.waterGlasses}/8 gelas. Coba minum air segera.\n2. **Gula darah rendah** — jika sedang puasa ${ctx.fastingHours} jam, pertimbangkan untuk makan.\n3. **Kurang tidur** atau stres.\n\nJika berlanjut, jangan ragu untuk makan dan istirahat. Kesehatan lebih penting dari target kalori! ❤️`;
+    return `Jika merasa pusing atau lemas, ada beberapa hal yang perlu diperhatikan, ${name}:\n\n1. **Dehidrasi** — kamu baru minum ${ctx.waterGlasses}/8 gelas. Coba minum air segera.\n2. **Kebutuhan Energi** — jika sedang puasa ${ctx.fastingHours} jam, pertimbangkan untuk segera makan.\n3. **Istirahat** — pastikan waktu tidur cukup.\n\nJangan ragu untuk berhenti berpuasa dan istirahat jika pusing berlanjut. Kesehatan selalu lebih penting dari target apa pun! ❤️`;
   }
 
   if (lower.includes('saran') || lower.includes('tips') || lower.includes('rekomendasi')) {
-    return `Berikut tips untuk hari ini, ${name}:\n\n${ctx.waterGlasses < 6 ? '💧 Tingkatkan minum air — baru ' + ctx.waterGlasses + '/8 gelas.\n' : ''}${ctx.steps < 5000 ? '🏃 Coba tambahkan jalan kaki 15 menit.\n' : ''}${ctx.netDeficit < 0 ? '🍽️ Kurangi sedikit porsi di makan berikutnya.\n' : '🟢 Defisitmu aman — pertahankan!\n'}\nKonsistensi lebih penting dari kesempurnaan. Kamu sudah di jalur yang benar! 💪`;
+    return `Berikut tips sederhana untuk hari ini, ${name}:\n\n${ctx.waterGlasses < 6 ? '💧 Tingkatkan minum air — baru ' + ctx.waterGlasses + '/8 gelas.\n' : ''}${ctx.steps < 5000 ? '🏃 Coba tambahkan jalan kaki 15 menit.\n' : ''}${ctx.netDeficit < 0 ? '🍽️ Kurangi sedikit porsi di makan berikutnya.\n' : '🟢 Defisitmu aman — pertahankan!\n'}\nKonsistensi lebih penting dari kesempurnaan. Kamu sudah di jalur yang benar! 💪`;
   }
 
-  // Generic fallback
-  return `Terima kasih bertanya, ${name}! Saya AI Coach yang lebih optimal jika terhubung ke Gemini Cloud.\n\nSaat ini saya bisa menjawab:\n• Pertanyaan tentang **kalori makanan** (misal: "berapa kalori nasi goreng?")\n• **Data harian** kamu (langkah, air, puasa, defisit)\n• **Tips kesehatan** umum\n\nUntuk jawaban yang lebih cerdas dan personal, konfigurasi API key Gemini di halaman Profil.`;
+  return `Terima kasih bertanya, ${name}! Saya AI Coach yang dapat memberikan jawaban lebih personal jika terhubung ke Gemini Cloud.\n\nSaat ini saya dapat membantu:\n• Estimasi **kalori makanan** (misal: "berapa kalori nasi goreng?")\n• Informasi **data harian** kamu (langkah, air, puasa, defisit)\n• **Tips kesehatan** umum\n\nUntuk respon yang lebih interaktif, konfigurasi API key Gemini di halaman Profil.`;
 }
 
 export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
@@ -205,71 +184,15 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     try {
       let replyText = '';
 
-      // --- 1. Try Gemini Cloud first if API key is configured ---
+      // 1. Delegate to centralized AI service query handler
       if (userApiKey && userApiKey.trim() !== '') {
-        const key = userApiKey.trim();
-        const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.
-Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
-
-KONTEKS REAL-TIME PENGGUNA SAAT INI:
-- Nama: ${userName}
-- Berpuasa: ${userContext.fastingHours} jam
-- Total Kalori Masuk (Dimakan): ${userContext.caloriesIn} kcal
-- Defisit Kalori Realtime: ${userContext.netDeficit} kcal
-- Langkah Kaki: ${userContext.steps} steps
-- Air Minum: ${userContext.waterGlasses} / 8 gelas
-
-PERTANYAAN PENGGUNA: "${query}"
-
-Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), berikan estimasi kalori dan nutrisinya. Jika pengguna menanyakan data pribadinya (langkah, kalori, air, puasa), jawab berdasarkan konteks real-time di atas. Berikan saran praktis 2-3 paragraf singkat.`;
-
-        const modelsToTry = [
-          'gemini-2.5-flash',
-          'gemini-3.5-flash',
-          'gemini-3.6-flash',
-          'gemini-3.5-flash-lite',
-          'gemini-3.1-flash-lite',
-          'gemma-4-31b-it',
-          'gemma-4-26b-a4b-it',
-        ];
-
-        let attempts = 0;
-        for (const model of modelsToTry) {
-          if (attempts >= 3) break;
-          attempts++;
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
-          try {
-            const response = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                }),
-                signal: controller.signal,
-              }
-            );
-
-            if (response.ok) {
-              const data = await response.json();
-              replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (replyText) break;
-            }
-            if (response.status === 401 || response.status === 403) break;
-            if (response.status !== 429 && response.status < 500) break;
-          } catch (fetchErr) {
-            console.warn(`Gemini Cloud chat for ${model} failed (network/timeout):`, fetchErr);
-            break; // Stop immediately on network error
-          } finally {
-            clearTimeout(timeoutId);
-          }
+        const cloudReply = await sendAICoachChatQuery(query, userName, userContext, userApiKey);
+        if (cloudReply) {
+          replyText = cloudReply;
         }
       }
 
-      // --- 2. Offline fallback: classify intent ---
+      // 2. Offline fallback: classify intent
       if (!replyText) {
         const intent = classifyIntent(query);
 

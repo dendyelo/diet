@@ -27,32 +27,37 @@ export interface AICoachResponse {
   recommendedAction: 'meal' | 'snack' | 'water' | 'fasting';
 }
 
+export interface UserContextData {
+  fastingHours: number;
+  caloriesIn: number;
+  netDeficit: number;
+  steps: number;
+  waterGlasses: number;
+}
+
 /**
- * Verified active Gemini & Gemma models for fallback chain
+ * Centralized list of verified active Gemini & Gemma models for fallback chain.
+ * Single Source of Truth for the entire application.
  */
-const GEMINI_MODELS = [
+export const GEMINI_MODELS = [
   'gemini-2.5-flash',
   'gemini-3.5-flash',
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3-flash-preview',
-  'gemini-flash-latest',
-  'gemini-flash-lite-latest',
   'gemma-4-31b-it',
   'gemma-4-26b-a4b-it',
 ];
 
-/**
- * Maximum model attempts during rate-limit fallback to prevent excessive wait time
- */
 const MAX_FALLBACK_ATTEMPTS = 3;
-
-/**
- * Per-request timeout in milliseconds
- */
 const REQUEST_TIMEOUT_MS = 8000;
+
+function parseNumber(value: any, fallback: number): number {
+  if (value === undefined || value === null) return fallback;
+  const num = typeof value === 'number' ? value : parseFloat(String(value));
+  if (isNaN(num) || num < 0) return fallback;
+  return Math.round(num * 10) / 10;
+}
 
 /**
  * Check Gemini AI Cloud API Connection Status dynamically
@@ -98,6 +103,16 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
     };
   }
 
+  if (connectionStatus === 'offline') {
+    return {
+      isOnline: false,
+      modeLabel: 'Koneksi Terputus (Offline 🟠)',
+      color: '#F59E0B',
+      description: 'Tidak ada koneksi internet. Menggunakan Engine Kuliner cadangan.',
+      connectionStatus: 'offline',
+    };
+  }
+
   if (connectionStatus === 'checking') {
     return {
       isOnline: false,
@@ -119,10 +134,13 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
 
 /**
  * Test Real Connection to Gemini AI API
+ * Differentiates network error/offline from HTTP 429 rate limit
  */
 export async function testGeminiAPIConnection(userApiKey: string): Promise<AIConnectionStatus> {
   const cleanKey = userApiKey.trim();
   if (!cleanKey) return 'not_configured';
+
+  let hasRateLimitError = false;
 
   let attempts = 0;
   for (const model of GEMINI_MODELS) {
@@ -150,12 +168,13 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
       if (response.status === 401 || response.status === 403) {
         return 'invalid_key';
       }
-      // If 429 or 5xx, continue loop up to MAX_FALLBACK_ATTEMPTS
-      if (response.status !== 429 && response.status < 500) {
+      if (response.status === 429) {
+        hasRateLimitError = true;
+      } else if (response.status < 500) {
         return 'offline';
       }
     } catch (error) {
-      // Network failure or timeout -> stop immediately! All models will fail if offline.
+      // Network failure / offline / timeout -> stop immediately! Do NOT mark as rate_limited when offline.
       console.warn(`Test connection network error for ${model}:`, error);
       return 'offline';
     } finally {
@@ -163,13 +182,15 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
     }
   }
 
-  return 'rate_limited';
+  return hasRateLimitError ? 'rate_limited' : 'offline';
 }
 
 /**
  * Estimate nutrition from food description using Gemini AI API with Smart Fallback
- * Smart loop: Breaks IMMEDIATELY on network error / offline / timeout to avoid user lag.
- * Only loops on HTTP 429 (rate limit) or 5xx (server error), up to max 3 attempts.
+ * Fixes:
+ * - Stops immediately on network failure (does not retry on network error)
+ * - Uses parseFloat to preserve decimal nutrients
+ * - Preserves overall dish calories when breakdown items are incomplete
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -197,9 +218,9 @@ Kembalikan HANYA format JSON valid tanpa markdown:
 {
   "name": "Nama hidangan yang rapi",
   "calories": 520,
-  "proteinGrams": 32,
+  "proteinGrams": 32.5,
   "carbsGrams": 48,
-  "fatGrams": 16,
+  "fatGrams": 16.2,
   "fiberGrams": 4,
   "itemsBreakdown": [
     { "name": "1 Centong Nasi Putih", "calories": 200 },
@@ -235,23 +256,27 @@ Kembalikan HANYA format JSON valid tanpa markdown:
           const jsonMatch = rawText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
+
+            const overallCalories = parseNumber(parsed.calories, 0);
             const items: FoodItemBreakdown[] = Array.isArray(parsed.itemsBreakdown)
               ? parsed.itemsBreakdown.map((it: any) => ({
                   name: it.name || 'Item',
-                  calories: Math.max(0, parseInt(it.calories, 10) || 100),
+                  calories: parseNumber(it.calories, 100),
                 }))
-              : [{ name: cleanInput, calories: Math.max(0, parseInt(parsed.calories, 10) || 300) }];
+              : [{ name: cleanInput, calories: overallCalories || 300 }];
 
             const sumCalories = items.reduce((acc, it) => acc + it.calories, 0);
+            // Preserve overall total if valid, otherwise use breakdown sum
+            const finalCalories = overallCalories > 0 ? overallCalories : (sumCalories || 300);
 
             return {
               name: parsed.name || cleanInput,
               nutrition: {
-                calories: sumCalories || Math.max(0, parseInt(parsed.calories, 10) || 300),
-                proteinGrams: Math.max(0, parseInt(parsed.proteinGrams, 10) || 15),
-                carbsGrams: Math.max(0, parseInt(parsed.carbsGrams, 10) || 40),
-                fatGrams: Math.max(0, parseInt(parsed.fatGrams, 10) || 10),
-                fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
+                calories: finalCalories,
+                proteinGrams: parseNumber(parsed.proteinGrams, 15),
+                carbsGrams: parseNumber(parsed.carbsGrams, 40),
+                fatGrams: parseNumber(parsed.fatGrams, 10),
+                fiberGrams: parseNumber(parsed.fiberGrams, 3),
               },
               confidence: 'high',
               aiNotes: parsed.aiNotes || `Estimasi nutrisi oleh Gemini Cloud AI (${model})`,
@@ -263,19 +288,18 @@ Kembalikan HANYA format JSON valid tanpa markdown:
 
         if (response.status === 401 || response.status === 403) {
           lastErrorReason = 'invalid_key';
-          break; // Key invalid -> stop immediately
+          break; // Stop immediately on invalid key
         }
         if (response.status === 429) {
           lastErrorReason = 'rate_limited';
-          // Continue to next model for 429 rate limit
+          // Continue to next model on rate limit
         } else if (response.status < 500) {
-          break; // Other 4xx error -> stop
+          break; // Stop on client error
         }
       } catch (error) {
-        // Network failure / offline / timeout -> STOP IMMEDIATELY!
-        // Do not waste time looping through models when offline.
+        // Network error / offline / timeout -> STOP IMMEDIATELY! Do NOT loop through remaining models.
         lastErrorReason = 'network_error';
-        console.warn(`Gemini Cloud network/timeout error (${model}):`, error);
+        console.warn(`Gemini Cloud network/timeout error for ${model}:`, error);
         break;
       } finally {
         clearTimeout(timeoutId);
@@ -297,8 +321,74 @@ Kembalikan HANYA format JSON valid tanpa markdown:
 }
 
 /**
+ * Centralized service call for AI Health Coach chat query.
+ * Encapsulates model routing, prompt formatting, network error handling, and timeout.
+ */
+export async function sendAICoachChatQuery(
+  query: string,
+  userName: string,
+  userContext: UserContextData,
+  userApiKey?: string
+): Promise<string | null> {
+  if (!userApiKey || userApiKey.trim().length === 0) return null;
+
+  const key = userApiKey.trim();
+  const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.
+Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
+
+KONTEKS REAL-TIME PENGGUNA SAAT INI:
+- Nama: ${userName}
+- Berpuasa: ${userContext.fastingHours} jam
+- Total Kalori Masuk (Dimakan): ${userContext.caloriesIn} kcal
+- Defisit Kalori Realtime: ${userContext.netDeficit} kcal
+- Langkah Kaki: ${userContext.steps} steps
+- Air Minum: ${userContext.waterGlasses} / 8 gelas
+
+PERTANYAAN PENGGUNA: "${query}"
+
+Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), berikan estimasi kalori dan nutrisinya. Jika pengguna menanyakan data pribadinya (langkah, kalori, air, puasa), jawab berdasarkan konteks real-time di atas. Berikan saran praktis 2-3 paragraf singkat.`;
+
+  let attempts = 0;
+  for (const model of GEMINI_MODELS) {
+    if (attempts >= MAX_FALLBACK_ATTEMPTS) break;
+    attempts++;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (reply) return reply;
+      }
+      if (response.status === 401 || response.status === 403) break;
+      if (response.status !== 429 && response.status < 500) break;
+    } catch (err) {
+      console.warn(`Gemini Cloud chat for ${model} failed (network/timeout):`, err);
+      break; // STOP IMMEDIATELY on network error
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  return null;
+}
+
+/**
  * Generate Dynamic Creative AI Coach Greeting & Question using Gemini AI Cloud API
- * Smart loop: Stops immediately on network error or max 3 attempts on rate limits.
  */
 export async function generateAICoachMessageWithAI(
   userData: {

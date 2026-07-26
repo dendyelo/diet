@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { parseFoodNutritionWithAI } from '../services/aiService';
 import { X, Send, Sparkles, User, Bot } from 'lucide-react-native';
 
 export interface ChatMessage {
@@ -36,8 +35,8 @@ interface AICoachChatModalProps {
 }
 
 const QUICK_PROMPTS = [
-  'Lagi lapar malam nih, cemilan sehat apa ya?',
   'Berapa kalori makan pisang goreng?',
+  'Lagi lapar malam nih, cemilan sehat apa ya?',
   'Puasa 14 jam ini bikin sedikit pusing, wajar tak?',
   'Defisitku 500 kcal hari ini, boleh makan bakso?',
 ];
@@ -53,7 +52,7 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     {
       id: 'welcome',
       sender: 'ai',
-      text: `Halo ${userName}! 👋 Saya HabitDiet AI Coach pribadi Anda. Ceritakan apa yang sedang Anda rasakan atau tanyakan kalori makanan (misal: pisang goreng, nasi uduk, lemas, pusing), saya siap membantu!`,
+      text: `Halo ${userName}! 👋 Saya HabitDiet Gemini AI Coach pribadi Anda. Ceritakan apa yang sedang Anda rasakan atau tanyakan kalori makanan (misal: pisang goreng, nasi uduk, lemas, pusing), saya siap membantu!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -82,11 +81,23 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     if (!textToSend) setInputText('');
     setLoading(true);
 
-    try {
-      let replyText = '';
+    // If Gemini API Key is missing, respond gracefully in chat bubble (No RedBox error!)
+    if (!userApiKey || userApiKey.trim() === '') {
+      setTimeout(() => {
+        const noKeyMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          sender: 'ai',
+          text: '⚠️ Gemini AI API Key belum dikonfigurasi.\n\nHarap masukkan API Key Gemini (Gratis dari Google AI Studio) di tab Profil agar AI Health Coach dapat menganalisis dan menjawab pertanyaan Anda secara presisi Cloud.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, noKeyMsg]);
+        setLoading(false);
+      }, 500);
+      return;
+    }
 
-      if (userApiKey && userApiKey.trim() !== '') {
-        const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
+    try {
+      const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
 Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
 
 KONTEKS REAL-TIME PENGGUNA SAAT INI:
@@ -101,48 +112,50 @@ PERTANYAAN PENGGUNA: "${query}"
 
 Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), SEBUTKAN KALORI DAN NUTRISI SPESIFIK MAKANAN TERSEBUT SECARA AKURAT. Berikan saran praktis 2-3 paragraf singkat.`;
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-            }),
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
         }
+      );
+
+      if (!response.ok) {
+        const errorMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          sender: 'ai',
+          text: '⚠️ Gagal menghubungi server Gemini AI. Mohon periksa koneksi internet atau validasi API Key Anda di menu Profil.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+        setLoading(false);
+        return;
       }
 
-      // Smart Fallback Engine (Dynamic Food Nutrition Lookup)
-      if (!replyText) {
-        const lowerQ = query.toLowerCase();
-
-        if (lowerQ.includes('pusing') || lowerQ.includes('lemas')) {
-          replyText = `Merasakan sedikit pusing atau lemas saat berpuasa (${userContext.fastingHours} jam) biasanya disebabkan oleh penurunan kadar gula darah atau kekurangan cairan. Cobalah minum 1-2 gelas air putih hangat diberi sejumput garam dapur atau batalkan puasa dengan makanan bernutrisi ringan.`;
-        } else if (lowerQ.includes('lapar malam')) {
-          replyText = `Untuk mengatasi lapar malam tanpa merusak defisit kalori (saat ini ${userContext.netDeficit} kcal), pilihlah cemilan rendah kalori seperti 1 butir telur rebus (78 kcal) atau minum 1 gelas air hangat dulu untuk mengecek hidrasi!`;
-        } else {
-          // Dynamic Food Nutrition Lookup for ANY food query
-          const foodResult = await parseFoodNutritionWithAI(query, userApiKey);
-          replyText = `1 Porsi ${foodResult.name} diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. ${foodResult.aiNotes || ''}`;
-        }
-      }
+      const data = await response.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const replyText = rawText.trim() || 'Maaf, Gemini AI tidak dapat memproses tanggapan ini. Coba tanyakan dengan kata-kata lain.';
 
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: replyText.trim(),
+        text: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (error) {
-      console.error('Error sending AI chat:', error);
+    } catch (error: any) {
+      // Graceful UI handling without console.error RedBox trigger
+      const errBubble: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'ai',
+        text: '⚠️ Terjadi gangguan koneksi. Mohon periksa jaringan internet Anda.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errBubble]);
     } finally {
       setLoading(false);
     }
@@ -226,7 +239,7 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
             {loading && (
               <View style={[styles.messageBubble, styles.aiBubble, styles.loadingBubble]}>
                 <ActivityIndicator size="small" color="#10B981" />
-                <Text style={styles.loadingText}>AI Coach sedang menganalisis...</Text>
+                <Text style={styles.loadingText}>Gemini AI Coach sedang berpikir...</Text>
               </View>
             )}
           </ScrollView>

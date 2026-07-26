@@ -1,4 +1,4 @@
-import { FastingStage, TriggerOption, MealLog } from '../types';
+import { FastingStage, TriggerOption, MealLog, DailySummary } from '../types';
 
 export const FASTING_STAGES: FastingStage[] = [
   {
@@ -58,49 +58,40 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
   },
   {
     type: 'STRES',
-    label: 'Stres / Penat',
+    label: 'Stres / Tekanan',
     emoji: '🤯',
     color: '#EF4444',
-    description: 'Pelarian emosional saat tekanan kerja atau pikiran lelah.',
+    description: 'Ngemil sebagai mekanisme regulasi emosi.',
   },
   {
     type: 'NONGKRONG',
     label: 'Nongkrong / Sosial',
-    emoji: '👥',
-    color: '#F59E0B',
-    description: 'Tergoda makan/minum manis saat berkumpul bersama teman.',
+    emoji: '🍻',
+    color: '#8B5CF6',
+    description: 'Makan bersama teman atau keluarga.',
   },
   {
     type: 'LAPAR_ASLI',
-    label: 'Lapar Fisik Asli',
-    emoji: '🤤',
+    label: 'Lapar Asli / Fisik',
+    emoji: '⚡',
     color: '#10B981',
-    description: 'Perut memang keroncongan dan tubuh butuh nutrisi riil.',
+    description: 'Lapar fisik alami tubuh butuh energi.',
   },
   {
     type: 'LAPAR_MALAM',
     label: 'Lapar Malam Hari',
     emoji: '🌙',
-    color: '#8B5CF6',
-    description: 'Cemilan larut malam menjelang atau saat waktu tidur.',
+    color: '#F59E0B',
+    description: 'Lapar larut malam sebelum tidur.',
   },
 ];
 
-/**
- * Get current Fasting Stage based on hours elapsed since last meal
- */
-export function getFastingStage(elapsedHours: number): FastingStage {
-  for (let i = FASTING_STAGES.length - 1; i >= 0; i--) {
-    if (elapsedHours >= FASTING_STAGES[i].minHours) {
-      return FASTING_STAGES[i];
-    }
-  }
-  return FASTING_STAGES[0];
+export function getFastingStage(elapsedSeconds: number): FastingStage {
+  const hours = Math.max(0, elapsedSeconds / 3600);
+  const stage = FASTING_STAGES.find((s) => hours >= s.minHours && hours < s.maxHours);
+  return stage || FASTING_STAGES[FASTING_STAGES.length - 1];
 }
 
-/**
- * Format elapsed seconds into HH:MM:SS
- */
 export function formatElapsedTime(totalSeconds: number): {
   hours: number;
   minutes: number;
@@ -120,9 +111,6 @@ export function formatElapsedTime(totalSeconds: number): {
   };
 }
 
-/**
- * Aggregate snacking trigger statistics
- */
 export function calculateTriggerStats(mealLogs: MealLog[]) {
   const snackLogs = mealLogs.filter((m) => m.isSnack && m.trigger);
   const counts: Record<string, number> = {};
@@ -155,4 +143,55 @@ export function getTopTrigger(mealLogs: MealLog[]) {
   const stats = calculateTriggerStats(mealLogs);
   const top = [...stats.breakdown].sort((a, b) => b.count - a.count)[0];
   return top && top.count > 0 ? top : null;
+}
+
+export interface WeeklyHabitSummary {
+  habitScore: number; // 0 - 100
+  avgDailyCalories: number;
+  waterCompliancePct: number;
+  proteinCompliancePct: number;
+  insightSentence: string;
+}
+
+/**
+ * Generate 7-day Weekly Habit Summary & Compliance Score
+ */
+export function generateWeeklyHabitSummary(
+  mealLogs: MealLog[],
+  waterGlassesHistory: number[] = [8, 7, 8, 6, 8, 8, 7]
+): WeeklyHabitSummary {
+  const totalCal = mealLogs.reduce((acc, m) => acc + (m.nutrition.calories || 0), 0);
+  const daysWithData = Math.max(1, Math.min(7, new Set(mealLogs.map((m) => m.timestamp.slice(0, 10))).size));
+  const avgDailyCalories = Math.round(totalCal / daysWithData);
+
+  const totalWater = waterGlassesHistory.reduce((acc, w) => acc + w, 0);
+  const avgWater = totalWater / Math.max(1, waterGlassesHistory.length);
+  const waterCompliancePct = Math.min(100, Math.round((avgWater / 8) * 100));
+
+  const totalProtein = mealLogs.reduce((acc, m) => acc + (m.nutrition.proteinGrams || 0), 0);
+  const avgProtein = totalProtein / daysWithData;
+  const proteinCompliancePct = Math.min(100, Math.round((avgProtein / 75) * 100));
+
+  // Habit Score Calculation (Weighted blend of water, protein, and consistency)
+  const consistencyScore = Math.min(100, Math.round((daysWithData / 7) * 100));
+  const habitScore = Math.round(
+    consistencyScore * 0.4 + waterCompliancePct * 0.3 + proteinCompliancePct * 0.3
+  );
+
+  let insightSentence = 'Konsistensi pola makanmu sangat baik minggu ini. Pertahankan hidrasi harian!';
+  if (habitScore >= 85) {
+    insightSentence = 'Luar biasa! Konsistensi gizi dan hidrasimu berada di tingkat optimal minggu ini 🎉.';
+  } else if (habitScore >= 60) {
+    insightSentence = 'Pola kebiasaanmu stabil. Coba tambahkan 1 gelas air lagi untuk hidrasi maksimal.';
+  } else {
+    insightSentence = 'Awal yang baik! Catat makanan dan air secara rutin untuk membangun momentum kebiasaan.';
+  }
+
+  return {
+    habitScore,
+    avgDailyCalories,
+    waterCompliancePct,
+    proteinCompliancePct,
+    insightSentence,
+  };
 }

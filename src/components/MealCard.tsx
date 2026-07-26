@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { MealLog } from '../types';
 import { TRIGGER_OPTIONS } from '../utils/habitAnalytics';
 import { Trash2, Cookie, Utensils, Edit3 } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
+import { Surface } from './Surface';
 
 interface MealCardProps {
   log: MealLog;
@@ -11,6 +13,8 @@ interface MealCardProps {
 }
 
 export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => {
+  const { colors, spacing, radius, typography } = useTheme();
+
   const triggerInfo = log.trigger
     ? TRIGGER_OPTIONS.find((t) => t.type === log.trigger)
     : null;
@@ -21,51 +25,101 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
   });
 
   return (
-    <View style={styles.card}>
-      <View style={styles.leftRow}>
+    <Surface
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        padding: spacing.sm + 4,
+        marginVertical: 4,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, flex: 1 }}>
         <View
-          style={[
-            styles.iconBox,
-            { backgroundColor: log.isSnack ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)' },
-          ]}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 2,
+            backgroundColor: log.isSnack ? colors.warningSubtle : colors.infoSubtle,
+          }}
         >
           {log.isSnack ? (
-            <Cookie size={16} color="#F59E0B" />
+            <Cookie size={16} color={colors.warning} />
           ) : (
-            <Utensils size={16} color="#3B82F6" />
+            <Utensils size={16} color={colors.info} />
           )}
         </View>
 
-        <View style={styles.textContainer}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name} numberOfLines={2}>{log.name}</Text>
-            <Text style={styles.time} numberOfLines={1}>{timeStr}</Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 6 }}>
+            <Text style={{ ...typography.bodyMedium, color: colors.textPrimary, flex: 1 }} numberOfLines={2}>
+              {log.name}
+            </Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
+              {timeStr}
+            </Text>
           </View>
 
           {/* Itemized Food Calorie Breakdown List */}
           {log.itemsBreakdown && log.itemsBreakdown.length > 0 && (
-            <View style={styles.breakdownContainer}>
+            <View
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: radius.sm,
+                padding: spacing.xs + 4,
+                marginVertical: 6,
+                borderWidth: 1,
+                borderColor: colors.divider,
+              }}
+            >
               {log.itemsBreakdown.map((item, index) => (
-                <View key={index} style={styles.breakdownItem}>
-                  <Text style={styles.breakdownDot}>•</Text>
-                  <Text style={styles.breakdownName} numberOfLines={1}>{item.name}:</Text>
-                  <Text style={styles.breakdownCal} numberOfLines={1}>{item.calories} kcal</Text>
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginVertical: 2 }}>
+                  <Text style={{ color: colors.info, fontSize: 12, fontWeight: 'bold' }}>•</Text>
+                  <Text style={{ ...typography.caption, color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
+                    {item.name}:
+                  </Text>
+                  <Text style={{ ...typography.caption, fontWeight: 'bold', color: colors.info }} numberOfLines={1}>
+                    {item.calories} kcal
+                  </Text>
                 </View>
               ))}
             </View>
           )}
 
-          <View style={styles.macroRow}>
-            <Text style={styles.calBadge} numberOfLines={1}>Total: {log.nutrition.calories} kcal</Text>
-            <Text style={styles.macroText} numberOfLines={1}>P: {log.nutrition.proteinGrams}g</Text>
-            <Text style={styles.macroText} numberOfLines={1}>K: {log.nutrition.carbsGrams}g</Text>
-            <Text style={styles.macroText} numberOfLines={1}>L: {log.nutrition.fatGrams}g</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }} numberOfLines={1}>
+              Total: {log.nutrition.calories} kcal
+            </Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
+              P: {log.nutrition.proteinGrams}g
+            </Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
+              K: {log.nutrition.carbsGrams}g
+            </Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
+              L: {log.nutrition.fatGrams}g
+            </Text>
           </View>
 
           {triggerInfo && (
-            <View style={[styles.triggerPill, { backgroundColor: triggerInfo.color + '20' }]}>
-              <Text style={styles.triggerEmoji}>{triggerInfo.emoji}</Text>
-              <Text style={[styles.triggerText, { color: triggerInfo.color }]} numberOfLines={1}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                alignSelf: 'flex-start',
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: radius.sm,
+                marginTop: 4,
+                backgroundColor: triggerInfo.color + '20',
+              }}
+            >
+              <Text style={{ fontSize: 11 }}>{triggerInfo.emoji}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: triggerInfo.color }} numberOfLines={1}>
                 {triggerInfo.label}
               </Text>
             </View>
@@ -73,134 +127,15 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
         </View>
       </View>
 
-      <View style={styles.actionsRow}>
-        <TouchableOpacity onPress={() => onEdit(log)} style={styles.actionBtn}>
-          <Edit3 size={16} color="#60A5FA" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 6 }}>
+        <TouchableOpacity onPress={() => onEdit(log)} style={{ padding: 6 }}>
+          <Edit3 size={16} color={colors.info} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => onDelete(log.id)} style={styles.actionBtn}>
-          <Trash2 size={16} color="rgba(255, 255, 255, 0.3)" />
+        <TouchableOpacity onPress={() => onDelete(log.id)} style={{ padding: 6 }}>
+          <Trash2 size={16} color={colors.textTertiary} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Surface>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 16,
-    padding: 12,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  leftRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    flex: 1,
-  },
-  iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
-    gap: 6,
-  },
-  name: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    flex: 1,
-  },
-  time: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.4)',
-  },
-  breakdownContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 10,
-    padding: 8,
-    marginVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  breakdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginVertical: 2,
-  },
-  breakdownDot: {
-    color: '#3B82F6',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  breakdownName: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.85)',
-    flex: 1,
-  },
-  breakdownCal: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#60A5FA',
-  },
-  macroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 4,
-  },
-  calBadge: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#34D399',
-  },
-  macroText: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  triggerPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginTop: 4,
-  },
-  triggerEmoji: {
-    fontSize: 11,
-  },
-  triggerText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginLeft: 6,
-  },
-  actionBtn: {
-    padding: 6,
-  },
-});

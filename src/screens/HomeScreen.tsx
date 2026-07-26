@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { useProfile, useMeals, useHealth, useAI } from '../context/AppContext';
+import { useProfile, useMeals, useHealth, useAI, useTheme } from '../context/AppContext';
 import { EatingTimer } from '../components/EatingTimer';
 import { EnergyGauge } from '../components/EnergyGauge';
 import { HabitRings } from '../components/HabitRings';
@@ -17,7 +16,7 @@ import { AddMealModal } from '../components/AddMealModal';
 import { EditMealModal } from '../components/EditMealModal';
 import { AICoachBanner } from '../components/AICoachBanner';
 import { AICoachChatModal } from '../components/AICoachChatModal';
-import { GlassCard } from '../components/GlassCard';
+import { Surface } from '../components/Surface';
 import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
 import { Droplet, Footprints, Utensils, Cookie, Sparkles } from 'lucide-react-native';
 import { isSameLocalDay } from '../utils/date';
@@ -27,6 +26,7 @@ export const HomeScreen: React.FC = () => {
   const { mealLogs = [], totalCaloriesIn, snackCount, addMealLog, updateMealLog, deleteMealLog } = useMeals();
   const { fastingState, steps = 0, waterGlasses = 0, energy, addWaterGlass, resetFastingTimer } = useHealth();
   const { userApiKey } = useAI();
+  const { colors, spacing, radius, typography } = useTheme();
 
   const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
   const [showAddMealModal, setShowAddMealModal] = useState<boolean>(false);
@@ -51,23 +51,27 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.sm, paddingBottom: 100 }}>
         {/* Header Title Bar */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting} numberOfLines={1}>Halo, {profile?.name || 'Teman Diet'}! 👋</Text>
-            <Text style={styles.subGreeting} numberOfLines={1}>Jaga defisit kalori & habit kesehatanmu hari ini.</Text>
-          </View>
-
-          {profile?.isCheatDay && (
-            <View style={styles.cheatBadge}>
-              <Text style={styles.cheatBadgeText} numberOfLines={1}>cheat day 🍕</Text>
-            </View>
-          )}
+        <View style={{ marginBottom: spacing.xs }}>
+          <Text style={{ ...typography.h1, color: colors.textPrimary }} numberOfLines={1}>Halo, {profile?.name || 'Teman Diet'}! 👋</Text>
+          <Text style={{ ...typography.caption, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>Jaga defisit kalori & habit kesehatanmu hari ini.</Text>
         </View>
 
-        {/* 1. Fasting Timer */}
+        {/* 1. AI Health Coach Banner */}
+        <AICoachBanner
+          elapsedSeconds={elapsedSeconds}
+          caloriesIn={totalCaloriesIn || 0}
+          netDeficit={energy?.netBalance || 500}
+          steps={steps || 0}
+          waterGlasses={waterGlasses || 0}
+          userName={profile?.name || 'Teman Diet'}
+          userApiKey={userApiKey}
+          onOpenChat={() => setShowChatModal(true)}
+        />
+
+        {/* 2. Fasting / Eating Timer */}
         <EatingTimer
           elapsedSeconds={elapsedSeconds}
           hasMealRecorded={hasMealRecorded}
@@ -75,138 +79,99 @@ export const HomeScreen: React.FC = () => {
           onStartFastingNow={handleStartFastingNow}
         />
 
-        {/* 2. Sleek Minimalist AI Health Coach Banner */}
-        <AICoachBanner
-          elapsedSeconds={elapsedSeconds}
-          caloriesIn={totalCaloriesIn}
-          netDeficit={energy?.netBalance || 0}
-          steps={steps}
-          waterGlasses={waterGlasses}
-          userName={profile?.name || 'Teman Diet'}
-          userApiKey={userApiKey}
-          onOpenChat={() => setShowChatModal(true)}
-        />
+        {/* 3. Energy Balance Gauge */}
+        {energy && (
+          <EnergyGauge
+            caloriesIn={totalCaloriesIn || 0}
+            caloriesOut={energy.totalCaloriesOut}
+            dailyBMR={energy.dailyBMR}
+            elapsedBMR={energy.elapsedBMR}
+            stepCalories={energy.stepCalories}
+            netBalance={energy.netBalance}
+            targetDeficit={energy.targetDeficit}
+            isDeficit={energy.isDeficit}
+            isCheatDay={profile?.isCheatDay}
+          />
+        )}
 
-        {/* 3. Live Synchronized Energy Balance Gauge */}
-        <EnergyGauge
-          caloriesIn={totalCaloriesIn}
-          caloriesOut={energy?.totalCaloriesOut ?? 0}
-          dailyBMR={energy?.dailyBMR ?? 0}
-          elapsedBMR={energy?.elapsedBMR ?? 0}
-          stepCalories={energy?.stepCalories ?? 0}
-          netBalance={energy?.netBalance ?? 0}
-          targetDeficit={energy?.targetDeficit ?? 500}
-          isDeficit={energy?.isDeficit ?? true}
-          isCheatDay={profile?.isCheatDay}
-        />
-
-        {/* Quick Action Bar */}
-        <View style={styles.quickBar}>
-          <TouchableOpacity style={styles.mealActionBtn} onPress={() => setShowAddMealModal(true)}>
-            <Utensils size={16} color="#FFFFFF" />
-            <Text style={styles.actionBtnText} numberOfLines={1}>+ Catat Makanan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.snackActionBtn} onPress={() => setShowSnackModal(true)}>
-            <Cookie size={16} color="#FFFFFF" />
-            <Text style={styles.actionBtnText} numberOfLines={1}>🍿 Catat Ngemil</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 4. Daily Habit Rings */}
+        {/* 4. Triple Habit Rings */}
         <HabitRings
           percentageDeficit={energy?.percentageToGoal || 0}
-          snackCount={snackCount}
-          maxSnacksAllowed={2}
-          waterGlasses={waterGlasses}
-          targetWaterGlasses={8}
+          snackCount={snackCount || 0}
+          waterGlasses={waterGlasses || 0}
         />
 
-        {/* 5. Hydration & Automatic Sensor Steps Widget Row */}
-        <View style={styles.widgetRow}>
-          {/* Water Widget */}
-          <GlassCard style={styles.widgetCard}>
-            <View style={styles.widgetHeader}>
-              <Droplet size={16} color="#3B82F6" />
-              <Text style={styles.widgetTitle} numberOfLines={1}>HIDRASI AIR</Text>
-            </View>
-            <Text style={styles.widgetValue} numberOfLines={1}>{waterGlasses} / 8 Gelas</Text>
-            <TouchableOpacity style={styles.widgetBtn} onPress={addWaterGlass}>
-              <Text style={styles.widgetBtnText} numberOfLines={1}>+ 1 Gelas Air</Text>
+        {/* 5. Quick Habit Logging Bar */}
+        <Surface style={{ padding: spacing.md }}>
+          <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
+            PENCATATAN KESEHATAN HARIAN
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: spacing.xs + 4 }}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: colors.infoSubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4 }}
+              onPress={() => addWaterGlass()}
+            >
+              <Droplet size={18} color={colors.info} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.info }}>+1 Air</Text>
             </TouchableOpacity>
-          </GlassCard>
 
-          {/* Steps Widget (100% Automated Sensor Sync) */}
-          <GlassCard style={styles.widgetCard}>
-            <View style={styles.widgetHeader}>
-              <Footprints size={16} color="#10B981" />
-              <Text style={styles.widgetTitle} numberOfLines={1}>LANGKAH KAKI</Text>
-            </View>
-            <Text style={styles.widgetValue} numberOfLines={1}>{steps.toLocaleString()} Steps</Text>
-            <View style={styles.autoSensorBadge}>
-              <View style={styles.sensorDot} />
-              <Text style={styles.autoSensorText} numberOfLines={1}>Sensor Otomatis</Text>
-            </View>
-          </GlassCard>
-        </View>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: colors.warningSubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4 }}
+              onPress={() => setShowSnackModal(true)}
+            >
+              <Cookie size={18} color={colors.warning} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Snack</Text>
+            </TouchableOpacity>
 
-        {/* Smart Activity Advice */}
-        {steps < 3000 && totalCaloriesIn > 1000 && (
-          <GlassCard style={styles.adviceCard}>
-            <View style={styles.adviceHeader}>
-              <Sparkles size={16} color="#F59E0B" />
-              <Text style={styles.adviceTitle} numberOfLines={1}>SARAN AKTIVITAS PINTAR</Text>
-            </View>
-            <Text style={styles.adviceText}>
-              Kalori masukmu hari ini sudah {totalCaloriesIn} kcal, tetapi langkah kaki baru {steps} steps.
-              Coba luangkan 15 menit jalan kaki sore ini untuk menjaga Defisit Kalori tetap hijau 🟢!
-            </Text>
-          </GlassCard>
-        )}
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: colors.primarySubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4 }}
+              onPress={() => setShowAddMealModal(true)}
+            >
+              <Utensils size={18} color={colors.primary} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>Makanan</Text>
+            </TouchableOpacity>
+          </View>
+        </Surface>
 
-        {/* Today's Meal Timeline Feed */}
-        <Text style={styles.feedTitle} numberOfLines={1}>RIWAYAT MAKAN HARI INI ({todayLogs.length})</Text>
-        {todayLogs.length === 0 ? (
-          <GlassCard style={styles.emptyCard}>
-            <Text style={styles.emptyText}>Belum ada makanan atau cemilan tercatat hari ini.</Text>
-            <Text style={styles.emptySub}>Klik "+ Catat Makanan" atau "🍿 Catat Ngemil" di atas.</Text>
-          </GlassCard>
-        ) : (
-          todayLogs.map((log) => (
-            <MealCard key={log.id} log={log} onEdit={(item) => setEditingLog(item)} onDelete={deleteMealLog} />
-          ))
-        )}
+        {/* 6. Today's Meal Timeline */}
+        <Surface style={{ padding: spacing.md }}>
+          <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
+            JURNAL MAKANAN HARI INI ({todayLogs.length})
+          </Text>
+
+          {todayLogs.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Belum ada pencatatan makanan hari ini.</Text>
+            </View>
+          ) : (
+            todayLogs.map((log) => (
+              <MealCard
+                key={log.id}
+                log={log}
+                onEdit={(item) => setEditingLog(item)}
+                onDelete={(id) => deleteMealLog(id)}
+              />
+            ))
+          )}
+        </Surface>
       </ScrollView>
 
       {/* Modals */}
-      <AICoachChatModal
-        visible={showChatModal}
-        onClose={() => setShowChatModal(false)}
-        userName={profile?.name || 'Teman Diet'}
-        userApiKey={userApiKey}
-        userContext={{
-          fastingHours: Math.floor(elapsedSeconds / 3600),
-          caloriesIn: totalCaloriesIn,
-          netDeficit: energy?.netBalance || 0,
-          steps,
-          waterGlasses,
-        }}
-      />
-
       <SnackModal
         visible={showSnackModal}
         onClose={() => setShowSnackModal(false)}
         onSubmitSnack={handleAddSnackSubmit}
-        onDrinkWater={addWaterGlass}
+        onDrinkWater={() => addWaterGlass()}
         userApiKey={userApiKey}
       />
 
       <AddMealModal
         visible={showAddMealModal}
         onClose={() => setShowAddMealModal(false)}
-        onSaveMeal={(name, nutrition, customTimestamp, itemsBreakdown) =>
-          addMealLog(name, false, nutrition, undefined, customTimestamp, 'ai', itemsBreakdown)
-        }
+        onSaveMeal={async (name, nutrition, customTimestamp, itemsBreakdown) => {
+          await addMealLog(name, false, nutrition, undefined, customTimestamp, 'ai', itemsBreakdown);
+        }}
         userApiKey={userApiKey}
       />
 
@@ -214,188 +179,24 @@ export const HomeScreen: React.FC = () => {
         visible={editingLog !== null}
         log={editingLog}
         onClose={() => setEditingLog(null)}
-        onSaveUpdate={(id, fields) => updateMealLog(id, fields)}
+        onSaveUpdate={async (id, updatedFields) => {
+          await updateMealLog(id, updatedFields);
+        }}
+      />
+
+      <AICoachChatModal
+        visible={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        userName={profile?.name || 'Teman Diet'}
+        userApiKey={userApiKey}
+        userContext={{
+          fastingHours: Math.floor(elapsedSeconds / 3600),
+          caloriesIn: totalCaloriesIn || 0,
+          netDeficit: energy?.netBalance || 500,
+          steps: steps || 0,
+          waterGlasses: waterGlasses || 0,
+        }}
       />
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#09090B',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#09090B',
-  },
-  scrollContent: {
-    padding: 14,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  greeting: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  subGreeting: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginTop: 2,
-  },
-  cheatBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
-    borderColor: '#F59E0B',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
-  },
-  cheatBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#F59E0B',
-    textTransform: 'uppercase',
-  },
-  quickBar: {
-    flexDirection: 'row',
-    gap: 10,
-    marginVertical: 8,
-  },
-  mealActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  snackActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#F59E0B',
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  actionBtnText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  widgetRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginVertical: 4,
-  },
-  widgetCard: {
-    flex: 1,
-    padding: 12,
-  },
-  widgetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  widgetTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: 'rgba(255, 255, 255, 0.6)',
-    letterSpacing: 0.8,
-    flex: 1,
-  },
-  widgetValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  widgetBtn: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    paddingVertical: 6,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  widgetBtnText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#60A5FA',
-  },
-  autoSensorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-  },
-  sensorDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  autoSensorText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#10B981',
-  },
-  adviceCard: {
-    borderColor: 'rgba(245, 158, 11, 0.25)',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-    marginVertical: 8,
-  },
-  adviceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  adviceTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#F59E0B',
-    letterSpacing: 0.8,
-  },
-  adviceText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 16,
-  },
-  feedTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 1,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  emptyCard: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  emptySub: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
-    marginTop: 4,
-  },
-});

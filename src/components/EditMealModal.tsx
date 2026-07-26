@@ -3,7 +3,6 @@ import {
   Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { MealLog, FoodItemBreakdown } from '../types';
 import { X, Save, Edit3, Plus, Trash2 } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface EditMealModalProps {
   visible: boolean;
@@ -26,6 +26,7 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
   onClose,
   onSaveUpdate,
 }) => {
+  const { colors, spacing, radius, typography } = useTheme();
   const [name, setName] = useState<string>('');
   const [calories, setCalories] = useState<string>('');
   const [protein, setProtein] = useState<string>('');
@@ -58,150 +59,188 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
     updated[index].calories = val;
     setItems(updated);
 
-    // Auto-update total calories from sum of items
-    const newTotal = updated.reduce((acc, it) => acc + it.calories, 0);
-    setCalories(newTotal.toString());
+    const sum = updated.reduce((acc, curr) => acc + (curr.calories || 0), 0);
+    if (sum > 0) setCalories(sum.toString());
   };
 
   const handleAddItem = () => {
-    const updated = [...items, { name: 'Bahan Baru', calories: 100 }];
-    setItems(updated);
-    const newTotal = updated.reduce((acc, it) => acc + it.calories, 0);
-    setCalories(newTotal.toString());
+    setItems([...items, { name: 'Item Baru', calories: 100 }]);
   };
 
   const handleRemoveItem = (index: number) => {
     const updated = items.filter((_, i) => i !== index);
     setItems(updated);
-    const newTotal = updated.reduce((acc, it) => acc + it.calories, 0);
-    setCalories(newTotal.toString());
+    const sum = updated.reduce((acc, curr) => acc + (curr.calories || 0), 0);
+    if (sum > 0) setCalories(sum.toString());
   };
 
   const handleSave = () => {
-    const totalCal = parseInt(calories, 10) || 0;
-    const p = parseInt(protein, 10) || 0;
-    const c = parseInt(carbs, 10) || 0;
-    const f = parseInt(fat, 10) || 0;
+    const parsedCal = parseInt(calories, 10) || log.nutrition.calories;
+    const parsedProtein = parseFloat(protein) || log.nutrition.proteinGrams;
+    const parsedCarbs = parseFloat(carbs) || log.nutrition.carbsGrams;
+    const parsedFat = parseFloat(fat) || log.nutrition.fatGrams;
 
     onSaveUpdate(log.id, {
       name: name.trim() || log.name,
       nutrition: {
-        calories: totalCal,
-        proteinGrams: p,
-        carbsGrams: c,
-        fatGrams: f,
+        calories: parsedCal,
+        proteinGrams: parsedProtein,
+        carbsGrams: parsedCarbs,
+        fatGrams: parsedFat,
       },
-      itemsBreakdown: items,
+      itemsBreakdown: items.length > 0 ? items : undefined,
     });
-
     onClose();
   };
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.overlay}
+        style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.sheetContainer}>
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <Edit3 size={20} color="#3B82F6" />
-              <Text style={styles.sheetTitle}>Edit Log Makanan & Rincian</Text>
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+            padding: spacing.md,
+            maxHeight: '90%',
+            borderWidth: 1,
+            borderColor: colors.divider,
+          }}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: spacing.md,
+              paddingBottom: spacing.sm,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.divider,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Edit3 size={18} color={colors.primary} />
+              <Text style={{ ...typography.h3, color: colors.textPrimary }}>Edit Makanan</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color="rgba(255, 255, 255, 0.7)" />
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <X size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Meal Title */}
-            <Text style={styles.sectionLabel}>NAMA MAKANAN</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} />
-
-            {/* Itemized Food Breakdown List */}
-            <View style={styles.itemsHeader}>
-              <Text style={styles.sectionLabel}>RINCIAN KALORI PER ITEM</Text>
-              <TouchableOpacity style={styles.addBtn} onPress={handleAddItem}>
-                <Plus size={12} color="#3B82F6" />
-                <Text style={styles.addBtnText}>+ Tambah Item</Text>
-              </TouchableOpacity>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
+            {/* Meal Name */}
+            <View style={{ gap: spacing.xs }}>
+              <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase' }}>Nama Makanan</Text>
+              <TextInput
+                style={{
+                  backgroundColor: colors.surfaceElevated,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: colors.divider,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  color: colors.textPrimary,
+                  fontSize: 14,
+                }}
+                value={name}
+                onChangeText={setName}
+              />
             </View>
 
-            {items.map((item, idx) => (
-              <View key={idx} style={styles.itemRow}>
-                <TextInput
-                  style={[styles.input, styles.itemNameInput]}
-                  value={item.name}
-                  onChangeText={(val) => handleItemNameChange(idx, val)}
-                  placeholder="Nama Item"
-                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
-                />
-                <TextInput
-                  style={[styles.input, styles.itemCalInput]}
-                  value={item.calories.toString()}
-                  keyboardType="numeric"
-                  onChangeText={(val) => handleItemCalorieChange(idx, val)}
-                  placeholder="kcal"
-                  placeholderTextColor="rgba(255, 255, 255, 0.3)"
-                />
-                <Text style={styles.kcalLabel}>kcal</Text>
-                <TouchableOpacity onPress={() => handleRemoveItem(idx)} style={styles.removeBtn}>
-                  <Trash2 size={16} color="#EF4444" />
+            {/* Total Calories & Macros */}
+            <View style={{ gap: spacing.xs }}>
+              <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase' }}>Ringkasan Nutrisi</Text>
+              <View style={{ flexDirection: 'row', gap: spacing.xs + 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2 }}>Kalori (kcal)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.primaryText, fontSize: 13, fontWeight: 'bold' }}
+                    keyboardType="number-pad"
+                    value={calories}
+                    onChangeText={setCalories}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2 }}>Protein (g)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.textPrimary, fontSize: 13 }}
+                    keyboardType="decimal-pad"
+                    value={protein}
+                    onChangeText={setProtein}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2 }}>Karbo (g)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.textPrimary, fontSize: 13 }}
+                    keyboardType="decimal-pad"
+                    value={carbs}
+                    onChangeText={setCarbs}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2 }}>Lemak (g)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.textPrimary, fontSize: 13 }}
+                    keyboardType="decimal-pad"
+                    value={fat}
+                    onChangeText={setFat}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Item Breakdown List */}
+            <View style={{ gap: spacing.xs }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase' }}>Rincian Komponen Makanan</Text>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={handleAddItem}>
+                  <Plus size={12} color={colors.primary} />
+                  <Text style={{ fontSize: 11, color: colors.primaryText, fontWeight: '700' }}>Tambah Item</Text>
                 </TouchableOpacity>
               </View>
-            ))}
 
-            {/* Total Nutrients */}
-            <Text style={styles.sectionLabel}>TOTAL NUTRISI GIZI</Text>
-            <View style={styles.grid2}>
-              <View style={styles.gridItem}>
-                <Text style={styles.subLabel}>TOTAL KALORI (KCAL)</Text>
-                <TextInput
-                  style={[styles.input, { borderColor: '#10B981', color: '#10B981', fontWeight: 'bold' }]}
-                  keyboardType="numeric"
-                  value={calories}
-                  onChangeText={setCalories}
-                />
-              </View>
-
-              <View style={styles.gridItem}>
-                <Text style={styles.subLabel}>PROTEIN (GRAM)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={protein}
-                  onChangeText={setProtein}
-                />
-              </View>
-            </View>
-
-            <View style={styles.grid2}>
-              <View style={styles.gridItem}>
-                <Text style={styles.subLabel}>KARBOHIDRAT (GRAM)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={carbs}
-                  onChangeText={setCarbs}
-                />
-              </View>
-
-              <View style={styles.gridItem}>
-                <Text style={styles.subLabel}>LEMAK (GRAM)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={fat}
-                  onChangeText={setFat}
-                />
-              </View>
+              {items.map((item, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, padding: 8, borderRadius: radius.sm }}>
+                  <TextInput
+                    style={{ flex: 2, color: colors.textPrimary, fontSize: 13, paddingVertical: 4 }}
+                    value={item.name}
+                    onChangeText={(val) => handleItemNameChange(idx, val)}
+                  />
+                  <TextInput
+                    style={{ flex: 1, color: colors.info, fontSize: 13, fontWeight: 'bold', textAlign: 'right', paddingVertical: 4 }}
+                    keyboardType="number-pad"
+                    value={item.calories.toString()}
+                    onChangeText={(val) => handleItemCalorieChange(idx, val)}
+                  />
+                  <Text style={{ fontSize: 11, color: colors.textTertiary }}>kcal</Text>
+                  <TouchableOpacity onPress={() => handleRemoveItem(idx)} style={{ padding: 4 }}>
+                    <Trash2 size={14} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
 
             {/* Save Button */}
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                backgroundColor: colors.primary,
+                paddingVertical: 14,
+                borderRadius: radius.md,
+                marginTop: spacing.sm,
+              }}
+              onPress={handleSave}
+            >
               <Save size={18} color="#FFFFFF" />
-              <Text style={styles.submitBtnText}>Simpan Perubahan Edit</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Simpan Perubahan</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -209,128 +248,3 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    backgroundColor: '#18181B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '85%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  subLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 4,
-  },
-  itemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  addBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#3B82F6',
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginVertical: 4,
-  },
-  itemNameInput: {
-    flex: 2,
-  },
-  itemCalInput: {
-    flex: 1,
-    textAlign: 'center',
-  },
-  kcalLabel: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  removeBtn: {
-    padding: 6,
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 13,
-  },
-  grid2: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  gridItem: {
-    flex: 1,
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#3B82F6',
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  submitBtnText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-});

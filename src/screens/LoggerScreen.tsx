@@ -2,15 +2,14 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TextInput,
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { useMeals, useAI } from '../context/AppContext';
-import { GlassCard } from '../components/GlassCard';
+import { useMeals, useAI, useTheme } from '../context/AppContext';
+import { Surface } from '../components/Surface';
 import { Sparkles, Utensils, Sliders, CheckCircle2, Wifi, AlertCircle } from 'lucide-react-native';
 
 interface LoggerScreenProps {
@@ -19,7 +18,8 @@ interface LoggerScreenProps {
 
 export const LoggerScreen: React.FC<LoggerScreenProps> = ({ onDone }) => {
   const { addMealLog } = useMeals();
-  const { parseFoodNutrition, aiStatus, userApiKey } = useAI();
+  const { parseFoodNutrition, aiStatus } = useAI();
+  const { colors, spacing, radius, typography } = useTheme();
 
   const [inputMode, setInputMode] = useState<'ai' | 'manual'>('ai');
   const [foodText, setFoodText] = useState<string>('');
@@ -58,373 +58,173 @@ export const LoggerScreen: React.FC<LoggerScreenProps> = ({ onDone }) => {
     if (!manualName.trim()) return;
 
     const kcal = parseInt(calories, 10) || 300;
-    const p = parseInt(protein, 10) || 15;
-    const c = parseInt(carbs, 10) || 40;
-    const f = parseInt(fat, 10) || 10;
+    const p = parseFloat(protein) || 15;
+    const c = parseFloat(carbs) || 40;
+    const f = parseFloat(fat) || 10;
 
-    await addMealLog(
-      manualName.trim(),
-      false,
-      { calories: kcal, proteinGrams: p, carbsGrams: c, fatGrams: f },
-      undefined,
-      undefined,
-      'manual'
-    );
+    await addMealLog(manualName.trim(), false, {
+      calories: kcal,
+      proteinGrams: p,
+      carbsGrams: c,
+      fatGrams: f,
+    });
 
+    setSuccessMsg(`✓ "${manualName}" (${kcal} kcal) berhasil dicatat secara manual.`);
     setManualName('');
-    setSuccessMsg(`✓ "${manualName}" (${kcal} kcal) berhasil dicatat!`);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        {/* Screen Header */}
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.screenTitle} numberOfLines={1}>PENCATAT NUTRISI & AI</Text>
-            <Text style={styles.screenSub}>
-              Hitung kalori makanan dari deskripsi santai atau manual.
-            </Text>
-          </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 100 }}>
+        <Text style={{ ...typography.h1, color: colors.textPrimary, marginTop: 10 }}>Pencatatan Makanan</Text>
 
-          {/* AI Status Indicator Badge */}
-          <View style={[styles.aiStatusBadge, { backgroundColor: aiStatus.color + '18', borderColor: aiStatus.color + '40' }]}>
-            <View style={[styles.statusDot, { backgroundColor: aiStatus.color }]} />
-            <Text style={[styles.statusBadgeText, { color: aiStatus.color }]} numberOfLines={1}>
-              {aiStatus.isOnline ? 'Cloud AI' : 'Engine Lokal'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Tab Selector Mode */}
-        <View style={styles.tabSelector}>
+        {/* Input Mode Selector */}
+        <View style={{ flexDirection: 'row', backgroundColor: colors.surfaceElevated, borderRadius: radius.md, padding: 4 }}>
           <TouchableOpacity
-            style={[styles.tabBtn, inputMode === 'ai' && styles.tabBtnActive]}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.sm, backgroundColor: inputMode === 'ai' ? colors.primary : 'transparent' }}
             onPress={() => setInputMode('ai')}
           >
-            <Sparkles size={16} color={inputMode === 'ai' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
-            <Text style={[styles.tabText, inputMode === 'ai' && styles.tabTextActive]} numberOfLines={1}>
-              Gemini AI Cloud
-            </Text>
+            <Sparkles size={16} color={inputMode === 'ai' ? '#FFFFFF' : colors.textTertiary} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: inputMode === 'ai' ? '#FFFFFF' : colors.textTertiary }}>Mode AI Text</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabBtn, inputMode === 'manual' && styles.tabBtnActive]}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.sm, backgroundColor: inputMode === 'manual' ? colors.primary : 'transparent' }}
             onPress={() => setInputMode('manual')}
           >
-            <Sliders size={16} color={inputMode === 'manual' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
-            <Text style={[styles.tabText, inputMode === 'manual' && styles.tabTextActive]} numberOfLines={1}>
-              Manual Input
-            </Text>
+            <Sliders size={16} color={inputMode === 'manual' ? '#FFFFFF' : colors.textTertiary} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: inputMode === 'manual' ? '#FFFFFF' : colors.textTertiary }}>Input Manual</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Success Message Banner */}
-        {successMsg !== '' && (
-          <View style={styles.successBanner}>
-            <CheckCircle2 size={18} color="#10B981" />
-            <Text style={styles.successText} numberOfLines={1}>{successMsg}</Text>
+        {successMsg ? (
+          <View style={{ backgroundColor: colors.primarySubtle, padding: spacing.sm + 4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary }}>
+            <Text style={{ ...typography.bodyMedium, color: colors.primaryText, textAlign: 'center' }}>{successMsg}</Text>
           </View>
-        )}
+        ) : null}
 
-        {/* Error Message Banner */}
-        {errorMsg !== '' && (
-          <View style={styles.errorBanner}>
-            <AlertCircle size={18} color="#EF4444" />
-            <Text style={styles.errorText}>{errorMsg}</Text>
+        {errorMsg ? (
+          <View style={{ backgroundColor: colors.dangerSubtle, padding: spacing.sm + 4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger }}>
+            <Text style={{ ...typography.bodyMedium, color: colors.danger, textAlign: 'center' }}>{errorMsg}</Text>
           </View>
-        )}
+        ) : null}
 
         {inputMode === 'ai' ? (
-          <GlassCard>
-            {/* AI Mode Banner */}
-            <View style={[styles.aiModeBar, { backgroundColor: aiStatus.color + '12' }]}>
-              <Wifi size={16} color={aiStatus.color} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.aiModeTitle, { color: aiStatus.color }]} numberOfLines={1}>
-                  {aiStatus.modeLabel}
-                </Text>
-                <Text style={styles.aiModeDesc}>{aiStatus.description}</Text>
-              </View>
-            </View>
+          <Surface style={{ padding: spacing.md }}>
+            <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs }}>Tulis Deskripsi Makanan</Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: spacing.md }}>
+              Tulis secara bebas. AI akan membedah porsi, cara masak, dan perkiraan kalori secara otomatis.
+            </Text>
 
-            <Text style={styles.label} numberOfLines={1}>DESKRIPSI MAKANAN (BAHASA INDONESIA)</Text>
             <TextInput
-              style={styles.textArea}
-              placeholder="Contoh: Makan siang Nasi Padang rendang, perkedel 1, daun singkong, dan es teh manis"
-              placeholderTextColor="rgba(255, 255, 255, 0.3)"
-              multiline={true}
-              numberOfLines={4}
-              value={foodText}
-              onChangeText={(text) => {
-                setFoodText(text);
-                if (errorMsg) setErrorMsg('');
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: colors.divider,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                color: colors.textPrimary,
+                fontSize: 14,
+                minHeight: 100,
+                textAlignVertical: 'top',
+                marginBottom: spacing.md,
               }}
+              placeholder="Contoh: 1 piring nasi goreng kambing + telur ceplok + kerupuk"
+              placeholderTextColor={colors.textTertiary}
+              value={foodText}
+              onChangeText={setFoodText}
+              multiline
             />
 
             <TouchableOpacity
-              style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                backgroundColor: colors.primary,
+                paddingVertical: 14,
+                borderRadius: radius.md,
+                opacity: (!foodText.trim() || loading) ? 0.4 : 1,
+              }}
               onPress={handleAILog}
-              disabled={loading}
+              disabled={!foodText.trim() || loading}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
                   <Sparkles size={18} color="#FFFFFF" />
-                  <Text style={styles.submitBtnText} numberOfLines={1}>Hitung Kalori dengan Gemini AI</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Proses AI & Catat</Text>
                 </>
               )}
             </TouchableOpacity>
-          </GlassCard>
+          </Surface>
         ) : (
-          <GlassCard>
-            <Text style={styles.label} numberOfLines={1}>NAMA MAKANAN</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Contoh: Dada Ayam Bakar + Nasi Merah"
-              placeholderTextColor="rgba(255, 255, 255, 0.3)"
-              value={manualName}
-              onChangeText={setManualName}
-            />
+          <Surface style={{ padding: spacing.md }}>
+            <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: spacing.md }}>Input Nutrisi Manual</Text>
 
-            <View style={styles.grid2}>
-              <View style={styles.gridItem}>
-                <Text style={styles.label} numberOfLines={1}>KALORI (KCAL)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="450"
-                  keyboardType="numeric"
-                  value={calories}
-                  onChangeText={setCalories}
-                />
+            <View style={{ gap: spacing.sm }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Nama Makanan</Text>
+              <TextInput
+                style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 14, paddingVertical: 10, color: colors.textPrimary, fontSize: 14 }}
+                placeholder="Nama makanan (misal: Ayam Bakar)"
+                placeholderTextColor={colors.textTertiary}
+                value={manualName}
+                onChangeText={setManualName}
+              />
+
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Kalori (kcal)</Text>
+              <TextInput
+                style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 14, paddingVertical: 10, color: colors.primaryText, fontSize: 14, fontWeight: 'bold' }}
+                keyboardType="number-pad"
+                value={calories}
+                onChangeText={setCalories}
+              />
+
+              <View style={{ flexDirection: 'row', gap: spacing.xs + 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ ...typography.caption, color: colors.textTertiary }}>Protein (g)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.textPrimary, fontSize: 13 }}
+                    keyboardType="decimal-pad"
+                    value={protein}
+                    onChangeText={setProtein}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ ...typography.caption, color: colors.textTertiary }}>Karbo (g)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.textPrimary, fontSize: 13 }}
+                    keyboardType="decimal-pad"
+                    value={carbs}
+                    onChangeText={setCarbs}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ ...typography.caption, color: colors.textTertiary }}>Lemak (g)</Text>
+                  <TextInput
+                    style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 10, paddingVertical: 8, color: colors.textPrimary, fontSize: 13 }}
+                    keyboardType="decimal-pad"
+                    value={fat}
+                    onChangeText={setFat}
+                  />
+                </View>
               </View>
 
-              <View style={styles.gridItem}>
-                <Text style={styles.label} numberOfLines={1}>PROTEIN (GRAM)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="25"
-                  keyboardType="numeric"
-                  value={protein}
-                  onChangeText={setProtein}
-                />
-              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: colors.primary, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center', marginTop: spacing.md }}
+                onPress={handleManualLog}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Simpan Makanan Manual</Text>
+              </TouchableOpacity>
             </View>
-
-            <View style={styles.grid2}>
-              <View style={styles.gridItem}>
-                <Text style={styles.label} numberOfLines={1}>KARBOHIDRAT (GRAM)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="50"
-                  keyboardType="numeric"
-                  value={carbs}
-                  onChangeText={setCarbs}
-                />
-              </View>
-
-              <View style={styles.gridItem}>
-                <Text style={styles.label} numberOfLines={1}>LEMAK (GRAM)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="15"
-                  keyboardType="numeric"
-                  value={fat}
-                  onChangeText={setFat}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleManualLog}>
-              <Utensils size={18} color="#FFFFFF" />
-              <Text style={styles.submitBtnText} numberOfLines={1}>Simpan Log Makanan</Text>
-            </TouchableOpacity>
-          </GlassCard>
+          </Surface>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#09090B',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#09090B',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  screenTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  screenSub: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-    lineHeight: 18,
-  },
-  aiStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginLeft: 8,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  aiModeBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-  aiModeTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  aiModeDesc: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginTop: 1,
-  },
-  tabSelector: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  tabBtnActive: {
-    backgroundColor: '#3B82F6',
-  },
-  tabText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  successBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    borderWidth: 1,
-    padding: 12,
-    borderRadius: 14,
-    marginBottom: 16,
-  },
-  successText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#10B981',
-    flex: 1,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderWidth: 1,
-    padding: 12,
-    borderRadius: 14,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#F87171',
-    flex: 1,
-    lineHeight: 16,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  textArea: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 14,
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  grid2: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  gridItem: {
-    flex: 1,
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#3B82F6',
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginTop: 20,
-  },
-  submitBtnText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-});

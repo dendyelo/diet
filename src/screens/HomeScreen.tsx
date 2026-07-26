@@ -13,6 +13,7 @@ import { calculateEnergyBalance } from '../utils/calorieCalc';
 import { EnergyGauge } from '../components/EnergyGauge';
 import { EatingTimer } from '../components/EatingTimer';
 import { AICoachBanner } from '../components/AICoachBanner';
+import { AICoachChatModal } from '../components/AICoachChatModal';
 import { HabitRings } from '../components/HabitRings';
 import { MealCard } from '../components/MealCard';
 import { SnackModal } from '../components/SnackModal';
@@ -28,6 +29,7 @@ import {
   Footprints,
   Sparkles,
   PartyPopper,
+  MessageCircle,
 } from 'lucide-react-native';
 
 export const HomeScreen: React.FC = () => {
@@ -49,6 +51,7 @@ export const HomeScreen: React.FC = () => {
 
   const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
   const [showAddMealModal, setShowAddMealModal] = useState<boolean>(false);
+  const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
 
   // Filter today's meal logs
@@ -101,7 +104,7 @@ export const HomeScreen: React.FC = () => {
           onEditTimePress={() => setShowAddMealModal(true)}
         />
 
-        {/* 2. Interactive AI Health Coach Proactive Banner (Dynamic Gemini AI Cloud) */}
+        {/* 2. Interactive AI Health Coach Proactive Banner */}
         <AICoachBanner
           elapsedSeconds={elapsedSeconds}
           caloriesIn={totalCaloriesIn}
@@ -113,6 +116,7 @@ export const HomeScreen: React.FC = () => {
           onOpenAddMeal={() => setShowAddMealModal(true)}
           onOpenSnack={() => setShowSnackModal(true)}
           onAddWater={addWaterGlass}
+          onOpenChat={() => setShowChatModal(true)}
         />
 
         {/* 3. Live Synchronized Energy Balance Gauge */}
@@ -207,6 +211,20 @@ export const HomeScreen: React.FC = () => {
       </ScrollView>
 
       {/* Modals */}
+      <AICoachChatModal
+        visible={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        userName={profile.name}
+        userApiKey={profile.geminiApiKey}
+        userContext={{
+          fastingHours: Math.floor(elapsedSeconds / 3600),
+          caloriesIn: totalCaloriesIn,
+          netDeficit: energy.netBalance,
+          steps,
+          waterGlasses,
+        }}
+      />
+
       <SnackModal
         visible={showSnackModal}
         onClose={() => setShowSnackModal(false)}

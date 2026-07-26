@@ -15,6 +15,7 @@ interface AICoachBannerProps {
   onOpenAddMeal: () => void;
   onOpenSnack: () => void;
   onAddWater: () => void;
+  onOpenChat: () => void;
 }
 
 export const AICoachBanner: React.FC<AICoachBannerProps> = ({
@@ -28,6 +29,7 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
   onOpenAddMeal,
   onOpenSnack,
   onAddWater,
+  onOpenChat,
 }) => {
   const fastingHours = Math.floor(elapsedSeconds / 3600);
   const currentHour = new Date().getHours();
@@ -110,17 +112,22 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
           </Text>
         </View>
 
-        {userApiKey ? (
-          <TouchableOpacity onPress={fetchAICoachGreeting} disabled={loadingAI} style={styles.refreshBtn}>
-            {loadingAI ? (
-              <ActivityIndicator size="small" color="#10B981" />
-            ) : (
-              <RefreshCw size={14} color="rgba(255, 255, 255, 0.5)" />
-            )}
+        <View style={styles.rightIcons}>
+          {userApiKey && (
+            <TouchableOpacity onPress={fetchAICoachGreeting} disabled={loadingAI} style={styles.refreshBtn}>
+              {loadingAI ? (
+                <ActivityIndicator size="small" color="#10B981" />
+              ) : (
+                <RefreshCw size={14} color="rgba(255, 255, 255, 0.5)" />
+              )}
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.chatHeaderBtn} onPress={onOpenChat}>
+            <MessageCircle size={16} color="#10B981" />
+            <Text style={styles.chatHeaderBtnText}>Chat Coach</Text>
           </TouchableOpacity>
-        ) : (
-          <MessageCircle size={16} color="rgba(255, 255, 255, 0.4)" />
-        )}
+        </View>
       </View>
 
       <Text style={styles.coachMessage}>{localMessage}</Text>
@@ -128,9 +135,14 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
 
       {/* Interactive Quick Answer Buttons */}
       <View style={styles.actionGrid}>
+        <TouchableOpacity style={styles.btnChat} onPress={onOpenChat}>
+          <MessageCircle size={14} color="#FFFFFF" />
+          <Text style={styles.btnText}>💬 Chat Kondisi Tubuh</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.btnMeal} onPress={onOpenAddMeal}>
           <Utensils size={14} color="#FFFFFF" />
-          <Text style={styles.btnText}>🥗 Lapar Asli, Makan</Text>
+          <Text style={styles.btnText}>🥗 Lapar, Makan</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.btnSnack} onPress={onOpenSnack}>
@@ -140,7 +152,7 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
 
         <TouchableOpacity style={styles.btnWater} onPress={onAddWater}>
           <Droplet size={14} color="#FFFFFF" />
-          <Text style={styles.btnText}>💧 Cuma Haus (+Air)</Text>
+          <Text style={styles.btnText}>💧 + Air</Text>
         </TouchableOpacity>
       </View>
     </GlassCard>
@@ -158,6 +170,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  rightIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   aiBadge: {
     flexDirection: 'row',
@@ -177,6 +194,20 @@ const styles = StyleSheet.create({
   refreshBtn: {
     padding: 4,
   },
+  chatHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  chatHeaderBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#10B981',
+  },
   coachMessage: {
     fontSize: 13,
     color: '#FFFFFF',
@@ -194,14 +225,23 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
+  },
+  btnChat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   btnMeal: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#3B82F6',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 12,
   },
@@ -210,7 +250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#F59E0B',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 12,
   },
@@ -219,7 +259,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { parseFoodNutritionWithAI } from '../services/aiService';
 import { X, Send, Sparkles, User, Bot } from 'lucide-react-native';
 
 export interface ChatMessage {
@@ -36,9 +37,9 @@ interface AICoachChatModalProps {
 
 const QUICK_PROMPTS = [
   'Lagi lapar malam nih, cemilan sehat apa ya?',
+  'Berapa kalori makan pisang goreng?',
   'Puasa 14 jam ini bikin sedikit pusing, wajar tak?',
   'Defisitku 500 kcal hari ini, boleh makan bakso?',
-  'Kenapa berat badanku stagnan minggu ini?',
 ];
 
 export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
@@ -52,7 +53,7 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     {
       id: 'welcome',
       sender: 'ai',
-      text: `Halo ${userName}! 👋 Saya HabitDiet AI Coach pribadi Anda. Ceritakan apa yang sedang Anda rasakan (misal: pusing, lapar malam, lemas, atau bingung mau makan apa), saya siap membantu!`,
+      text: `Halo ${userName}! 👋 Saya HabitDiet AI Coach pribadi Anda. Ceritakan apa yang sedang Anda rasakan atau tanyakan kalori makanan (misal: pisang goreng, nasi uduk, lemas, pusing), saya siap membantu!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -88,17 +89,17 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
         const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
 Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
 
-KONTEKS REAL-TIME PENGGUNA DAAT INI:
+KONTEKS REAL-TIME PENGGUNA SAAT INI:
 - Nama: ${userName}
 - Berpuasa: ${userContext.fastingHours} jam
-- Kalori Masuk (Dimakan): ${userContext.caloriesIn} kcal
+- Total Kalori Masuk (Dimakan): ${userContext.caloriesIn} kcal
 - Defisit Kalori Realtime: ${userContext.netDeficit} kcal
 - Langkah Kaki: ${userContext.steps} steps
 - Air Minum: ${userContext.waterGlasses} / 8 gelas
 
 PERTANYAAN PENGGUNA: "${query}"
 
-Instruksi: Berikan jawaban/solusi yang sangat praktis, ramah, ilmiah, dan mudah dipahami dalam 2-4 paragraf singkat. Berikan saran empati sesuai kondisi fisik pengguna saat ini.`;
+Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), SEBUTKAN KALORI DAN NUTRISI SPESIFIK MAKANAN TERSEBUT SECARA AKURAT. Berikan saran praktis 2-3 paragraf singkat.`;
 
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
@@ -117,17 +118,18 @@ Instruksi: Berikan jawaban/solusi yang sangat praktis, ramah, ilmiah, dan mudah 
         }
       }
 
-      // Smart Fallback Local Response if offline or error
+      // Smart Fallback Engine (Dynamic Food Nutrition Lookup)
       if (!replyText) {
         const lowerQ = query.toLowerCase();
+
         if (lowerQ.includes('pusing') || lowerQ.includes('lemas')) {
-          replyText = `Merasakan sedikit pusing atau lemas saat berpuasa (${userContext.fastingHours} jam) sering kali disebabkan oleh penurunan kadar gula darah sementara atau kekurangan elektrolit. Cobalah minum 1-2 gelas air putih hangat diberi sejumput garam dapur atau batalkan puasa dengan makanan berprotein & bernutrisi ringan.`;
-        } else if (lowerQ.includes('lapar malam') || lowerQ.includes('ngemil')) {
-          replyText = `Untuk mengatasi lapar malam tanpa merusak defisit kalori (saat ini ${userContext.netDeficit} kcal), pilihlah cemilan rendah kalori tinggi protein seperti 1 butir telur rebus (78 kcal), 1 potong tahu kukus, atau minum 1 gelas air hangat dulu untuk mengecek hidrasi!`;
-        } else if (lowerQ.includes('bakso') || lowerQ.includes('makan')) {
-          replyText = `Boleh banget! Semangkuk bakso bening tanpa minyak berlebih hanya sekitar 300-350 kcal. Kalori masukmu saat ini baru ${userContext.caloriesIn} kcal, jadi masih sangat aman berada di dalam batas target defisitmu!`;
+          replyText = `Merasakan sedikit pusing atau lemas saat berpuasa (${userContext.fastingHours} jam) biasanya disebabkan oleh penurunan kadar gula darah atau kekurangan cairan. Cobalah minum 1-2 gelas air putih hangat diberi sejumput garam dapur atau batalkan puasa dengan makanan bernutrisi ringan.`;
+        } else if (lowerQ.includes('lapar malam')) {
+          replyText = `Untuk mengatasi lapar malam tanpa merusak defisit kalori (saat ini ${userContext.netDeficit} kcal), pilihlah cemilan rendah kalori seperti 1 butir telur rebus (78 kcal) atau minum 1 gelas air hangat dulu untuk mengecek hidrasi!`;
         } else {
-          replyText = `Terima kasih sudah berbagi kondisi Dendy! Dengan defisit kalori realtime ${userContext.netDeficit} kcal dan ${userContext.steps} steps hari ini, ritme tubuhmu berjalan sangat baik. Tetap jaga hidrasi air putih dan dengarkan sinyal alami tubuhmu ya!`;
+          // Dynamic Food Nutrition Lookup for ANY food query
+          const foodResult = await parseFoodNutritionWithAI(query, userApiKey);
+          replyText = `1 Porsi ${foodResult.name} diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. ${foodResult.aiNotes || ''}`;
         }
       }
 
@@ -224,7 +226,7 @@ Instruksi: Berikan jawaban/solusi yang sangat praktis, ramah, ilmiah, dan mudah 
             {loading && (
               <View style={[styles.messageBubble, styles.aiBubble, styles.loadingBubble]}>
                 <ActivityIndicator size="small" color="#10B981" />
-                <Text style={styles.loadingText}>AI Coach sedang berpikir...</Text>
+                <Text style={styles.loadingText}>AI Coach sedang menganalisis...</Text>
               </View>
             )}
           </ScrollView>
@@ -233,7 +235,7 @@ Instruksi: Berikan jawaban/solusi yang sangat praktis, ramah, ilmiah, dan mudah 
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.chatInput}
-              placeholder="Ketik apa yang sedang Anda rasakan..."
+              placeholder="Ketik pertanyaan atau kalori makanan..."
               placeholderTextColor="rgba(255, 255, 255, 0.3)"
               value={inputText}
               onChangeText={setInputText}

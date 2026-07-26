@@ -12,6 +12,7 @@ import {
 import { MealLog, NutritionData } from '../types';
 import { Sparkles, Clock, Plus, X } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
+import { triggerHaptic } from '../utils/haptics';
 
 interface QuickAddMealModalProps {
   visible: boolean;
@@ -35,8 +36,8 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
 
   if (!visible) return null;
 
-  // 1-Tap Duplicate recent meal
   const handleDuplicateRecent = (meal: MealLog) => {
+    triggerHaptic('success');
     onSaveMeal({
       name: meal.name,
       isSnack: meal.isSnack,
@@ -49,7 +50,6 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
     onClose();
   };
 
-  // Submit text for AI parsing
   const handleSubmitAI = async () => {
     const text = inputText.trim();
     if (!text || loading) return;
@@ -57,6 +57,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
     setLoading(true);
     try {
       const parsed = await onParseAI(text);
+      triggerHaptic('success');
       if (parsed) {
         onSaveMeal({
           name: parsed.name,
@@ -68,7 +69,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
         onClose();
       }
     } catch {
-      // Fallback manual entry
+      triggerHaptic('success');
       onSaveMeal({
         name: text,
         isSnack: false,
@@ -82,11 +83,11 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
     }
   };
 
-  // Submit quick calories
   const handleQuickCalories = () => {
     const cal = parseInt(quickCalories, 10);
     if (isNaN(cal) || cal <= 0) return;
 
+    triggerHaptic('success');
     onSaveMeal({
       name: 'Catatan Cepat',
       isSnack: false,
@@ -102,7 +103,6 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
     onClose();
   };
 
-  // Extract unique recent meals
   const uniqueRecentMeals = useMemo(() => {
     return recentMeals.slice(0, 50).reduce<MealLog[]>((acc, current) => {
       const exists = acc.some((m) => m.name.toLowerCase() === current.name.toLowerCase());
@@ -114,7 +114,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.75)', justifyContent: 'flex-end' }}>
+        <View style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' }}>
           <TouchableWithoutFeedback>
             <View
               style={{
@@ -140,7 +140,12 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                 }}
               >
                 <Text style={{ ...typography.h2, color: colors.textPrimary }}>Catat Makanan Cepat</Text>
-                <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+                <TouchableOpacity
+                  onPress={onClose}
+                  style={{ padding: 8, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Tutup dialog"
+                >
                   <X size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
               </View>
@@ -151,7 +156,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                   <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Ketik / Bicara Makanan
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
                     <TextInput
                       style={{
                         flex: 1,
@@ -163,6 +168,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                         paddingVertical: 10,
                         color: colors.textPrimary,
                         fontSize: 13,
+                        minHeight: 44,
                       }}
                       placeholder="misal: Nasi uduk komplit + telur"
                       placeholderTextColor={colors.textTertiary}
@@ -182,6 +188,8 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                       }}
                       onPress={handleSubmitAI}
                       disabled={!inputText.trim() || loading}
+                      accessibilityRole="button"
+                      accessibilityLabel="Analisis makanan dengan AI"
                     >
                       {loading ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
@@ -212,11 +220,14 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                             borderRadius: radius.sm,
                             borderWidth: 1,
                             borderColor: colors.primarySubtle,
+                            minHeight: 44,
                           }}
                           onPress={() => handleDuplicateRecent(meal)}
                           activeOpacity={0.7}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Duplikat makanan ${meal.name}`}
                         >
-                          <Clock size={12} color={colors.primary} />
+                          <Clock size={14} color={colors.primary} />
                           <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>
                             {meal.name}
                           </Text>
@@ -234,7 +245,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                   <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Input Kalori Langsung
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
                     <TextInput
                       style={{
                         flex: 1,
@@ -246,6 +257,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                         paddingVertical: 10,
                         color: colors.textPrimary,
                         fontSize: 13,
+                        minHeight: 44,
                       }}
                       placeholder="Jumlah kalori (misal: 450)"
                       placeholderTextColor={colors.textTertiary}
@@ -263,9 +275,12 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                         paddingVertical: 10,
                         borderRadius: radius.md,
                         opacity: !quickCalories.trim() ? 0.4 : 1,
+                        minHeight: 44,
                       }}
                       onPress={handleQuickCalories}
                       disabled={!quickCalories.trim()}
+                      accessibilityRole="button"
+                      accessibilityLabel="Tambah kalori langsung"
                     >
                       <Plus size={18} color="#FFFFFF" />
                       <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Tambah</Text>

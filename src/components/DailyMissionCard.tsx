@@ -1,8 +1,13 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { CheckCircle2, Circle, Plus } from 'lucide-react-native';
 import { Surface } from './Surface';
 import { useTheme } from '../context/ThemeContext';
+import { triggerHaptic } from '../utils/haptics';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export interface DailyMissionItem {
   id: string;
@@ -60,6 +65,19 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
 
   const completedCount = missions.filter((m) => m.isCompleted).length;
 
+  // Micro-animation transition on completion count change
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (completedCount > 0) {
+      triggerHaptic('success');
+    }
+  }, [completedCount]);
+
+  const handleWaterClick = () => {
+    triggerHaptic('light');
+    onAddWater();
+  };
+
   return (
     <Surface style={{ padding: spacing.md, marginVertical: spacing.xs }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
@@ -82,7 +100,7 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
 
       <View style={{ gap: spacing.sm }}>
         {missions.map((mission) => (
-          <View key={mission.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+          <View key={mission.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, paddingVertical: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, flex: 1 }}>
               {mission.isCompleted ? (
                 <CheckCircle2 size={18} color={colors.primary} />
@@ -105,19 +123,24 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 2,
+                  gap: 4,
                   backgroundColor: colors.primarySubtle,
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.xs,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
                   borderRadius: radius.sm,
                   borderWidth: 1,
                   borderColor: colors.primarySubtle,
+                  minHeight: 44,
+                  minWidth: 44,
+                  justifyContent: 'center',
                 }}
-                onPress={onAddWater}
+                onPress={handleWaterClick}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Tambah 1 gelas air minum"
               >
-                <Plus size={12} color={colors.primary} />
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>+1</Text>
+                <Plus size={14} color={colors.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primaryText }}>+1</Text>
               </TouchableOpacity>
             )}
           </View>

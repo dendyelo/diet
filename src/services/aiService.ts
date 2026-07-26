@@ -17,6 +17,12 @@ export interface AIStatus {
   description: string;
 }
 
+export interface AICoachResponse {
+  coachMessage: string;
+  questionPrompt: string;
+  recommendedAction: 'meal' | 'snack' | 'water' | 'fasting';
+}
+
 /**
  * Check AI engine current status
  */
@@ -26,14 +32,14 @@ export function getAIStatus(userApiKey?: string): AIStatus {
       isOnline: true,
       modeLabel: 'Gemini AI Cloud (Online - Ultra Smart)',
       color: '#10B981',
-      description: 'Presisi tinggi dengan analisis metode memasak, santan, minyak & porsi presisi.',
+      description: 'Presisi tinggi dengan analisis metode memasak, santan, minyak & coach interaktif bebas.',
     };
   }
   return {
     isOnline: false,
     modeLabel: 'Smart Local Engine (Offline - Culinary DB)',
     color: '#F59E0B',
-    description: 'Estimasi gizi akurat berbasis kecerdasan kuliner lokal & porsi makanan di HP.',
+    description: 'Estimasi gizi akurat berbasis kecerdasan kuliner lokal & coach interaktif di HP.',
   };
 }
 
@@ -72,7 +78,6 @@ function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
   let totalCarbs = 0;
   let totalFat = 0;
 
-  // Split input by comma or 'pake' or '+' or 'dan' or newline
   const rawParts = foodText.split(/,|\+|\spake\s|\sdan\s|\n/i).map((p) => p.trim()).filter(Boolean);
 
   if (rawParts.length > 0) {
@@ -86,15 +91,13 @@ function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
       let unitFat = 5;
       let displayLabel = part;
 
-      // Cooking method modifier
       let oilFatAdd = 0;
       if (pLower.includes('goreng') || pLower.includes('crispy') || pLower.includes('tepung')) {
-        oilFatAdd = 6; // Extra fat from deep frying
+        oilFatAdd = 6;
       } else if (pLower.includes('santan') || pLower.includes('gulai') || pLower.includes('rendang')) {
-        oilFatAdd = 8; // Extra saturated fat from coconut milk
+        oilFatAdd = 8;
       }
 
-      // Sugar modifier for drinks
       let sugarAdd = 0;
       if (pLower.includes('less sugar')) {
         sugarAdd = -15;
@@ -110,7 +113,7 @@ function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
         unitFat = isFried ? 8 : 5;
         displayLabel = `${qty} Butir Telur${pLower.includes('dadar') ? ' Dadar' : pLower.includes('ceplok') ? ' Ceplok' : ' Rebus'}`;
       } else if (pLower.includes('nasi uduk') || pLower.includes('nasi kuning')) {
-        unitCal = 260; // Coconut rice
+        unitCal = 260;
         unitProtein = 5;
         unitCarbs = 46;
         unitFat = 7;
@@ -170,7 +173,6 @@ function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
         displayLabel = 'Sambal';
       }
 
-      // Apply quantity and modifiers
       const itemTotalCal = Math.round((unitCal + oilFatAdd * 9) * qty);
       items.push({ name: displayLabel, calories: itemTotalCal });
 
@@ -181,7 +183,6 @@ function smartIndonesianCulinaryEngine(foodText: string): AIFoodResult {
     });
   }
 
-  // Fallback if no parts matched
   if (items.length === 0) {
     items.push({ name: foodText, calories: 350 });
     totalCalories = 350;
@@ -217,7 +218,6 @@ export async function parseFoodNutritionWithAI(
     throw new Error('Deskripsi makanan tidak boleh kosong.');
   }
 
-  // If no Gemini API key provided, use smart Indonesian culinary heuristic estimator
   if (!userApiKey || userApiKey.trim() === '') {
     return smartIndonesianCulinaryEngine(cleanInput);
   }
@@ -267,7 +267,6 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan lua
     const data = await response.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Clean JSON response string from potential backticks
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -301,4 +300,73 @@ Kembalikan HANYA format JSON valid tanpa markdown formatting atau penjelasan lua
   }
 
   return smartIndonesianCulinaryEngine(cleanInput);
+}
+
+/**
+ * Generate Dynamic Creative AI Coach Greeting & Question using Gemini AI Cloud API
+ */
+export async function generateAICoachMessageWithAI(
+  userData: {
+    name: string;
+    fastingHours: number;
+    caloriesIn: number;
+    netDeficit: number;
+    steps: number;
+    waterGlasses: number;
+    currentHour: number;
+  },
+  userApiKey?: string
+): Promise<AICoachResponse | null> {
+  if (!userApiKey || userApiKey.trim() === '') return null;
+
+  try {
+    const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach yang hangat, peduli, empati, ramah, dan agak humoris santai.
+
+DATA PENGGUNA SAAT INI (Jam ${userData.currentHour}:00):
+- Nama: ${userData.name || 'Teman'}
+- Berpuasa: ${userData.fastingHours} Jam
+- Total Kalori Masuk (Dimakan): ${userData.caloriesIn} kcal
+- Defisit Kalori Realtime: ${userData.netDeficit} kcal
+- Jumlah Langkah: ${userData.steps} steps
+- Air Minum: ${userData.waterGlasses} / 8 gelas
+
+TUGAS:
+Buatkan 1 dialog sapaan & pertanyaan interaktif yang kreatif, alami, dan bebas menyesuaikan data ini! Jangan kaku.
+Kembalikan HANYA format JSON valid tanpa markdown formatting:
+{
+  "coachMessage": "kalimat sapaan empati & saran gizi kreatif 1-2 kalimat (misal: 'Halo Dendy! Defisit kalorimu sudah 600 kcal nih, tapi perutmu belum diisi dari jam 12 siang.')",
+  "questionPrompt": "pertanyaan interaktif santai (misal: 'Apakah perutmu mulai membunyikan sinyal lapar asli?')",
+  "recommendedAction": "meal"
+}
+* Catatan recommendedAction hanya boleh salah satu dari: "meal", "snack", "water", "fasting".`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        coachMessage: parsed.coachMessage || `Halo ${userData.name}! Bagaimanakah kondisi energimu saat ini?`,
+        questionPrompt: parsed.questionPrompt || 'Apakah kamu merasa lapar asli atau butuh minum air?',
+        recommendedAction: parsed.recommendedAction || 'meal',
+      };
+    }
+  } catch (err) {
+    console.error('Error generating AI Coach message:', err);
+  }
+
+  return null;
 }

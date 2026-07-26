@@ -101,7 +101,7 @@ export const HomeScreen: React.FC = () => {
           onEditTimePress={() => setShowAddMealModal(true)}
         />
 
-        {/* 2. Interactive AI Health Coach Proactive Banner */}
+        {/* 2. Interactive AI Health Coach Proactive Banner (Dynamic Gemini AI Cloud) */}
         <AICoachBanner
           elapsedSeconds={elapsedSeconds}
           caloriesIn={totalCaloriesIn}
@@ -109,6 +109,7 @@ export const HomeScreen: React.FC = () => {
           steps={steps}
           waterGlasses={waterGlasses}
           userName={profile.name}
+          userApiKey={profile.geminiApiKey}
           onOpenAddMeal={() => setShowAddMealModal(true)}
           onOpenSnack={() => setShowSnackModal(true)}
           onAddWater={addWaterGlass}

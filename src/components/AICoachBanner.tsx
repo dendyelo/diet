@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { GlassCard } from './GlassCard';
-import { Sparkles, MessageCircle, Utensils, Cookie, Droplet, Smile } from 'lucide-react-native';
+import { generateAICoachMessageWithAI } from '../services/aiService';
+import { Sparkles, MessageCircle, Utensils, Cookie, Droplet, RefreshCw } from 'lucide-react-native';
 
 interface AICoachBannerProps {
   elapsedSeconds: number;
@@ -10,6 +11,7 @@ interface AICoachBannerProps {
   steps: number;
   waterGlasses: number;
   userName: string;
+  userApiKey?: string;
   onOpenAddMeal: () => void;
   onOpenSnack: () => void;
   onAddWater: () => void;
@@ -22,6 +24,7 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
   steps,
   waterGlasses,
   userName,
+  userApiKey,
   onOpenAddMeal,
   onOpenSnack,
   onAddWater,
@@ -29,35 +32,72 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
   const fastingHours = Math.floor(elapsedSeconds / 3600);
   const currentHour = new Date().getHours();
 
-  // Dynamic AI Persona Logic based on real-time state
-  let coachMessage = '';
-  let questionPrompt = '';
-  let highlightType: 'meal' | 'fasting' | 'water' | 'steps' | 'snack' = 'meal';
+  const [aiMessage, setAiMessage] = useState<string>('');
+  const [aiQuestion, setAiQuestion] = useState<string>('');
+  const [loadingAI, setLoadingAI] = useState<boolean>(false);
+  const [isCloudAI, setIsCloudAI] = useState<boolean>(false);
 
-  if (caloriesIn === 0 && currentHour >= 12) {
-    coachMessage = `Halo ${userName}! Sudah jam ${currentHour}:00 dan kamu belum mencatat makanan hari ini.`;
-    questionPrompt = 'Apakah kamu sudah lapar dan mau makan siang sekarang?';
-    highlightType = 'meal';
-  } else if (netDeficit > 700 && caloriesIn < 800 && currentHour >= 13) {
-    coachMessage = `Defisit kalorimu saat ini cukup besar (${netDeficit} kcal). Jagalah tenaga tubuhmu agar tidak terlalu lemas!`;
-    questionPrompt = 'Apakah perutmu mulai menyuarakan lapar asli?';
-    highlightType = 'meal';
-  } else if (fastingHours >= 14 && fastingHours < 18) {
-    coachMessage = `Luar biasa! Kamu sudah berpuasa selama ${fastingHours} jam. Tubuhmu sedang aktif dalam fase Pembakaran Lemak (Fat Adaptation)! 🔥`;
-    questionPrompt = 'Bagaimana rasanya? Masih merasa segar atau ingin membatalkan puasa?';
-    highlightType = 'fasting';
-  } else if (waterGlasses < 4 && currentHour >= 14) {
-    coachMessage = `Asupan air minummu baru ${waterGlasses} gelas hari ini. Seringkali rasa 'ngemil' sebenarnya adalah sinyal haus dari otak.`;
-    questionPrompt = 'Yuk, minum 1 gelas air putih dingin sekarang?';
-    highlightType = 'water';
-  } else if (steps < 2000 && currentHour >= 16) {
-    coachMessage = `Langkah kakimu baru ${steps} steps hari ini.`;
-    questionPrompt = 'Mau luangkan 10-15 menit jalan santai sore ini untuk membakar lemak lebih lancar?';
-    highlightType = 'steps';
-  } else {
-    coachMessage = `Hebat ${userName}! Pola habit dan defisit kalorimu berjalan sangat rapi hari ini.`;
-    questionPrompt = 'Bagaimana kondisi tubuh dan energi perasaanmu saat ini?';
-    highlightType = 'snack';
+  const fetchAICoachGreeting = async () => {
+    if (!userApiKey || userApiKey.trim() === '') {
+      setIsCloudAI(false);
+      return;
+    }
+
+    setLoadingAI(true);
+    try {
+      const response = await generateAICoachMessageWithAI(
+        {
+          name: userName,
+          fastingHours,
+          caloriesIn,
+          netDeficit,
+          steps,
+          waterGlasses,
+          currentHour,
+        },
+        userApiKey
+      );
+
+      if (response && response.coachMessage) {
+        setAiMessage(response.coachMessage);
+        setAiQuestion(response.questionPrompt);
+        setIsCloudAI(true);
+      }
+    } catch (err) {
+      console.error('Failed to fetch AI coach message:', err);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAICoachGreeting();
+  }, [userApiKey, caloriesIn, waterGlasses]);
+
+  // Fallback Local Engine Messages if no API Key or offline
+  let localMessage = aiMessage;
+  let localQuestion = aiQuestion;
+
+  if (!isCloudAI || !localMessage) {
+    if (caloriesIn === 0 && currentHour >= 12) {
+      localMessage = `Halo ${userName}! Sudah jam ${currentHour}:00 dan kamu belum mencatat makanan hari ini.`;
+      localQuestion = 'Apakah kamu sudah lapar dan mau makan siang sekarang?';
+    } else if (netDeficit > 700 && caloriesIn < 800 && currentHour >= 13) {
+      localMessage = `Defisit kalorimu saat ini cukup besar (${netDeficit} kcal). Jagalah tenaga tubuhmu agar tidak terlalu lemas!`;
+      localQuestion = 'Apakah perutmu mulai menyuarakan lapar asli?';
+    } else if (fastingHours >= 14 && fastingHours < 18) {
+      localMessage = `Luar biasa! Kamu sudah berpuasa selama ${fastingHours} jam. Tubuhmu sedang aktif dalam fase Pembakaran Lemak (Fat Adaptation)! 🔥`;
+      localQuestion = 'Bagaimana rasanya? Masih merasa segar atau ingin membatalkan puasa?';
+    } else if (waterGlasses < 4 && currentHour >= 14) {
+      localMessage = `Asupan air minummu baru ${waterGlasses} gelas hari ini. Seringkali rasa 'ngemil' sebenarnya adalah sinyal haus dari otak.`;
+      localQuestion = 'Yuk, minum 1 gelas air putih dingin sekarang?';
+    } else if (steps < 2000 && currentHour >= 16) {
+      localMessage = `Langkah kakimu baru ${steps} steps hari ini.`;
+      localQuestion = 'Mau luangkan 10-15 menit jalan santai sore ini untuk membakar lemak lebih lancar?';
+    } else {
+      localMessage = `Hebat ${userName}! Pola habit dan defisit kalorimu berjalan sangat rapi hari ini.`;
+      localQuestion = 'Bagaimana kondisi tubuh dan energi perasaanmu saat ini?';
+    }
   }
 
   return (
@@ -65,13 +105,26 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.aiBadge}>
           <Sparkles size={14} color="#10B981" />
-          <Text style={styles.aiBadgeText}>AI HEALTH COACH INTERAKTIF</Text>
+          <Text style={styles.aiBadgeText}>
+            {isCloudAI ? 'GEMINI AI COACH CLOUD 🟢' : 'AI HEALTH COACH INTERAKTIF 🟡'}
+          </Text>
         </View>
-        <MessageCircle size={16} color="rgba(255, 255, 255, 0.4)" />
+
+        {userApiKey ? (
+          <TouchableOpacity onPress={fetchAICoachGreeting} disabled={loadingAI} style={styles.refreshBtn}>
+            {loadingAI ? (
+              <ActivityIndicator size="small" color="#10B981" />
+            ) : (
+              <RefreshCw size={14} color="rgba(255, 255, 255, 0.5)" />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <MessageCircle size={16} color="rgba(255, 255, 255, 0.4)" />
+        )}
       </View>
 
-      <Text style={styles.coachMessage}>{coachMessage}</Text>
-      <Text style={styles.questionPrompt}>{questionPrompt}</Text>
+      <Text style={styles.coachMessage}>{localMessage}</Text>
+      <Text style={styles.questionPrompt}>{localQuestion}</Text>
 
       {/* Interactive Quick Answer Buttons */}
       <View style={styles.actionGrid}>
@@ -120,6 +173,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#10B981',
     letterSpacing: 0.8,
+  },
+  refreshBtn: {
+    padding: 4,
   },
   coachMessage: {
     fontSize: 13,

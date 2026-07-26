@@ -20,6 +20,7 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   timestamp: string;
+  sourceTag?: string; // 'Gemini Cloud' | 'Data Harian' | 'Estimasi Offline'
 }
 
 interface AICoachChatModalProps {
@@ -153,15 +154,18 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
       sender: 'ai',
       text: `Halo ${userName}! 👋 Saya HabitDiet AI Coach pribadi Anda. Ceritakan apa yang sedang Anda rasakan atau tanyakan kalori makanan (misal: pisang goreng, nasi uduk, lemas, pusing), saya siap membantu!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      sourceTag: 'Gemini Cloud',
     },
   ]);
   const [inputText, setInputText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Clean timer cleanup in useEffect
   useEffect(() => {
     if (visible) {
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 200);
+      const timer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 200);
+      return () => clearTimeout(timer);
     }
   }, [visible, messages]);
 
@@ -183,12 +187,14 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
 
     try {
       let replyText = '';
+      let sourceTag = 'Gemini Cloud';
 
       // 1. Delegate to centralized AI service query handler
       if (userApiKey && userApiKey.trim() !== '') {
         const cloudReply = await sendAICoachChatQuery(query, userName, userContext, userApiKey);
         if (cloudReply) {
           replyText = cloudReply;
+          sourceTag = 'Gemini Cloud';
         }
       }
 
@@ -198,11 +204,14 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
 
         if (intent === 'data_query') {
           replyText = generateDataResponse(query, userName, userContext);
+          sourceTag = 'Data Harian';
         } else if (intent === 'food_query') {
           const foodResult = await parseFoodNutritionWithAI(query, undefined); // force offline engine
           replyText = `1 Porsi **${foodResult.name}** diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. ${userContext.netDeficit >= 0 ? 'Sisa target defisit kalori harianmu sangat terjaga 🟢!' : `Kamu sudah surplus ${Math.abs(userContext.netDeficit)} kcal, pertimbangkan untuk bergerak lebih aktif 🟠.`}`;
+          sourceTag = 'Estimasi Offline';
         } else {
           replyText = generateOfflineCoachResponse(query, userName, userContext);
+          sourceTag = 'Estimasi Offline';
         }
       }
 
@@ -212,16 +221,18 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
         sender: 'ai',
         text: replyText.trim(),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sourceTag,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errMsgId = createLocalId('chat');
       const errBubble: ChatMessage = {
         id: errMsgId,
         sender: 'ai',
         text: '⚠️ Terjadi gangguan koneksi. Mohon periksa jaringan internet Anda.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sourceTag: 'Estimasi Offline',
       };
       setMessages((prev) => [...prev, errBubble]);
     } finally {
@@ -297,6 +308,11 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
                     <Text style={styles.bubbleSender} numberOfLines={1}>
                       {isUser ? userName : 'AI Health Coach'}
                     </Text>
+                    {msg.sourceTag && !isUser && (
+                      <View style={styles.tagBadge}>
+                        <Text style={styles.tagBadgeText}>{msg.sourceTag}</Text>
+                      </View>
+                    )}
                     <Text style={styles.bubbleTime} numberOfLines={1}>{msg.timestamp}</Text>
                   </View>
                   <Text style={styles.bubbleText}>{msg.text}</Text>
@@ -453,6 +469,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  tagBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  tagBadgeText: {
+    fontSize: 8,
+    color: '#34D399',
+    fontWeight: '600',
   },
   bubbleTime: {
     fontSize: 9,

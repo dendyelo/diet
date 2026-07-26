@@ -49,14 +49,29 @@ export const GEMINI_MODELS = [
   'gemma-4-26b-a4b-it',
 ];
 
-const MAX_FALLBACK_ATTEMPTS = 3;
-const REQUEST_TIMEOUT_MS = 8000;
+export const MAX_FALLBACK_ATTEMPTS = 3;
+export const REQUEST_TIMEOUT_MS = 8000;
 
-function parseNumber(value: any, fallback: number): number {
+export function parseNumber(value: unknown, fallback: number): number {
   if (value === undefined || value === null) return fallback;
   const num = typeof value === 'number' ? value : parseFloat(String(value));
   if (isNaN(num) || num < 0) return fallback;
   return Math.round(num * 10) / 10;
+}
+
+export function safeExtractJsonObject(rawText: string): Record<string, unknown> | null {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  try {
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -171,7 +186,7 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
       if (response.status === 429) {
         hasRateLimitError = true;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Network failure / offline / timeout -> stop immediately!
       console.warn(`Test connection network error for ${model}:`, error);
       return 'offline';
@@ -187,8 +202,9 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
  * Estimate nutrition from food description using Gemini AI API with Smart Fallback
  * Fixes:
  * - Stops immediately on network failure (does not retry on network error)
- * - Uses parseFloat to preserve decimal nutrients
+ * - Uses parseFloat to preserve decimal nutrients (e.g. 12.5g protein)
  * - Preserves overall dish calories when breakdown items are incomplete
+ * - Type-safe unknown validation
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -251,24 +267,26 @@ Kembalikan HANYA format JSON valid tanpa markdown:
         if (response.ok) {
           const data = await response.json();
           const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+          const parsed = safeExtractJsonObject(rawText);
 
+          if (parsed) {
             const overallCalories = parseNumber(parsed.calories, 0);
-            const items: FoodItemBreakdown[] = Array.isArray(parsed.itemsBreakdown)
-              ? parsed.itemsBreakdown.map((it: any) => ({
-                  name: it.name || 'Item',
-                  calories: parseNumber(it.calories, 100),
-                }))
-              : [{ name: cleanInput, calories: overallCalories || 300 }];
+
+            const rawItems = Array.isArray(parsed.itemsBreakdown) ? parsed.itemsBreakdown : [];
+            const items: FoodItemBreakdown[] = rawItems
+              .filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+              .map((it) => ({
+                name: typeof it.name === 'string' && it.name.trim() ? it.name.trim() : 'Item',
+                calories: parseNumber(it.calories, 100),
+              }));
 
             const sumCalories = items.reduce((acc, it) => acc + it.calories, 0);
-            // Preserve overall total if valid, otherwise use breakdown sum
+            // Preserve overall total if valid, otherwise fallback to breakdown sum
             const finalCalories = overallCalories > 0 ? overallCalories : (sumCalories || 300);
+            const finalItems = items.length > 0 ? items : [{ name: cleanInput, calories: finalCalories }];
 
             return {
-              name: parsed.name || cleanInput,
+              name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : cleanInput,
               nutrition: {
                 calories: finalCalories,
                 proteinGrams: parseNumber(parsed.proteinGrams, 15),
@@ -277,9 +295,11 @@ Kembalikan HANYA format JSON valid tanpa markdown:
                 fiberGrams: parseNumber(parsed.fiberGrams, 3),
               },
               confidence: 'high',
-              aiNotes: parsed.aiNotes || `Estimasi nutrisi oleh Gemini Cloud AI (${model})`,
+              aiNotes: typeof parsed.aiNotes === 'string' && parsed.aiNotes.trim()
+                ? parsed.aiNotes.trim()
+                : `Estimasi nutrisi oleh Gemini Cloud AI (${model})`,
               isOnlineAI: true,
-              itemsBreakdown: items,
+              itemsBreakdown: finalItems,
             };
           }
         }
@@ -294,7 +314,7 @@ Kembalikan HANYA format JSON valid tanpa markdown:
         } else if (response.status < 500) {
           break; // Stop on client error
         }
-      } catch (error) {
+      } catch (error: unknown) {
         // Network error / offline / timeout -> STOP IMMEDIATELY! Do NOT loop through remaining models.
         lastErrorReason = 'network_error';
         console.warn(`Gemini Cloud network/timeout error for ${model}:`, error);
@@ -374,7 +394,7 @@ Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Ji
       }
       if (response.status === 401 || response.status === 403) break;
       if (response.status !== 429 && response.status < 500) break;
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn(`Gemini Cloud chat for ${model} failed (network/timeout):`, err);
       break; // STOP IMMEDIATELY on network error
     } finally {
@@ -447,19 +467,22 @@ Kembalikan HANYA format JSON valid:
         if (response.ok) {
           const data = await response.json();
           const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+          const parsed = safeExtractJsonObject(rawText);
+          if (parsed) {
             return {
-              coachMessage: parsed.coachMessage || `Halo ${userData.name}! Bagaimanakah kondisi energimu saat ini?`,
-              questionPrompt: parsed.questionPrompt || 'Apakah kamu merasa lapar asli atau butuh minum air?',
-              recommendedAction: parsed.recommendedAction || 'meal',
+              coachMessage: typeof parsed.coachMessage === 'string' && parsed.coachMessage.trim()
+                ? parsed.coachMessage.trim()
+                : `Halo ${userData.name}! Bagaimanakah kondisi energimu saat ini?`,
+              questionPrompt: typeof parsed.questionPrompt === 'string' && parsed.questionPrompt.trim()
+                ? parsed.questionPrompt.trim()
+                : 'Apakah kamu merasa lapar asli atau butuh minum air?',
+              recommendedAction: (parsed.recommendedAction as any) || 'meal',
             };
           }
         }
         if (response.status === 401 || response.status === 403) break;
         if (response.status !== 429 && response.status < 500) break;
-      } catch (err) {
+      } catch (err: unknown) {
         console.error(`Error generating AI Coach message with ${model}:`, err);
         break; // Stop immediately on network error
       } finally {

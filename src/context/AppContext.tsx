@@ -1,29 +1,33 @@
 import React, { ReactNode } from 'react';
 import { ProfileProvider, useProfile } from './ProfileContext';
 import { MealProvider, useMeals } from './MealContext';
+import { WeightProvider, useWeight } from './WeightContext';
 import { HealthProvider, useHealth } from './HealthContext';
 import { AIProvider, useAI } from './AIContext';
 
-export { useProfile, useMeals, useHealth, useAI };
+export { useProfile, useMeals, useWeight, useHealth, useAI };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <ProfileProvider>
       <MealProvider>
-        <HealthProvider>
-          <AIProvider>{children}</AIProvider>
-        </HealthProvider>
+        <WeightProvider>
+          <HealthProvider>
+            <AIProvider>{children}</AIProvider>
+          </HealthProvider>
+        </WeightProvider>
       </MealProvider>
     </ProfileProvider>
   );
 };
 
 /**
- * Backward-compatible facade hook aggregating all 4 modular contexts
+ * Backward-compatible facade hook aggregating all 5 modular contexts
  */
 export const useApp = () => {
   const profileCtx = useProfile();
   const mealCtx = useMeals();
+  const weightCtx = useWeight();
   const healthCtx = useHealth();
   const aiCtx = useAI();
 
@@ -41,6 +45,12 @@ export const useApp = () => {
     addMealLog: mealCtx.addMealLog,
     updateMealLog: mealCtx.updateMealLog,
     deleteMealLog: mealCtx.deleteMealLog,
+
+    // WeightContext
+    weightLogs: weightCtx.weightLogs,
+    addWeightLog: weightCtx.addWeightLog,
+    updateWeightLog: weightCtx.updateWeightLog,
+    deleteWeightLog: weightCtx.deleteWeightLog,
 
     // HealthContext
     waterGlasses: healthCtx.waterGlasses,

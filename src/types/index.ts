@@ -81,3 +81,12 @@ export type AIConnectionStatus =
   | 'invalid_key'
   | 'rate_limited'
   | 'offline';
+
+export interface WeightLog {
+  id: string;
+  weightKg: number;
+  recordedAt: string; // ISO string
+  note?: string;
+}
+
+export type WeightTrend = 'down' | 'stable' | 'up';

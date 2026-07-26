@@ -3,11 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } fro
 import { AppProvider } from './src/context/AppContext';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LoggerScreen } from './src/screens/LoggerScreen';
+import { WeightScreen } from './src/screens/WeightScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { Home, Utensils, PieChart, User } from 'lucide-react-native';
+import { Home, Utensils, Scale, PieChart, User } from 'lucide-react-native';
 
-type TabName = 'home' | 'logger' | 'analytics' | 'profile';
+type TabName = 'home' | 'logger' | 'weight' | 'analytics' | 'profile';
 
 const MainNavigator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabName>('home');
@@ -18,6 +19,8 @@ const MainNavigator: React.FC = () => {
         return <HomeScreen />;
       case 'logger':
         return <LoggerScreen />;
+      case 'weight':
+        return <WeightScreen />;
       case 'analytics':
         return <AnalyticsScreen />;
       case 'profile':
@@ -42,6 +45,11 @@ const MainNavigator: React.FC = () => {
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('logger')}>
           <Utensils size={20} color={activeTab === 'logger' ? '#3B82F6' : 'rgba(255, 255, 255, 0.4)'} />
           <Text style={[styles.tabLabel, activeTab === 'logger' && styles.tabLabelActive]}>AI Log</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('weight')}>
+          <Scale size={20} color={activeTab === 'weight' ? '#3B82F6' : 'rgba(255, 255, 255, 0.4)'} />
+          <Text style={[styles.tabLabel, activeTab === 'weight' && styles.tabLabelActive]}>Berat</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('analytics')}>

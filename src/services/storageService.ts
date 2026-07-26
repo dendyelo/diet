@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, MealLog } from '../types';
+import { UserProfile, MealLog, WeightLog } from '../types';
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const KEYS = {
   SCHEMA_VERSION: '@habitdiet_schema_version',
@@ -10,6 +10,7 @@ const KEYS = {
   WATER_GLASSES: '@habitdiet_water_glasses',
   STEP_RECORD: '@habitdiet_step_record',
   LEGACY_STEP_COUNT: '@habitdiet_step_count',
+  WEIGHT_LOGS: '@habitdiet_weight_logs',
 };
 
 export interface StepRecord {
@@ -100,6 +101,27 @@ export async function runStepByStepMigrations(currentVersion: number): Promise<v
       await AsyncStorage.setItem(KEYS.USER_PROFILE, JSON.stringify(parsed));
     }
     ver = 5;
+  }
+
+  // V5 -> V6: Weight Tracking - seed initial weight log from profile
+  if (ver < 6) {
+    const existingLogs = await AsyncStorage.getItem(KEYS.WEIGHT_LOGS);
+    if (!existingLogs) {
+      const profileData = await AsyncStorage.getItem(KEYS.USER_PROFILE);
+      if (profileData) {
+        const parsed = JSON.parse(profileData);
+        if (parsed.weightKg && typeof parsed.weightKg === 'number' && parsed.weightKg >= 20 && parsed.weightKg <= 300) {
+          const seedLog: WeightLog = {
+            id: `weight_seed_${Date.now()}`,
+            weightKg: parsed.weightKg,
+            recordedAt: new Date().toISOString(),
+            note: 'Berat awal dari profil',
+          };
+          await AsyncStorage.setItem(KEYS.WEIGHT_LOGS, JSON.stringify([seedLog]));
+        }
+      }
+    }
+    ver = 6;
   }
 
   await AsyncStorage.setItem(KEYS.SCHEMA_VERSION, SCHEMA_VERSION.toString());
@@ -280,3 +302,38 @@ export async function saveStepRecord(dateStr: string, record: StepRecord): Promi
     }
   });
 }
+
+/**
+ * Load Weight Logs with Strict Schema Validation
+ */
+export async function loadWeightLogs(): Promise<WeightLog[]> {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.WEIGHT_LOGS);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((log: any) => {
+          if (!log || typeof log !== 'object') return false;
+          if (typeof log.id !== 'string' || log.id.trim() === '') return false;
+          if (typeof log.weightKg !== 'number' || log.weightKg < 20 || log.weightKg > 300) return false;
+          if (!log.recordedAt || Number.isNaN(new Date(log.recordedAt).getTime())) return false;
+          return true;
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error loading weight logs:', error);
+  }
+  return [];
+}
+
+export async function saveWeightLogs(logs: WeightLog[]): Promise<void> {
+  return storageQueue.enqueue(async () => {
+    try {
+      await AsyncStorage.setItem(KEYS.WEIGHT_LOGS, JSON.stringify(logs));
+    } catch (error) {
+      console.error('Error saving weight logs:', error);
+    }
+  });
+}
+

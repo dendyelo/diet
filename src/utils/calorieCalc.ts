@@ -10,13 +10,32 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
 
 /**
  * Calculate Basal Metabolic Rate (BMR) using Mifflin-St Jeor Formula
+ * Sanitized to realistic human physiological bounds (900 kcal - 2800 kcal).
  */
 export function calculateBMR(profile: UserProfile): number {
-  const { weightKg, heightCm, age, gender } = profile;
-  if (!weightKg || !heightCm || !age) return 1600;
+  // Sanitize inputs to valid human ranges
+  let weightKg = Number(profile.weightKg);
+  if (isNaN(weightKg) || weightKg < 30 || weightKg > 250) {
+    weightKg = 70; // Fallback default
+  }
+
+  let heightCm = Number(profile.heightCm);
+  if (isNaN(heightCm) || heightCm < 100 || heightCm > 230) {
+    heightCm = 170; // Fallback default
+  }
+
+  let age = Number(profile.age);
+  if (isNaN(age) || age < 10 || age > 100) {
+    age = 26; // Fallback default
+  }
+
+  const gender = profile.gender === 'female' ? 'female' : 'male';
 
   const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  return Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
+  const rawBMR = Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
+
+  // Clamp BMR to realistic human limits (900 kcal to 2800 kcal)
+  return Math.min(2800, Math.max(900, rawBMR));
 }
 
 /**
@@ -34,7 +53,10 @@ export function calculateTDEE(profile: UserProfile): number {
  */
 export function calculateStepCalories(steps: number, weightKg: number): number {
   if (!steps || steps <= 0) return 0;
-  const userWeight = weightKg || 70;
+  let userWeight = Number(weightKg);
+  if (isNaN(userWeight) || userWeight < 30 || userWeight > 250) {
+    userWeight = 70;
+  }
   const caloriesPerStep = userWeight * 0.00041;
   return Math.round(steps * caloriesPerStep);
 }
@@ -50,7 +72,7 @@ export function calculateEnergyBalance(
 ) {
   const bmr = calculateBMR(profile);
   const stepCalories = calculateStepCalories(steps, profile.weightKg);
-  
+
   // Direct synchronization: BMR (Resting) + Step Burn (Active)
   const totalCaloriesOut = bmr + stepCalories;
   const netBalance = totalCaloriesOut - totalCaloriesIn; // Positive = Deficit, Negative = Surplus

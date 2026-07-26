@@ -28,7 +28,21 @@ export async function loadUserProfile(): Promise<UserProfile> {
   try {
     const data = await AsyncStorage.getItem(KEYS.USER_PROFILE);
     if (data) {
-      return { ...DEFAULT_PROFILE, ...JSON.parse(data) };
+      const parsed = JSON.parse(data);
+      const profile: UserProfile = { ...DEFAULT_PROFILE, ...parsed };
+
+      // Sanitize loaded profile values from any accidental typos/overflows
+      if (typeof profile.weightKg !== 'number' || profile.weightKg < 30 || profile.weightKg > 250) {
+        profile.weightKg = DEFAULT_PROFILE.weightKg;
+      }
+      if (typeof profile.heightCm !== 'number' || profile.heightCm < 100 || profile.heightCm > 250) {
+        profile.heightCm = DEFAULT_PROFILE.heightCm;
+      }
+      if (typeof profile.age !== 'number' || profile.age < 10 || profile.age > 100) {
+        profile.age = DEFAULT_PROFILE.age;
+      }
+
+      return profile;
     }
   } catch (error) {
     console.error('Error loading user profile:', error);

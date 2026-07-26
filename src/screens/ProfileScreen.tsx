@@ -33,14 +33,20 @@ export const ProfileScreen: React.FC = () => {
   const aiStatus = getAIStatus(apiKey);
 
   const handleSave = async () => {
+    const parsedAge = Math.min(100, Math.max(10, parseInt(age, 10) || 26));
+    const parsedHeight = Math.min(230, Math.max(100, parseInt(height, 10) || 170));
+    const parsedWeight = Math.min(250, Math.max(30, parseFloat(weight) || 70));
+    const parsedTargetWeight = Math.min(250, Math.max(30, parseFloat(targetWeight) || 65));
+    const parsedDeficit = Math.min(1500, Math.max(100, parseInt(targetDeficit, 10) || 500));
+
     await updateProfile({
       name: name.trim() || 'Teman Diet',
-      age: parseInt(age, 10) || 26,
+      age: parsedAge,
       gender,
-      heightCm: parseInt(height, 10) || 170,
-      weightKg: parseFloat(weight) || 70,
-      targetWeightKg: parseFloat(targetWeight) || 65,
-      targetDeficitKcal: parseInt(targetDeficit, 10) || 500,
+      heightCm: parsedHeight,
+      weightKg: parsedWeight,
+      targetWeightKg: parsedTargetWeight,
+      targetDeficitKcal: parsedDeficit,
       bedtimeHour: parseInt(bedtime, 10) || 23,
       geminiApiKey: apiKey.trim(),
     });
@@ -89,7 +95,7 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.grid2}>
             <View style={styles.gridItem}>
               <Text style={styles.label}>USIA (TAHUN)</Text>
-              <TextInput style={styles.input} keyboardType="numeric" value={age} onChangeText={setAge} />
+              <TextInput style={styles.input} keyboardType="numeric" value={age} onChangeText={setAge} maxLength={3} />
             </View>
             <View style={styles.gridItem}>
               <Text style={styles.label}>JENIS KELAMIN</Text>
@@ -117,11 +123,11 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.grid2}>
             <View style={styles.gridItem}>
               <Text style={styles.label}>TINGGI (CM)</Text>
-              <TextInput style={styles.input} keyboardType="numeric" value={height} onChangeText={setHeight} />
+              <TextInput style={styles.input} keyboardType="numeric" value={height} onChangeText={setHeight} maxLength={3} />
             </View>
             <View style={styles.gridItem}>
               <Text style={styles.label}>BERAT SAAT INI (KG)</Text>
-              <TextInput style={styles.input} keyboardType="numeric" value={weight} onChangeText={setWeight} />
+              <TextInput style={styles.input} keyboardType="numeric" value={weight} onChangeText={setWeight} maxLength={4} />
             </View>
           </View>
 
@@ -133,6 +139,7 @@ export const ProfileScreen: React.FC = () => {
                 keyboardType="numeric"
                 value={targetWeight}
                 onChangeText={setTargetWeight}
+                maxLength={4}
               />
             </View>
             <View style={styles.gridItem}>
@@ -142,6 +149,7 @@ export const ProfileScreen: React.FC = () => {
                 keyboardType="numeric"
                 value={targetDeficit}
                 onChangeText={setTargetDeficit}
+                maxLength={4}
               />
             </View>
           </View>

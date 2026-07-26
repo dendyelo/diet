@@ -8,6 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { Utensils, Droplets, Scale, Timer, X } from 'lucide-react-native';
+import { theme } from '../theme';
 
 interface QuickActionMenuProps {
   visible: boolean;
@@ -41,48 +42,48 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
               <View style={styles.gridContainer}>
                 {/* Food */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10B981' }]}
+                  style={[styles.actionBtn, { backgroundColor: theme.colors.primarySubtle, borderColor: theme.colors.primary }]}
                   onPress={() => handleAction('food')}
                   activeOpacity={0.7}
                 >
-                  <Utensils size={24} color="#10B981" />
-                  <Text style={[styles.actionLabel, { color: '#34D399' }]}>Makan</Text>
+                  <Utensils size={24} color={theme.colors.primary} />
+                  <Text style={[styles.actionLabel, { color: theme.colors.primaryText }]}>Makan</Text>
                 </TouchableOpacity>
 
                 {/* Water */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: '#3B82F6' }]}
+                  style={[styles.actionBtn, { backgroundColor: theme.colors.waterSubtle, borderColor: theme.colors.water }]}
                   onPress={() => handleAction('water')}
                   activeOpacity={0.7}
                 >
-                  <Droplets size={24} color="#3B82F6" />
+                  <Droplets size={24} color={theme.colors.water} />
                   <Text style={[styles.actionLabel, { color: '#60A5FA' }]}>Air Minum</Text>
                 </TouchableOpacity>
 
                 {/* Weight */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: '#A855F7' }]}
+                  style={[styles.actionBtn, { backgroundColor: theme.colors.weightSubtle, borderColor: theme.colors.weight }]}
                   onPress={() => handleAction('weight')}
                   activeOpacity={0.7}
                 >
-                  <Scale size={24} color="#A855F7" />
+                  <Scale size={24} color={theme.colors.weight} />
                   <Text style={[styles.actionLabel, { color: '#C084FC' }]}>Berat Badan</Text>
                 </TouchableOpacity>
 
                 {/* Fasting */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#F59E0B' }]}
+                  style={[styles.actionBtn, { backgroundColor: theme.colors.warningSubtle, borderColor: theme.colors.warning }]}
                   onPress={() => handleAction('fasting')}
                   activeOpacity={0.7}
                 >
-                  <Timer size={24} color="#F59E0B" />
+                  <Timer size={24} color={theme.colors.warning} />
                   <Text style={[styles.actionLabel, { color: '#FBBF24' }]}>Puasa</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Close Button */}
               <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-                <X size={20} color="rgba(255, 255, 255, 0.6)" />
+                <X size={20} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
@@ -102,19 +103,19 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     width: '90%',
-    backgroundColor: '#18181B',
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.colors.border,
   },
   menuTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.textMuted,
     letterSpacing: 0.5,
-    marginBottom: 16,
+    marginBottom: theme.spacing.md,
     textTransform: 'uppercase',
   },
   gridContainer: {
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
     width: '48%',
     paddingVertical: 18,
     paddingHorizontal: 12,
-    borderRadius: 20,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -139,11 +140,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   closeBtn: {
-    marginTop: 16,
+    marginTop: theme.spacing.md,
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: theme.colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },

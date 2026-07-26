@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { CheckCircle2, Circle, Plus } from 'lucide-react-native';
-import { GlassCard } from './GlassCard';
+import { Surface } from './Surface';
+import { theme } from '../theme';
 
 export interface DailyMissionItem {
   id: string;
@@ -28,7 +29,6 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
   todayMealsCount,
   onAddWater,
 }) => {
-  // Point 2: Deficit mission is completed ONLY if at least 1 meal has been logged AND user is in deficit!
   const isDeficitAchieved = todayMealsCount > 0 && netDeficit >= 0;
 
   const missions: DailyMissionItem[] = [
@@ -59,7 +59,7 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
   const completedCount = missions.filter((m) => m.isCompleted).length;
 
   return (
-    <GlassCard style={styles.card}>
+    <Surface style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>Misi Hari Ini</Text>
         <View style={styles.badge}>
@@ -72,9 +72,9 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
           <View key={mission.id} style={styles.missionItem}>
             <View style={styles.missionLeft}>
               {mission.isCompleted ? (
-                <CheckCircle2 size={18} color="#10B981" />
+                <CheckCircle2 size={18} color={theme.colors.primary} />
               ) : (
-                <Circle size={18} color="rgba(255, 255, 255, 0.3)" />
+                <Circle size={18} color={theme.colors.textMuted} />
               )}
               <Text
                 style={[
@@ -86,53 +86,51 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
               </Text>
             </View>
 
-            {/* Point 3: Explicit +1 button for Water row */}
             {mission.id === 'water' && waterGlasses < 8 && (
               <TouchableOpacity
                 style={styles.waterPlusBtn}
                 onPress={onAddWater}
                 activeOpacity={0.7}
               >
-                <Plus size={12} color="#10B981" />
+                <Plus size={12} color={theme.colors.primary} />
                 <Text style={styles.waterPlusText}>+1</Text>
               </TouchableOpacity>
             )}
           </View>
         ))}
       </View>
-    </GlassCard>
+    </Surface>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
-    borderRadius: 22,
-    marginVertical: 6,
+    padding: theme.spacing.md,
+    marginVertical: theme.spacing.xs,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: theme.spacing.sm,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: theme.colors.text,
   },
   badge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: theme.colors.primarySubtle,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#34D399',
+    color: theme.colors.primaryText,
   },
   missionList: {
     gap: 10,
@@ -151,18 +149,18 @@ const styles = StyleSheet.create({
   },
   missionText: {
     fontSize: 13,
-    color: '#E4E4E7',
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
   completedText: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.textMuted,
     textDecorationLine: 'line-through',
   },
   waterPlusBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: theme.colors.primarySubtle,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -172,6 +170,6 @@ const styles = StyleSheet.create({
   waterPlusText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#34D399',
+    color: theme.colors.primaryText,
   },
 });

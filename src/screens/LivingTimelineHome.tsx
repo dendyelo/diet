@@ -12,11 +12,12 @@ import {
   useWeight,
   useHealth,
 } from '../context/AppContext';
-import { GlassCard } from '../components/GlassCard';
+import { Surface } from '../components/Surface';
 import { DailyMissionCard } from '../components/DailyMissionCard';
 import { InlineCoachCard } from '../components/InlineCoachCard';
 import { calculateTargetCalories, calculateTargetProtein } from '../utils/calorieCalc';
 import { MealLog } from '../types';
+import { theme } from '../theme';
 import { Utensils, Plus, Droplets, Footprints, Dumbbell } from 'lucide-react-native';
 
 interface LivingTimelineHomeProps {
@@ -49,9 +50,18 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
     return todayLogs.reduce((acc: number, m: MealLog) => acc + (m.nutrition.proteinGrams || 0), 0);
   }, [todayLogs]);
 
-  // Determine time-of-day greeting and concise coach advice
+  // Directive 5: Deeper Contextual Coach Advice based on time & user logging state
   const timeState = useMemo(() => {
     if (currentHour >= 5 && currentHour < 12) {
+      if (todayLogs.length > 0) {
+        return {
+          greeting: `Selamat Pagi, ${profile.name || 'Teman'} 🌅`,
+          subtitle: 'Sarapanmu sudah tercatat. Siap melangkah hari ini!',
+          advice: `Bagus! Proteinmu sudah ${Math.round(proteinGrams)}g pagi ini. Pertahankan hidrasi harian.`,
+          actionLabel: '+ Minum Air',
+          onAction: () => addWaterGlass(),
+        };
+      }
       return {
         greeting: `Selamat Pagi, ${profile.name || 'Teman'} 🌅`,
         subtitle: 'Awali hari dengan energi positif dan pola makan terjaga.',
@@ -73,7 +83,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
       return {
         greeting: `Selamat Siang, ${profile.name || 'Teman'} ☀️`,
         subtitle: 'Berikut ringkasan energimu sejauh ini.',
-        advice: 'Ingat minum air putih di sela aktivitas siangmu.',
+        advice: `Mantap! Target protein tercapai (${Math.round(proteinGrams)}g). Ingat minum air putih di sela aktivitas.`,
         actionLabel: '+ Minum Air',
         onAction: () => addWaterGlass(),
       };
@@ -88,7 +98,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onAction: onOpenAddMeal,
       };
     }
-  }, [currentHour, profile.name, proteinGrams, targetProtein, netDeficit, onOpenAddMeal, addWaterGlass]);
+  }, [currentHour, profile.name, todayLogs.length, proteinGrams, targetProtein, netDeficit, onOpenAddMeal, addWaterGlass]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -98,8 +108,8 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         <Text style={styles.subtitleText}>{timeState.subtitle}</Text>
       </View>
 
-      {/* Point 1: Hierarchical Metric Display — Primary Dominant Calorie Metric */}
-      <GlassCard style={styles.primaryMetricCard}>
+      {/* Primary Dominant Calorie Metric */}
+      <Surface style={styles.primaryMetricCard}>
         <Text style={styles.cardHeaderTitle}>Target Kalori Harian</Text>
         <View style={styles.primaryCalorieRow}>
           <Text style={styles.primaryCalorieValue}>{caloriesIn.toLocaleString()}</Text>
@@ -113,28 +123,31 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
             ]}
           />
         </View>
-      </GlassCard>
+      </Surface>
 
-      {/* Point 1: 3 Secondary Compact Metrics Below */}
+      {/* 3 Secondary Compact Metrics Below */}
       <View style={styles.secondaryMetricRow}>
-        <GlassCard style={styles.secondaryCard}>
+        <Surface style={styles.secondaryCard}>
           <Dumbbell size={14} color="#A855F7" />
           <Text style={styles.secondaryValue}>{Math.round(proteinGrams)}/{targetProtein}g</Text>
           <Text style={styles.secondaryLabel}>Protein</Text>
-        </GlassCard>
+        </Surface>
 
-        <GlassCard style={styles.secondaryCard}>
-          <Droplets size={14} color="#3B82F6" />
+        <Surface style={styles.secondaryCard}>
+          <Droplets size={14} color={theme.colors.water} />
           <Text style={styles.secondaryValue}>{waterGlasses}/8</Text>
           <Text style={styles.secondaryLabel}>Air (Gelas)</Text>
-        </GlassCard>
+        </Surface>
 
-        <GlassCard style={styles.secondaryCard}>
-          <Footprints size={14} color="#10B981" />
+        <Surface style={styles.secondaryCard}>
+          <Footprints size={14} color={theme.colors.primary} />
           <Text style={styles.secondaryValue}>{steps.toLocaleString()}</Text>
           <Text style={styles.secondaryLabel}>Langkah</Text>
-        </GlassCard>
+        </Surface>
       </View>
+
+      {/* Directive 6: Distinct Breathing Room Spacing between sections */}
+      <View style={styles.sectionSpacer} />
 
       {/* 2. Concise Health Coach Card */}
       <InlineCoachCard
@@ -143,6 +156,8 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onActionPress={timeState.onAction}
         onOpenChatPress={onOpenAICoachChat}
       />
+
+      <View style={styles.sectionSpacer} />
 
       {/* 3. Daily Mission Checklist */}
       <DailyMissionCard
@@ -155,25 +170,27 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onAddWater={() => addWaterGlass()}
       />
 
-      {/* Point 6: Honest Section Header "Makanan Hari Ini" */}
+      <View style={styles.sectionSpacer} />
+
+      {/* 4. Section "Makanan Hari Ini" */}
       <View style={styles.timelineSection}>
         <Text style={styles.sectionTitle}>Makanan Hari Ini</Text>
 
         {todayLogs.length === 0 && (
-          <GlassCard style={styles.emptyCard}>
+          <Surface style={styles.emptyCard}>
             <Text style={styles.emptyText}>Belum ada makanan dicatat hari ini.</Text>
             <TouchableOpacity style={styles.quickAddBtn} onPress={onOpenAddMeal}>
-              <Plus size={14} color="#10B981" />
+              <Plus size={14} color={theme.colors.primary} />
               <Text style={styles.quickAddText}>Catat Makanan Pertama</Text>
             </TouchableOpacity>
-          </GlassCard>
+          </Surface>
         )}
 
         {todayLogs.map((meal: MealLog) => (
-          <GlassCard key={meal.id} style={styles.timelineItem}>
+          <Surface key={meal.id} style={styles.timelineItem}>
             <View style={styles.timelineRow}>
               <View style={styles.iconBox}>
-                <Utensils size={16} color="#10B981" />
+                <Utensils size={16} color={theme.colors.primary} />
               </View>
               <View style={styles.timelineTextGroup}>
                 <Text style={styles.mealName}>{meal.name}</Text>
@@ -183,7 +200,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
               </View>
               <Text style={styles.mealCal}>{meal.nutrition.calories} kcal</Text>
             </View>
-          </GlassCard>
+          </Surface>
         ))}
       </View>
     </ScrollView>
@@ -193,36 +210,34 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
+    backgroundColor: theme.colors.background,
   },
   content: {
-    padding: 16,
+    padding: theme.spacing.md,
     paddingTop: 50,
     paddingBottom: 100,
-    gap: 8,
   },
   headerBox: {
-    marginBottom: 8,
+    marginBottom: theme.spacing.md,
   },
   greetingText: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
   },
   subtitleText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: theme.colors.textMuted,
   },
   primaryMetricCard: {
-    padding: 16,
-    borderRadius: 22,
-    marginVertical: 4,
+    padding: theme.spacing.md,
+    marginVertical: theme.spacing.xs,
   },
   cardHeaderTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -235,53 +250,55 @@ const styles = StyleSheet.create({
   primaryCalorieValue: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: theme.colors.text,
   },
   primaryCalorieSub: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.textMuted,
   },
   progressBarTrack: {
     height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: theme.colors.border,
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: theme.colors.primary,
     borderRadius: 4,
   },
   secondaryMetricRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginVertical: 2,
+    gap: theme.spacing.sm,
+    marginVertical: theme.spacing.xs,
   },
   secondaryCard: {
     flex: 1,
     padding: 12,
-    borderRadius: 18,
     alignItems: 'center',
     gap: 4,
   },
   secondaryValue: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: theme.colors.text,
   },
   secondaryLabel: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.textMuted,
+  },
+  sectionSpacer: {
+    height: theme.spacing.sm,
   },
   timelineSection: {
-    marginTop: 12,
-    gap: 8,
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: theme.colors.text,
     marginBottom: 4,
   },
   emptyCard: {
@@ -291,27 +308,26 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.colors.textMuted,
   },
   quickAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: theme.colors.primarySubtle,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 14,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   quickAddText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#34D399',
+    color: theme.colors.primaryText,
   },
   timelineItem: {
     padding: 14,
-    borderRadius: 18,
     marginVertical: 2,
   },
   timelineRow: {
@@ -323,7 +339,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: theme.colors.primarySubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -333,16 +349,16 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: theme.colors.text,
   },
   mealTime: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: theme.colors.textMuted,
     marginTop: 2,
   },
   mealCal: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#10B981',
+    color: theme.colors.primary,
   },
 });

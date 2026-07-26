@@ -1,6 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { GlassCard } from './GlassCard';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { Surface } from './Surface';
+import { theme } from '../theme';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface InlineCoachCardProps {
   adviceText: string;
@@ -15,8 +20,13 @@ export const InlineCoachCard: React.FC<InlineCoachCardProps> = ({
   onActionPress,
   onOpenChatPress,
 }) => {
+  // Smooth LayoutAnimation on advice change (Directive 4)
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [adviceText]);
+
   return (
-    <GlassCard style={styles.card}>
+    <Surface style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.titleText}>Coach</Text>
       </View>
@@ -44,45 +54,43 @@ export const InlineCoachCard: React.FC<InlineCoachCardProps> = ({
           </TouchableOpacity>
         )}
       </View>
-    </GlassCard>
+    </Surface>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
-    borderRadius: 22,
-    marginVertical: 6,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+    marginVertical: theme.spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: theme.spacing.xs,
   },
   titleText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#34D399',
+    color: theme.colors.primaryText,
     letterSpacing: 0.3,
   },
   adviceText: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: theme.colors.text,
     fontWeight: '600',
     lineHeight: 20,
-    marginBottom: 12,
+    marginBottom: theme.spacing.sm,
   },
   btnRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.spacing.sm,
     alignItems: 'center',
   },
   primaryActionBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 14,
+    borderRadius: theme.radius.sm,
   },
   primaryActionText: {
     fontSize: 12,
@@ -90,16 +98,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   secondaryActionBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: theme.colors.surfaceSubtle,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 14,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: theme.colors.border,
   },
   secondaryActionText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: theme.colors.textSecondary,
   },
 });

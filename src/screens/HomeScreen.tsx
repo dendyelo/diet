@@ -19,7 +19,7 @@ import { AddMealModal } from '../components/AddMealModal';
 import { EditMealModal } from '../components/EditMealModal';
 import { WelcomeBackModal } from '../components/WelcomeBackModal';
 import { GlassCard } from '../components/GlassCard';
-import { MealLog } from '../types';
+import { MealLog, NutritionData, TriggerType, FoodItemBreakdown } from '../types';
 import {
   Utensils,
   Cookie,
@@ -61,8 +61,13 @@ export const HomeScreen: React.FC = () => {
   // Calculate Energy Balance (Synchronized BMR + Active Step Burn)
   const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps);
 
-  const handleAddSnackSubmit = (name: string, calories: number, trigger: any) => {
-    addMealLog(name, true, { calories, proteinGrams: 4, carbsGrams: 20, fatGrams: 8 }, trigger);
+  const handleAddSnackSubmit = (
+    name: string,
+    nutrition: NutritionData,
+    trigger: TriggerType,
+    itemsBreakdown?: FoodItemBreakdown[]
+  ) => {
+    addMealLog(name, true, nutrition, trigger, undefined, 'ai', itemsBreakdown);
   };
 
   return (
@@ -191,6 +196,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setShowSnackModal(false)}
         onSubmitSnack={handleAddSnackSubmit}
         onDrinkWater={addWaterGlass}
+        userApiKey={profile.geminiApiKey}
       />
 
       <AddMealModal

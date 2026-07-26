@@ -28,9 +28,14 @@ export interface AICoachResponse {
 }
 
 /**
- * Gemini models for automatic fallback
+ * Gemini & Gemma models for automatic fallback (combines 3000+ RPD free daily quota)
  */
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash'];
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-3.5-flash',
+  'gemma-4-31b-it',
+  'gemma-4-26b-a4b-it',
+];
 
 /**
  * Check Gemini AI Cloud API Connection Status dynamically

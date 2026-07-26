@@ -223,7 +223,12 @@ PERTANYAAN PENGGUNA: "${query}"
 
 Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), berikan estimasi kalori dan nutrisinya. Jika pengguna menanyakan data pribadinya (langkah, kalori, air, puasa), jawab berdasarkan konteks real-time di atas. Berikan saran praktis 2-3 paragraf singkat.`;
 
-        const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash'];
+        const modelsToTry = [
+          'gemini-2.5-flash',
+          'gemini-3.5-flash',
+          'gemma-4-31b-it',
+          'gemma-4-26b-a4b-it',
+        ];
         for (const model of modelsToTry) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 12000);

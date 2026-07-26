@@ -69,16 +69,20 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
 
   useEffect(() => {
     fetchAICoachGreeting();
-  }, [userApiKey, caloriesIn, waterGlasses]);
+  }, [userApiKey, caloriesIn, waterGlasses, netDeficit]);
 
   let displayMessage = aiMessage;
   let displayQuestion = aiQuestion;
 
   if (!isCloudAI || !displayMessage) {
-    // Dynamic Rotation index to prevent repeating the same topic (water, steps, fasting, deficit)
     const rotateIndex = (currentHour + Math.floor(currentMinute / 5)) % 4;
+    const isSurplus = netDeficit < 0;
+    const absNet = Math.abs(netDeficit);
 
-    if (caloriesIn === 0 && currentHour >= 12) {
+    if (isSurplus) {
+      displayMessage = `Perhatian ${userName}! Kalori masukmu saat ini surplus ${absNet} kcal 🔴. Tenang, seiring berjalannya hari, BMR istirahat dan langkah kakimu akan terus membakar kalori ini!`;
+      displayQuestion = 'Yuk, luangkan 10-15 menit jalan kaki santai untuk kembali ke defisit hijau 🟢?';
+    } else if (caloriesIn === 0 && currentHour >= 12) {
       displayMessage = `Halo ${userName}! Sudah jam ${currentHour}:00 dan kamu belum mencatat makanan hari ini.`;
       displayQuestion = 'Apakah kamu sudah lapar dan mau makan siang sekarang?';
     } else if (rotateIndex === 0 && fastingHours >= 6) {
@@ -91,7 +95,7 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
       displayMessage = `Asupan air minummu saat ini ${waterGlasses} / 8 gelas. Hidrasi yang terjaga mencegah pusing saat puasa.`;
       displayQuestion = 'Yuk, minum 1 gelas air putih dingin sekarang?';
     } else {
-      displayMessage = `Hebat ${userName}! Defisit kalorimu saat ini ${netDeficit} kcal. Pola habitmu berjalan sangat seimbang hari ini.`;
+      displayMessage = `Hebat ${userName}! Defisit kalorimu saat ini ${absNet} kcal. Pola habitmu berjalan sangat seimbang hari ini.`;
       displayQuestion = 'Bagaimana kondisi tubuh dan energi perasaanmu saat ini?';
     }
   }

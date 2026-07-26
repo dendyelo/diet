@@ -13,7 +13,7 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
  */
 export function calculateBMR(profile: UserProfile): number {
   const { weightKg, heightCm, age, gender } = profile;
-  if (!weightKg || !heightCm || !age) return 1600; // Default fallback
+  if (!weightKg || !heightCm || !age) return 1600;
 
   const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
   return Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
@@ -30,10 +30,13 @@ export function calculateTDEE(profile: UserProfile): number {
 
 /**
  * Calculate active calories burned from walking steps
+ * Refined formula matching Apple Watch & Garmin active calorie algorithms:
+ * ~285 kcal for 10,000 steps (70kg adult)
  */
 export function calculateStepCalories(steps: number, weightKg: number): number {
   if (!steps || steps <= 0) return 0;
-  const caloriesPerStep = (weightKg || 70) * 0.000571;
+  const userWeight = weightKg || 70;
+  const caloriesPerStep = userWeight * 0.00041;
   return Math.round(steps * caloriesPerStep);
 }
 

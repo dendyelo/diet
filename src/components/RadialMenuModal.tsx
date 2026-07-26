@@ -24,7 +24,9 @@ export const RadialMenuModal: React.FC<RadialMenuModalProps> = ({
 
   const handleAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
     onClose();
-    setTimeout(() => onSelectAction(action), 50);
+    requestAnimationFrame(() => {
+      onSelectAction(action);
+    });
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -103,11 +103,13 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
   };
 
   // Extract unique recent meals
-  const uniqueRecentMeals = recentMeals.reduce<MealLog[]>((acc, current) => {
-    const exists = acc.some((m) => m.name.toLowerCase() === current.name.toLowerCase());
-    if (!exists && acc.length < 4) acc.push(current);
-    return acc;
-  }, []);
+  const uniqueRecentMeals = useMemo(() => {
+    return recentMeals.slice(0, 50).reduce<MealLog[]>((acc, current) => {
+      const exists = acc.some((m) => m.name.toLowerCase() === current.name.toLowerCase());
+      if (!exists && acc.length < 4) acc.push(current);
+      return acc;
+    }, []);
+  }, [recentMeals]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>

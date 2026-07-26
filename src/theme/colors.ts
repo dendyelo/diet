@@ -6,6 +6,7 @@ export interface ColorTokens {
   divider: string;
   dividerSubtle: string;
   border: string;
+  overlay: string;
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
@@ -36,6 +37,7 @@ export const darkColors: ColorTokens = {
   divider: 'rgba(255, 255, 255, 0.08)',
   dividerSubtle: 'rgba(255, 255, 255, 0.04)',
   border: 'rgba(255, 255, 255, 0.08)',
+  overlay: 'rgba(0, 0, 0, 0.75)',
   textPrimary: '#FFFFFF',
   textSecondary: '#E4E4E7',
   textTertiary: 'rgba(255, 255, 255, 0.5)',
@@ -66,6 +68,7 @@ export const lightColors: ColorTokens = {
   divider: 'rgba(0, 0, 0, 0.08)',
   dividerSubtle: 'rgba(0, 0, 0, 0.04)',
   border: 'rgba(0, 0, 0, 0.08)',
+  overlay: 'rgba(0, 0, 0, 0.4)',
   textPrimary: '#18181B',
   textSecondary: '#3F3F46',
   textTertiary: 'rgba(0, 0, 0, 0.5)',

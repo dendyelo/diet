@@ -10,6 +10,7 @@ import Svg, {
   LinearGradient,
   Stop,
 } from 'react-native-svg';
+import { useTheme } from '../context/ThemeContext';
 
 export interface WeightChartProps {
   dataPoints: { dateLabel: string; dateStr: string; weightKg: number }[];
@@ -22,8 +23,8 @@ export const WeightChart: React.FC<WeightChartProps> = ({
   maDataPoints,
   targetKg,
 }) => {
+  const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
-  // Assume a typical padding for the container. The user can wrap this in a GlassCard.
   const chartWidth = windowWidth - 32;
   const chartHeight = 200;
 
@@ -54,9 +55,8 @@ export const WeightChart: React.FC<WeightChartProps> = ({
 
     const minY = actualMin - 1;
     const maxY = actualMax + 1;
-    const yRange = maxY - minY || 1; // Prevent division by zero
+    const yRange = maxY - minY || 1;
 
-    // Prepare Daily Points with normalized X (0 to 1)
     const dailyPoints = dataPoints.map((dp, index) => {
       const normalizedX =
         dataPoints.length > 1 ? index / (dataPoints.length - 1) : 0.5;
@@ -66,7 +66,6 @@ export const WeightChart: React.FC<WeightChartProps> = ({
       };
     });
 
-    // Prepare MA Points mapped to the same X axis
     const maPoints = maDataPoints
       .map((ma) => {
         const matchingIndex = dataPoints.findIndex(
@@ -84,13 +83,11 @@ export const WeightChart: React.FC<WeightChartProps> = ({
       })
       .filter(Boolean) as { weightKg: number; normalizedX: number }[];
 
-    // Y Grid Lines (e.g., 5 evenly spaced lines)
     const yGridLines = [];
     for (let i = 0; i <= 4; i++) {
       yGridLines.push(minY + (yRange * i) / 4);
     }
 
-    // X Labels (max 7)
     const maxLabels = 7;
     const step = Math.ceil(dataPoints.length / maxLabels);
     const xLabels = dataPoints
@@ -102,7 +99,6 @@ export const WeightChart: React.FC<WeightChartProps> = ({
       }))
       .filter((_, i) => i % step === 0 || i === dataPoints.length - 1);
 
-    // Remove duplicates if the last element was added twice
     const uniqueXLabels = xLabels.filter(
       (item, index, self) =>
         index === self.findIndex((t) => t.index === item.index)
@@ -123,7 +119,7 @@ export const WeightChart: React.FC<WeightChartProps> = ({
   if (!hasData || !dailyPoints || dailyPoints.length === 0) {
     return (
       <View style={[styles.emptyContainer, { height: chartHeight }]}>
-        <Text style={styles.emptyText}>Belum ada data</Text>
+        <Text style={{ color: colors.textTertiary, fontSize: 14 }}>Belum ada data</Text>
       </View>
     );
   }
@@ -136,7 +132,6 @@ export const WeightChart: React.FC<WeightChartProps> = ({
     padding.top +
     ((maxY! - val) / yRange!) * (chartHeight - padding.top - padding.bottom);
 
-  // Path generators
   const getLinePath = (
     pts: { weightKg: number; normalizedX: number }[]
   ) => {
@@ -153,7 +148,6 @@ export const WeightChart: React.FC<WeightChartProps> = ({
   const dailyPath = getLinePath(dailyPoints);
   const maPath = getLinePath(maPoints!);
 
-  // Gradient area path
   const firstPt = dailyPoints[0];
   const lastPt = dailyPoints[dailyPoints.length - 1];
   const areaBottomY = chartHeight - padding.bottom;
@@ -169,8 +163,8 @@ export const WeightChart: React.FC<WeightChartProps> = ({
       <Svg width={chartWidth} height={chartHeight}>
         <Defs>
           <LinearGradient id="gradientFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#3B82F6" stopOpacity="0.4" />
-            <Stop offset="1" stopColor="#3B82F6" stopOpacity="0" />
+            <Stop offset="0" stopColor={colors.info} stopOpacity="0.4" />
+            <Stop offset="1" stopColor={colors.info} stopOpacity="0" />
           </LinearGradient>
         </Defs>
 
@@ -185,13 +179,13 @@ export const WeightChart: React.FC<WeightChartProps> = ({
                   y1={y}
                   x2={chartWidth - padding.right}
                   y2={y}
-                  stroke="rgba(255,255,255,0.08)"
+                  stroke={colors.divider}
                   strokeWidth="1"
                 />
                 <SvgText
                   x={padding.left - 8}
-                  y={y + 4} // center text vertically
-                  fill="rgba(255,255,255,0.5)"
+                  y={y + 4}
+                  fill={colors.textTertiary}
                   fontSize="10"
                   textAnchor="end"
                 >
@@ -207,7 +201,7 @@ export const WeightChart: React.FC<WeightChartProps> = ({
               key={`x-${i}`}
               x={getX(labelObj.normalizedX)}
               y={chartHeight - 10}
-              fill="rgba(255,255,255,0.5)"
+              fill={colors.textTertiary}
               fontSize="10"
               textAnchor="middle"
             >
@@ -222,7 +216,7 @@ export const WeightChart: React.FC<WeightChartProps> = ({
           y1={getY(targetKg)}
           x2={chartWidth - padding.right}
           y2={getY(targetKg)}
-          stroke="#F59E0B"
+          stroke={colors.warning}
           strokeWidth="2"
           strokeDasharray="4 4"
         />
@@ -234,7 +228,7 @@ export const WeightChart: React.FC<WeightChartProps> = ({
         {maPath ? (
           <Path
             d={maPath}
-            stroke="#10B981"
+            stroke={colors.primary}
             strokeWidth="2"
             fill="none"
             strokeDasharray="4 4"
@@ -242,7 +236,7 @@ export const WeightChart: React.FC<WeightChartProps> = ({
         ) : null}
 
         {/* Daily Weight Line */}
-        <Path d={dailyPath} stroke="#3B82F6" strokeWidth="2" fill="none" />
+        <Path d={dailyPath} stroke={colors.info} strokeWidth="2" fill="none" />
 
         {/* Daily Weight Data Points */}
         {dailyPoints.map((dp, i) => (
@@ -251,8 +245,8 @@ export const WeightChart: React.FC<WeightChartProps> = ({
             cx={getX(dp.normalizedX)}
             cy={getY(dp.weightKg)}
             r="3"
-            fill="#3B82F6"
-            stroke="#09090B"
+            fill={colors.info}
+            stroke={colors.surface}
             strokeWidth="1.5"
           />
         ))}
@@ -261,16 +255,16 @@ export const WeightChart: React.FC<WeightChartProps> = ({
       {/* Legend */}
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendIndicator, { backgroundColor: '#3B82F6' }]} />
-          <Text style={styles.legendText}>Berat Harian</Text>
+          <View style={[styles.legendIndicator, { backgroundColor: colors.info }]} />
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Berat Harian</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendIndicator, styles.dashedIndicator, { borderColor: '#10B981' }]} />
-          <Text style={styles.legendText}>MA-7</Text>
+          <View style={[styles.legendIndicator, styles.dashedIndicator, { borderColor: colors.primary }]} />
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>MA-7</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendIndicator, styles.dashedIndicator, { borderColor: '#F59E0B' }]} />
-          <Text style={styles.legendText}>Target</Text>
+          <View style={[styles.legendIndicator, styles.dashedIndicator, { borderColor: colors.warning }]} />
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Target</Text>
         </View>
       </View>
     </View>
@@ -286,10 +280,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-  },
-  emptyText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 14,
   },
   legendContainer: {
     flexDirection: 'row',
@@ -313,9 +303,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 2,
     borderStyle: 'dashed',
-  },
-  legendText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
   },
 });

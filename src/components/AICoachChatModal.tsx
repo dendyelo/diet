@@ -3,7 +3,6 @@ import {
   Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -14,13 +13,14 @@ import {
 import { parseFoodNutritionWithAI, sendAICoachChatQuery, UserContextData } from '../services/aiService';
 import { X, Send, Sparkles, User, Bot } from 'lucide-react-native';
 import { createLocalId } from '../utils/id';
+import { useTheme } from '../context/ThemeContext';
 
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
   text: string;
   timestamp: string;
-  sourceTag?: string; // 'Gemini Cloud' | 'Data Harian' | 'Estimasi Offline'
+  sourceTag?: string;
 }
 
 interface AICoachChatModalProps {
@@ -58,87 +58,15 @@ const FOOD_KEYWORDS = [
   'kopi', 'teh', 'susu', 'jus',
 ];
 
-function classifyIntent(query: string): ChatIntent {
-  const lower = query.toLowerCase();
+function detectChatIntent(text: string): ChatIntent {
+  const lower = text.toLowerCase();
+  const isData = DATA_KEYWORDS.some((kw) => lower.includes(kw));
+  if (isData) return 'data_query';
 
-  const isDataQuery = DATA_KEYWORDS.some((kw) => lower.includes(kw));
-  const isQuestion = lower.includes('?') || lower.startsWith('berapa') || lower.startsWith('sudah') ||
-    lower.startsWith('apa') || lower.startsWith('gimana') || lower.startsWith('bagaimana') ||
-    lower.startsWith('kapan');
-
-  if (isDataQuery && isQuestion && !FOOD_KEYWORDS.some((kw) => lower.includes(kw))) {
-    return 'data_query';
-  }
-  if (isDataQuery && (lower.includes('saya') || lower.includes('ku') || lower.includes('aku'))) {
-    return 'data_query';
-  }
-
-  const isFoodQuery = FOOD_KEYWORDS.some((kw) => lower.includes(kw));
-  if (isFoodQuery) {
-    return 'food_query';
-  }
+  const isFood = FOOD_KEYWORDS.some((kw) => lower.includes(kw));
+  if (isFood) return 'food_query';
 
   return 'general';
-}
-
-function generateDataResponse(query: string, userName: string, ctx: UserContextData): string {
-  const lower = query.toLowerCase();
-  const name = userName || 'Teman';
-
-  if (lower.includes('langkah') || lower.includes('step') || lower.includes('jalan')) {
-    const target = 10000;
-    const pct = Math.min(100, Math.round((ctx.steps / target) * 100));
-    if (ctx.steps >= target) {
-      return `🏃 Luar biasa ${name}! Kamu sudah mencapai **${ctx.steps.toLocaleString()} langkah** hari ini — target ${target.toLocaleString()} langkah tercapai 🎉!\n\nPertahankan aktivitasmu yang konsisten ini. Langkah harian yang cukup membantu menjaga kesehatan jantung dan pembakaran kalori aktif.`;
-    }
-    return `🏃 Langkah kamu hari ini: **${ctx.steps.toLocaleString()} langkah** (${pct}% dari target ${target.toLocaleString()}).\n\nSisa ${(target - ctx.steps).toLocaleString()} langkah lagi. Coba jalan kaki 10-15 menit untuk mendekati target!`;
-  }
-
-  if (lower.includes('air') || lower.includes('minum') || lower.includes('gelas')) {
-    const target = 8;
-    if (ctx.waterGlasses >= target) {
-      return `💧 Mantap ${name}! Kamu sudah minum **${ctx.waterGlasses}/${target} gelas** hari ini — target hidrasi tercapai 🎉!\n\nTetap minum sesuai rasa haus. Hidrasi yang cukup menjaga metabolisme tetap optimal.`;
-    }
-    return `💧 Kamu sudah minum **${ctx.waterGlasses}/${target} gelas** hari ini.\n\nSisa ${target - ctx.waterGlasses} gelas lagi. Coba letakkan botol minum di dekatmu sebagai pengingat!`;
-  }
-
-  if (lower.includes('puasa') || lower.includes('fasting') || lower.includes('berpuasa')) {
-    if (ctx.fastingHours > 0) {
-      return `⏱️ Kamu sudah berpuasa selama **${ctx.fastingHours} jam**, ${name}!\n\n${ctx.fastingHours >= 16 ? 'Kamu sudah melewati jendela 16 jam. Tubuh dapat mulai meningkatkan penggunaan cadangan energi, tetapi respon setiap orang bisa berbeda.' : ctx.fastingHours >= 12 ? 'Sudah melewati 12 jam. Banyak orang merasa penggunaan energi lebih terasa setelah 12 jam, namun tetap dengarkan kondisi tubuhmu.' : 'Teruskan puasamu jika terasa nyaman. Tetap perhatikan sinyal dari tubuhmu.'}`;
-    }
-    return `⏱️ Kamu tidak sedang berpuasa saat ini, ${name}. Jika ingin memulai intermittent fasting, waktu terbaik biasanya dimulai setelah makan malam terakhir.`;
-  }
-
-  if (lower.includes('defisit') || lower.includes('surplus')) {
-    if (ctx.netDeficit >= 0) {
-      return `📊 Status energi hari ini: **Defisit ${ctx.netDeficit} kcal** — kamu dalam jalur yang tepat, ${name} 🟢!\n\nKalori masuk: ${ctx.caloriesIn} kcal. Pertahankan pola ini untuk progres yang konsisten.`;
-    }
-    return `📊 Status energi hari ini: **Surplus ${Math.abs(ctx.netDeficit)} kcal** 🟠.\n\nKalori masuk: ${ctx.caloriesIn} kcal. Tidak perlu panik — tambahkan aktivitas fisik atau kurangi sedikit porsi di makan berikutnya.`;
-  }
-
-  return `📋 Ringkasan harimu, ${name}:\n\n🔥 Kalori masuk: **${ctx.caloriesIn} kcal**\n📊 Status: **${ctx.netDeficit >= 0 ? `Defisit ${ctx.netDeficit}` : `Surplus ${Math.abs(ctx.netDeficit)}`} kcal**\n🏃 Langkah: **${ctx.steps.toLocaleString()}**\n💧 Air: **${ctx.waterGlasses}/8 gelas**\n⏱️ Puasa: **${ctx.fastingHours} jam**\n\nTerus pantau dan konsisten! 💪`;
-}
-
-function generateOfflineCoachResponse(query: string, userName: string, ctx: UserContextData): string {
-  const name = userName || 'Teman';
-  const lower = query.toLowerCase();
-
-  if (lower.includes('lapar') || lower.includes('hungry')) {
-    if (ctx.fastingHours > 0) {
-      return `Aku paham rasa lapar saat puasa bisa mengganggu, ${name}. Coba minum air putih dulu — sering kali tubuh bingung antara lapar dan haus.\n\nJika sudah melewati ${ctx.fastingHours} jam puasa dan merasa lemas atau tidak nyaman, tidak apa-apa untuk mengakhiri puasa. Kesehatanmu adalah prioritas utama! 🙏`;
-    }
-    return `Lapar itu respon alami tubuh, ${name}! Coba cemilan sehat seperti buah segar, kacang almond, atau yoghurt rendah lemak.\n\nKalori masukmu saat ini ${ctx.caloriesIn} kcal. ${ctx.netDeficit >= 0 ? 'Masih ada ruang untuk cemilan sehat!' : 'Pilih cemilan rendah kalori agar tetap seimbang.'}`;
-  }
-
-  if (lower.includes('pusing') || lower.includes('lemas') || lower.includes('capek') || lower.includes('lelah')) {
-    return `Jika merasa pusing atau lemas, ada beberapa hal yang perlu diperhatikan, ${name}:\n\n1. **Dehidrasi** — kamu baru minum ${ctx.waterGlasses}/8 gelas. Coba minum air segera.\n2. **Kebutuhan Energi** — jika sedang puasa ${ctx.fastingHours} jam, pertimbangkan untuk segera makan.\n3. **Istirahat** — pastikan waktu tidur cukup.\n\nJangan ragu untuk berhenti berpuasa dan istirahat jika pusing berlanjut. Kesehatan selalu lebih penting dari target apa pun! ❤️`;
-  }
-
-  if (lower.includes('saran') || lower.includes('tips') || lower.includes('rekomendasi')) {
-    return `Berikut tips sederhana untuk hari ini, ${name}:\n\n${ctx.waterGlasses < 6 ? '💧 Tingkatkan minum air — baru ' + ctx.waterGlasses + '/8 gelas.\n' : ''}${ctx.steps < 5000 ? '🏃 Coba tambahkan jalan kaki 15 menit.\n' : ''}${ctx.netDeficit < 0 ? '🍽️ Kurangi sedikit porsi di makan berikutnya.\n' : '🟢 Defisitmu aman — pertahankan!\n'}\nKonsistensi lebih penting dari kesempurnaan. Kamu sudah di jalur yang benar! 💪`;
-  }
-
-  return `Terima kasih bertanya, ${name}! Saya AI Coach yang dapat memberikan jawaban lebih personal jika terhubung ke Gemini Cloud.\n\nSaat ini saya dapat membantu:\n• Estimasi **kalori makanan** (misal: "berapa kalori nasi goreng?")\n• Informasi **data harian** kamu (langkah, air, puasa, defisit)\n• **Tips kesehatan** umum\n\nUntuk respon yang lebih interaktif, konfigurasi API key Gemini di halaman Profil.`;
 }
 
 export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
@@ -148,36 +76,39 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
   userApiKey,
   userContext,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      sender: 'ai',
-      text: `Halo ${userName}! 👋 Saya HabitDiet AI Coach pribadi Anda. Ceritakan apa yang sedang Anda rasakan atau tanyakan kalori makanan (misal: pisang goreng, nasi uduk, lemas, pusing), saya siap membantu!`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      sourceTag: 'Gemini Cloud',
-    },
-  ]);
+  const { colors, spacing, radius, typography } = useTheme();
   const [inputText, setInputText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Clean timer cleanup in useEffect
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      sender: 'ai',
+      text: `Halo ${userName}! Saya Health Coach AI kamu. Ada yang mau ditanyakan tentang pola makan, kalori, atau progres kesehatanmu hari ini?`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      sourceTag: 'Data Harian',
+    },
+  ]);
+
   useEffect(() => {
-    if (visible) {
-      const timer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 200);
-      return () => clearTimeout(timer);
+    if (visible && messages.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     }
-  }, [visible, messages]);
+  }, [messages, visible]);
+
+  if (!visible) return null;
 
   const handleSendMessage = async (textToSend?: string) => {
-    const query = textToSend || inputText.trim();
-    if (!query || loading) return;
+    const queryText = (textToSend || inputText).trim();
+    if (!queryText || loading) return;
 
-    const userMsgId = createLocalId('chat');
     const userMsg: ChatMessage = {
-      id: userMsgId,
+      id: createLocalId(),
       sender: 'user',
-      text: query,
+      text: queryText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -185,56 +116,63 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     if (!textToSend) setInputText('');
     setLoading(true);
 
+    const intent = detectChatIntent(queryText);
+
     try {
-      let replyText = '';
-      let sourceTag = 'Gemini Cloud';
-
-      // 1. Delegate to centralized AI service query handler
-      if (userApiKey && userApiKey.trim() !== '') {
-        const cloudReply = await sendAICoachChatQuery(query, userName, userContext, userApiKey);
-        if (cloudReply) {
-          replyText = cloudReply;
-          sourceTag = 'Gemini Cloud';
-        }
-      }
-
-      // 2. Offline fallback: classify intent
-      if (!replyText) {
-        const intent = classifyIntent(query);
-
-        if (intent === 'data_query') {
-          replyText = generateDataResponse(query, userName, userContext);
-          sourceTag = 'Data Harian';
-        } else if (intent === 'food_query') {
-          const foodResult = await parseFoodNutritionWithAI(query, undefined); // force offline engine
-          replyText = `1 Porsi **${foodResult.name}** diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. ${userContext.netDeficit >= 0 ? 'Sisa target defisit kalori harianmu sangat terjaga 🟢!' : `Kamu sudah surplus ${Math.abs(userContext.netDeficit)} kcal, pertimbangkan untuk bergerak lebih aktif 🟠.`}`;
-          sourceTag = 'Estimasi Offline';
+      if (intent === 'food_query') {
+        const parsed = await parseFoodNutritionWithAI(queryText, userApiKey);
+        let responseText = '';
+        if (parsed.itemsBreakdown && parsed.itemsBreakdown.length > 1) {
+          const breakdownStr = parsed.itemsBreakdown
+            .map((item) => `• ${item.name}: ~${item.calories} kcal`)
+            .join('\n');
+          responseText = `Estimasi nutrisi untuk "${parsed.name}":\n\n📌 Rincian:\n${breakdownStr}\n\n🔥 Total: ~${parsed.nutrition.calories} kcal | Protein: ${parsed.nutrition.proteinGrams}g | Karbo: ${parsed.nutrition.carbsGrams}g | Lemak: ${parsed.nutrition.fatGrams}g.`;
         } else {
-          replyText = generateOfflineCoachResponse(query, userName, userContext);
-          sourceTag = 'Estimasi Offline';
+          responseText = `Estimasi nutrisi untuk "${parsed.name}":\n🔥 ~${parsed.nutrition.calories} kcal (Protein: ${parsed.nutrition.proteinGrams}g, Karbo: ${parsed.nutrition.carbsGrams}g, Lemak: ${parsed.nutrition.fatGrams}g).`;
         }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createLocalId(),
+            sender: 'ai',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            sourceTag: userApiKey ? 'Gemini Cloud' : 'Estimasi Offline',
+          },
+        ]);
+      } else {
+        const aiResponse = (await sendAICoachChatQuery(queryText, userName, userContext, userApiKey)) || 'Maaf, terjadi masalah jaringan saat menghubungi Coach. Tetap jaga hidrasi dan pola makanmu!';
+
+        let tag = 'Gemini Cloud';
+        if (aiResponse.includes('Target kalori') || aiResponse.includes('Defisit')) {
+          tag = 'Data Harian';
+        } else if (!userApiKey) {
+          tag = 'Estimasi Offline';
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createLocalId(),
+            sender: 'ai',
+            text: aiResponse,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            sourceTag: tag,
+          },
+        ]);
       }
-
-      const aiMsgId = createLocalId('chat');
-      const aiMsg: ChatMessage = {
-        id: aiMsgId,
-        sender: 'ai',
-        text: replyText.trim(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sourceTag,
-      };
-
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch (error: unknown) {
-      const errMsgId = createLocalId('chat');
-      const errBubble: ChatMessage = {
-        id: errMsgId,
-        sender: 'ai',
-        text: '⚠️ Terjadi gangguan koneksi. Mohon periksa jaringan internet Anda.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sourceTag: 'Estimasi Offline',
-      };
-      setMessages((prev) => [...prev, errBubble]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createLocalId(),
+          sender: 'ai',
+          text: 'Maaf, terjadi gangguan saat menghubungi Coach. Tetap jaga pola makan dan hidrasimu!',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          sourceTag: 'Estimasi Offline',
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -243,41 +181,85 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.overlay}
+        style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.sheetContainer}>
+        <View
+          style={{
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+            padding: spacing.md,
+            height: '90%',
+            borderWidth: 1,
+            borderColor: colors.divider,
+          }}
+        >
           {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <View style={styles.botIconBox}>
-                <Bot size={20} color="#10B981" />
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingBottom: spacing.sm,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.divider,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.primarySubtle,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Bot size={20} color={colors.primary} />
               </View>
               <View>
-                <Text style={styles.sheetTitle} numberOfLines={1}>Chat AI Health Coach</Text>
-                <Text style={styles.sheetSub} numberOfLines={1}>Tanya bebas kondisi & konsultasi gizi real-time</Text>
+                <Text style={{ ...typography.h3, color: colors.textPrimary }}>AI Health Coach</Text>
+                <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                  {userApiKey ? '🟢 Online (Gemini AI Cloud)' : '🟡 Offline Mode (Aturan Cerdas)'}
+                </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X size={20} color="rgba(255, 255, 255, 0.7)" />
+
+            <TouchableOpacity onPress={onClose} style={{ padding: 6 }}>
+              <X size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
 
-          {/* Quick Prompts Bar */}
+          {/* Quick Prompts */}
           <ScrollView
-            horizontal={true}
+            horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.quickPromptsScroll}
-            contentContainerStyle={styles.quickPromptsContainer}
+            style={{ maxHeight: 44, marginVertical: spacing.xs }}
+            contentContainerStyle={{ gap: spacing.xs, alignItems: 'center' }}
           >
             {QUICK_PROMPTS.map((prompt, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.quickPromptChip}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: colors.primarySubtle,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: radius.sm,
+                  borderWidth: 1,
+                  borderColor: colors.primarySubtle,
+                }}
                 onPress={() => handleSendMessage(prompt)}
+                activeOpacity={0.7}
               >
-                <Sparkles size={12} color="#10B981" />
-                <Text style={styles.quickPromptText} numberOfLines={1}>{prompt}</Text>
+                <Sparkles size={12} color={colors.primary} />
+                <Text style={{ fontSize: 11, color: colors.primaryText, fontWeight: '600' }} numberOfLines={1}>
+                  {prompt}
+                </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -285,8 +267,8 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
           {/* Messages Scroll Area */}
           <ScrollView
             ref={scrollViewRef}
-            style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
+            style={{ flex: 1, marginVertical: 4 }}
+            contentContainerStyle={{ paddingVertical: 8, gap: 12 }}
             showsVerticalScrollIndicator={false}
           >
             {messages.map((msg) => {
@@ -294,52 +276,105 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
               return (
                 <View
                   key={msg.id}
-                  style={[
-                    styles.messageBubble,
-                    isUser ? styles.userBubble : styles.aiBubble,
-                  ]}
+                  style={{
+                    padding: 12,
+                    borderRadius: radius.md,
+                    maxWidth: '88%',
+                    alignSelf: isUser ? 'flex-end' : 'flex-start',
+                    backgroundColor: isUser ? colors.primary : colors.surfaceElevated,
+                    borderWidth: isUser ? 0 : 1,
+                    borderColor: colors.divider,
+                    borderBottomRightRadius: isUser ? 4 : radius.md,
+                    borderBottomLeftRadius: isUser ? radius.md : 4,
+                  }}
                 >
-                  <View style={styles.bubbleHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     {isUser ? (
-                      <User size={12} color="#60A5FA" />
+                      <User size={12} color="#FFFFFF" />
                     ) : (
-                      <Bot size={12} color="#10B981" />
+                      <Bot size={12} color={colors.primary} />
                     )}
-                    <Text style={styles.bubbleSender} numberOfLines={1}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: isUser ? '#FFFFFF' : colors.textSecondary }} numberOfLines={1}>
                       {isUser ? userName : 'AI Health Coach'}
                     </Text>
                     {msg.sourceTag && !isUser && (
-                      <View style={styles.tagBadge}>
-                        <Text style={styles.tagBadgeText}>{msg.sourceTag}</Text>
+                      <View
+                        style={{
+                          backgroundColor: colors.primarySubtle,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: colors.primarySubtle,
+                        }}
+                      >
+                        <Text style={{ fontSize: 8, color: colors.primaryText, fontWeight: '600' }}>{msg.sourceTag}</Text>
                       </View>
                     )}
-                    <Text style={styles.bubbleTime} numberOfLines={1}>{msg.timestamp}</Text>
+                    <Text style={{ fontSize: 9, color: isUser ? 'rgba(255, 255, 255, 0.7)' : colors.textTertiary, marginLeft: 'auto' }} numberOfLines={1}>
+                      {msg.timestamp}
+                    </Text>
                   </View>
-                  <Text style={styles.bubbleText}>{msg.text}</Text>
+                  <Text style={{ fontSize: 13, color: isUser ? '#FFFFFF' : colors.textPrimary, lineHeight: 19 }}>
+                    {msg.text}
+                  </Text>
                 </View>
               );
             })}
 
             {loading && (
-              <View style={[styles.messageBubble, styles.aiBubble, styles.loadingBubble]}>
-                <ActivityIndicator size="small" color="#10B981" />
-                <Text style={styles.loadingText} numberOfLines={1}>AI Coach sedang menganalisis...</Text>
+              <View
+                style={{
+                  padding: 12,
+                  borderRadius: radius.md,
+                  alignSelf: 'flex-start',
+                  backgroundColor: colors.surfaceElevated,
+                  borderWidth: 1,
+                  borderColor: colors.divider,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={{ fontSize: 12, color: colors.primaryText, fontStyle: 'italic' }} numberOfLines={1}>
+                  AI Coach sedang menganalisis...
+                </Text>
               </View>
             )}
           </ScrollView>
 
           {/* Input Chat Box */}
-          <View style={styles.inputContainer}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.xs + 4, borderTopWidth: 1, borderTopColor: colors.divider }}>
             <TextInput
-              style={styles.chatInput}
+              style={{
+                flex: 1,
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: colors.divider,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                color: colors.textPrimary,
+                fontSize: 13,
+                maxHeight: 80,
+              }}
               placeholder="Ketik pertanyaan atau kalori makanan..."
-              placeholderTextColor="rgba(255, 255, 255, 0.3)"
+              placeholderTextColor={colors.textTertiary}
               value={inputText}
               onChangeText={setInputText}
               multiline={true}
             />
             <TouchableOpacity
-              style={[styles.sendBtn, (!inputText.trim() || loading) && styles.sendBtnDisabled]}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: colors.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: (!inputText.trim() || loading) ? 0.4 : 1,
+              }}
               onPress={() => handleSendMessage()}
               disabled={!inputText.trim() || loading}
             >
@@ -351,177 +386,3 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    backgroundColor: '#18181B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 16,
-    height: '90%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  botIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  sheetSub: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  closeBtn: {
-    padding: 6,
-  },
-  quickPromptsScroll: {
-    maxHeight: 44,
-    marginVertical: 8,
-  },
-  quickPromptsContainer: {
-    gap: 8,
-    alignItems: 'center',
-  },
-  quickPromptChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  quickPromptText: {
-    fontSize: 11,
-    color: '#34D399',
-    fontWeight: '600',
-  },
-  messagesContainer: {
-    flex: 1,
-    marginVertical: 4,
-  },
-  messagesContent: {
-    paddingVertical: 8,
-    gap: 12,
-  },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 16,
-    maxWidth: '88%',
-  },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#3B82F6',
-    borderBottomRightRadius: 4,
-  },
-  aiBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderBottomLeftRadius: 4,
-  },
-  loadingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 12,
-    color: '#10B981',
-    fontStyle: 'italic',
-  },
-  bubbleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  bubbleSender: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  tagBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  tagBadgeText: {
-    fontSize: 8,
-    color: '#34D399',
-    fontWeight: '600',
-  },
-  bubbleTime: {
-    fontSize: 9,
-    color: 'rgba(255, 255, 255, 0.4)',
-    marginLeft: 'auto',
-  },
-  bubbleText: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    lineHeight: 19,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  chatInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 13,
-    maxHeight: 80,
-  },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.4,
-  },
-});

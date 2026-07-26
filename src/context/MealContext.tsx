@@ -80,46 +80,43 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       itemsBreakdown,
     };
 
-    let latestTimestamp: string | null = null;
-
+    let nextLogs: MealLog[] = [];
     setMealLogs((prevLogs) => {
-      const updatedLogs = [newLog, ...prevLogs];
-      latestTimestamp = getLatestMealTimestamp(updatedLogs);
-      saveMealLogs(updatedLogs);
-      return updatedLogs;
+      nextLogs = [newLog, ...prevLogs];
+      return nextLogs;
     });
 
+    const latestTimestamp = getLatestMealTimestamp(nextLogs);
+    await saveMealLogs(nextLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
   const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
-    let latestTimestamp: string | null = null;
-
+    let nextLogs: MealLog[] = [];
     setMealLogs((prevLogs) => {
-      const updatedLogs = prevLogs.map((log) => {
+      nextLogs = prevLogs.map((log) => {
         if (log.id === id) {
           return { ...log, ...updatedFields };
         }
         return log;
       });
-      latestTimestamp = getLatestMealTimestamp(updatedLogs);
-      saveMealLogs(updatedLogs);
-      return updatedLogs;
+      return nextLogs;
     });
 
+    const latestTimestamp = getLatestMealTimestamp(nextLogs);
+    await saveMealLogs(nextLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
   const deleteMealLog = async (id: string) => {
-    let latestTimestamp: string | null = null;
-
+    let nextLogs: MealLog[] = [];
     setMealLogs((prevLogs) => {
-      const updatedLogs = prevLogs.filter((m) => m.id !== id);
-      latestTimestamp = getLatestMealTimestamp(updatedLogs);
-      saveMealLogs(updatedLogs);
-      return updatedLogs;
+      nextLogs = prevLogs.filter((m) => m.id !== id);
+      return nextLogs;
     });
 
+    const latestTimestamp = getLatestMealTimestamp(nextLogs);
+    await saveMealLogs(nextLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 

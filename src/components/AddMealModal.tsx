@@ -1,0 +1,241 @@
+import React, { useState } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { parseFoodNutritionWithAI } from '../services/aiService';
+import { NutritionData } from '../types';
+import { X, Sparkles, Clock, Utensils } from 'lucide-react-native';
+
+interface AddMealModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSaveMeal: (name: string, nutrition: NutritionData, customTimestamp?: string) => void;
+  userApiKey?: string;
+}
+
+const TIME_OPTIONS = [
+  { label: 'Baru Saja', offsetMinutes: 0 },
+  { label: '30m Lalu', offsetMinutes: 30 },
+  { label: '1j Lalu', offsetMinutes: 60 },
+  { label: '2j Lalu', offsetMinutes: 120 },
+];
+
+export const AddMealModal: React.FC<AddMealModalProps> = ({
+  visible,
+  onClose,
+  onSaveMeal,
+  userApiKey,
+}) => {
+  const [foodText, setFoodText] = useState<string>('');
+  const [selectedTimeOffset, setSelectedTimeOffset] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const handleParseAndSave = async () => {
+    if (!foodText.trim()) return;
+
+    setLoading(true);
+    try {
+      const result = await parseFoodNutritionWithAI(foodText, userApiKey);
+
+      // Calculate timestamp based on back-dating selection
+      const timestamp = new Date(Date.now() - selectedTimeOffset * 60 * 1000).toISOString();
+
+      onSaveMeal(result.name, result.nutrition, timestamp);
+      setFoodText('');
+      onClose();
+    } catch (error) {
+      console.error('Error parsing meal:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.overlay}
+      >
+        <View style={styles.sheetContainer}>
+          <View style={styles.header}>
+            <View style={styles.titleRow}>
+              <Utensils size={20} color="#60A5FA" />
+              <Text style={styles.sheetTitle}>Catat Makanan Utama</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <X size={20} color="rgba(255, 255, 255, 0.7)" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Time Picker Back-Dating */}
+            <Text style={styles.sectionLabel}>KAPAN ANDA MAKAN INI?</Text>
+            <View style={styles.timeGrid}>
+              {TIME_OPTIONS.map((opt) => {
+                const isSelected = selectedTimeOffset === opt.offsetMinutes;
+                return (
+                  <TouchableOpacity
+                    key={opt.label}
+                    style={[styles.timeChip, isSelected && styles.timeChipSelected]}
+                    onPress={() => setSelectedTimeOffset(opt.offsetMinutes)}
+                  >
+                    <Clock size={12} color={isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
+                    <Text style={[styles.timeChipText, isSelected && styles.timeChipTextSelected]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Food Input */}
+            <Text style={styles.sectionLabel}>APA YANG ANDA MAKAN?</Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Contoh: Nasi padang pake rendang, perkedel 1, dan daun singkong"
+              placeholderTextColor="rgba(255, 255, 255, 0.3)"
+              multiline={true}
+              numberOfLines={4}
+              value={foodText}
+              onChangeText={setFoodText}
+            />
+            <Text style={styles.hintText}>
+              💡 AI akan otomatis menghitung estimasi Kalori, Karbo, Protein, dan Lemak.
+            </Text>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+              onPress={handleParseAndSave}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Sparkles size={18} color="#FFFFFF" />
+                  <Text style={styles.submitBtnText}>Hitung & Simpan dengan AI</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  sheetContainer: {
+    backgroundColor: '#18181B',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  timeChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  timeChipSelected: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  timeChipText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  timeChipTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  textArea: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  hintText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.4)',
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  submitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#3B82F6',
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 24,
+    marginBottom: 20,
+  },
+  submitBtnText: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+});

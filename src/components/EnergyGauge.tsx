@@ -6,7 +6,8 @@ import { GlassCard } from './GlassCard';
 interface EnergyGaugeProps {
   caloriesIn: number;
   caloriesOut: number;
-  bmr?: number;
+  dailyBMR?: number;
+  elapsedBMR?: number;
   stepCalories?: number;
   netBalance: number;
   targetDeficit: number;
@@ -17,7 +18,8 @@ interface EnergyGaugeProps {
 export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
   caloriesIn,
   caloriesOut,
-  bmr = 1600,
+  dailyBMR = 1600,
+  elapsedBMR = 800,
   stepCalories = 0,
   netBalance,
   targetDeficit,
@@ -84,7 +86,7 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
             {isDeficit ? `-${absBalance}` : `+${absBalance}`}
           </Text>
           <Text style={styles.netSubText}>
-            {isDeficit ? 'Target Net Deficit' : 'Surplus Warning'}
+            {isDeficit ? 'Net Defisit Saat Ini' : 'Surplus Warning'}
           </Text>
         </View>
       </View>
@@ -102,7 +104,7 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
           <Text style={styles.statLabel}>KALORI KELUAR (OUT)</Text>
           <Text style={[styles.statValue, { color: '#34D399' }]}>{caloriesOut} kcal</Text>
           <Text style={styles.statSub}>
-            BMR ({bmr}) + Steps (+{stepCalories})
+            BMR ({elapsedBMR}/{dailyBMR}) + Steps (+{stepCalories})
           </Text>
         </View>
       </View>

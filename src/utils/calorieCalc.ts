@@ -9,24 +9,23 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
 };
 
 /**
- * Calculate Basal Metabolic Rate (BMR) using Mifflin-St Jeor Formula
+ * Calculate Basal Metabolic Rate (BMR) for 24 hours using Mifflin-St Jeor Formula
  * Sanitized to realistic human physiological bounds (900 kcal - 2800 kcal).
  */
 export function calculateBMR(profile: UserProfile): number {
-  // Sanitize inputs to valid human ranges
   let weightKg = Number(profile.weightKg);
   if (isNaN(weightKg) || weightKg < 30 || weightKg > 250) {
-    weightKg = 70; // Fallback default
+    weightKg = 70;
   }
 
   let heightCm = Number(profile.heightCm);
   if (isNaN(heightCm) || heightCm < 100 || heightCm > 230) {
-    heightCm = 170; // Fallback default
+    heightCm = 170;
   }
 
   let age = Number(profile.age);
   if (isNaN(age) || age < 10 || age > 100) {
-    age = 26; // Fallback default
+    age = 26;
   }
 
   const gender = profile.gender === 'female' ? 'female' : 'male';
@@ -34,8 +33,23 @@ export function calculateBMR(profile: UserProfile): number {
   const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
   const rawBMR = Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
 
-  // Clamp BMR to realistic human limits (900 kcal to 2800 kcal)
   return Math.min(2800, Math.max(900, rawBMR));
+}
+
+/**
+ * Calculate Pro-Rated BMR accumulated up to the current minute of the day.
+ * E.g., at 12:00 PM (noon), exactly 50% of the 24-hour BMR has been burned.
+ */
+export function calculateElapsedBMR(dailyBMR: number, dateObj: Date = new Date()): number {
+  const hours = dateObj.getHours();
+  const minutes = dateObj.getMinutes();
+  const seconds = dateObj.getSeconds();
+
+  const totalSecondsInDay = 24 * 3600;
+  const elapsedSecondsInDay = hours * 3600 + minutes * 60 + seconds;
+
+  const fraction = Math.min(1, Math.max(0, elapsedSecondsInDay / totalSecondsInDay));
+  return Math.round(dailyBMR * fraction);
 }
 
 /**
@@ -62,19 +76,21 @@ export function calculateStepCalories(steps: number, weightKg: number): number {
 }
 
 /**
- * Synchronized Net Energy Balance (Deficit or Surplus)
- * Calorie OUT = Resting BMR + Active Step Calories (100% Synchronized with Steps!)
+ * Real-time Synchronized Energy Balance
+ * Calorie OUT = Pro-rated Elapsed BMR (Ticks minute-by-minute) + Active Step Calories
  */
 export function calculateEnergyBalance(
   profile: UserProfile,
   totalCaloriesIn: number,
-  steps: number
+  steps: number,
+  dateObj: Date = new Date()
 ) {
-  const bmr = calculateBMR(profile);
+  const dailyBMR = calculateBMR(profile);
+  const elapsedBMR = calculateElapsedBMR(dailyBMR, dateObj);
   const stepCalories = calculateStepCalories(steps, profile.weightKg);
 
-  // Direct synchronization: BMR (Resting) + Step Burn (Active)
-  const totalCaloriesOut = bmr + stepCalories;
+  // Gradually accumulating BMR + Step Burn
+  const totalCaloriesOut = elapsedBMR + stepCalories;
   const netBalance = totalCaloriesOut - totalCaloriesIn; // Positive = Deficit, Negative = Surplus
   const targetDeficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
 
@@ -85,10 +101,11 @@ export function calculateEnergyBalance(
   );
 
   return {
-    bmr,
+    dailyBMR,
+    elapsedBMR,
     stepCalories,
     totalCaloriesOut,
-    netBalance, // if positive, calories burned > eaten (DEFICIT)
+    netBalance,
     isDeficit,
     targetDeficit,
     percentageToGoal,

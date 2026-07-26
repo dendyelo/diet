@@ -43,6 +43,124 @@ const QUICK_PROMPTS = [
   'Defisitku 500 kcal hari ini, boleh makan bakso?',
 ];
 
+type ChatIntent = 'food_query' | 'data_query' | 'general';
+
+const DATA_KEYWORDS = [
+  'langkah', 'step', 'steps', 'jalan',
+  'kalori masuk', 'kalori saya', 'total kalori', 'berapa kalori saya',
+  'defisit', 'surplus',
+  'air', 'minum', 'gelas',
+  'puasa', 'fasting', 'berpuasa',
+  'progres', 'progress', 'status', 'kondisi saya', 'data saya', 'ringkasan',
+];
+
+const FOOD_KEYWORDS = [
+  'kalori', 'kcal', 'nutrisi', 'gizi',
+  'makan', 'porsi', 'mangkok', 'piring',
+  'nasi', 'ayam', 'ikan', 'telur', 'roti', 'bakso', 'mie', 'sate',
+  'goreng', 'bakar', 'rebus', 'kukus', 'panggang', 'tumis', 'gulai', 'rendang',
+  'cemilan', 'snack', 'kue', 'pisang', 'buah',
+  'kopi', 'teh', 'susu', 'jus',
+];
+
+function classifyIntent(query: string): ChatIntent {
+  const lower = query.toLowerCase();
+
+  // Data queries: user asking about their own stats
+  const isDataQuery = DATA_KEYWORDS.some((kw) => lower.includes(kw));
+  const isQuestion = lower.includes('?') || lower.startsWith('berapa') || lower.startsWith('sudah') ||
+    lower.startsWith('apa') || lower.startsWith('gimana') || lower.startsWith('bagaimana') ||
+    lower.startsWith('kapan');
+
+  // If asking about personal data (e.g. "berapa langkah saya")
+  if (isDataQuery && isQuestion && !FOOD_KEYWORDS.some((kw) => lower.includes(kw))) {
+    return 'data_query';
+  }
+  // Also catch "berapa langkah" without question mark
+  if (isDataQuery && (lower.includes('saya') || lower.includes('ku') || lower.includes('aku'))) {
+    return 'data_query';
+  }
+
+  // Food queries: mentions specific food items or asks about calories of food
+  const isFoodQuery = FOOD_KEYWORDS.some((kw) => lower.includes(kw));
+  if (isFoodQuery) {
+    return 'food_query';
+  }
+
+  // Default: general conversation/question
+  return 'general';
+}
+
+interface UserContextData {
+  fastingHours: number;
+  caloriesIn: number;
+  netDeficit: number;
+  steps: number;
+  waterGlasses: number;
+}
+
+function generateDataResponse(query: string, userName: string, ctx: UserContextData): string {
+  const lower = query.toLowerCase();
+  const name = userName || 'Teman';
+
+  if (lower.includes('langkah') || lower.includes('step') || lower.includes('jalan')) {
+    const target = 10000;
+    const pct = Math.min(100, Math.round((ctx.steps / target) * 100));
+    if (ctx.steps >= target) {
+      return `🏃 Luar biasa ${name}! Kamu sudah mencapai **${ctx.steps.toLocaleString()} langkah** hari ini — target ${target.toLocaleString()} langkah tercapai 🎉!\n\nPertahankan aktivitasmu yang konsisten ini. Langkah harian yang cukup membantu menjaga kesehatan jantung dan pembakaran kalori aktif.`;
+    }
+    return `🏃 Langkah kamu hari ini: **${ctx.steps.toLocaleString()} langkah** (${pct}% dari target ${target.toLocaleString()}).\n\nSisa ${(target - ctx.steps).toLocaleString()} langkah lagi. Coba jalan kaki 10-15 menit untuk mendekati target!`;
+  }
+
+  if (lower.includes('air') || lower.includes('minum') || lower.includes('gelas')) {
+    const target = 8;
+    if (ctx.waterGlasses >= target) {
+      return `💧 Mantap ${name}! Kamu sudah minum **${ctx.waterGlasses}/${target} gelas** hari ini — target hidrasi tercapai 🎉!\n\nTetap minum sesuai rasa haus. Hidrasi yang cukup menjaga metabolisme tetap optimal.`;
+    }
+    return `💧 Kamu sudah minum **${ctx.waterGlasses}/${target} gelas** hari ini.\n\nSisa ${target - ctx.waterGlasses} gelas lagi. Coba letakkan botol minum di dekatmu sebagai pengingat!`;
+  }
+
+  if (lower.includes('puasa') || lower.includes('fasting') || lower.includes('berpuasa')) {
+    if (ctx.fastingHours > 0) {
+      return `⏱️ Kamu sudah berpuasa selama **${ctx.fastingHours} jam**, ${name}!\n\n${ctx.fastingHours >= 16 ? 'Kamu sudah melewati jendela 16 jam — fase autophagy aktif 🔥. Pertahankan jika nyaman!' : ctx.fastingHours >= 12 ? 'Sudah melewati 12 jam — pembakaran lemak mulai meningkat. Kuat terus! 💪' : 'Teruskan puasamu. Pembakaran lemak biasanya dimulai setelah 12 jam.'}`;
+    }
+    return `⏱️ Kamu tidak sedang berpuasa saat ini, ${name}. Jika ingin memulai intermittent fasting, waktu terbaik biasanya dimulai setelah makan malam terakhir.`;
+  }
+
+  if (lower.includes('defisit') || lower.includes('surplus')) {
+    if (ctx.netDeficit >= 0) {
+      return `📊 Status energi hari ini: **Defisit ${ctx.netDeficit} kcal** — kamu dalam jalur yang tepat, ${name} 🟢!\n\nKalori masuk: ${ctx.caloriesIn} kcal. Pertahankan pola ini untuk progres yang konsisten.`;
+    }
+    return `📊 Status energi hari ini: **Surplus ${Math.abs(ctx.netDeficit)} kcal** 🟠.\n\nKalori masuk: ${ctx.caloriesIn} kcal. Tidak perlu panik — tambahkan aktivitas fisik atau kurangi sedikit porsi di makan berikutnya.`;
+  }
+
+  // General data summary
+  return `📋 Ringkasan harimu, ${name}:\n\n🔥 Kalori masuk: **${ctx.caloriesIn} kcal**\n📊 Status: **${ctx.netDeficit >= 0 ? `Defisit ${ctx.netDeficit}` : `Surplus ${Math.abs(ctx.netDeficit)}`} kcal**\n🏃 Langkah: **${ctx.steps.toLocaleString()}**\n💧 Air: **${ctx.waterGlasses}/8 gelas**\n⏱️ Puasa: **${ctx.fastingHours} jam**\n\nTerus pantau dan konsisten! 💪`;
+}
+
+function generateOfflineCoachResponse(query: string, userName: string, ctx: UserContextData): string {
+  const name = userName || 'Teman';
+  const lower = query.toLowerCase();
+
+  if (lower.includes('lapar') || lower.includes('hungry')) {
+    if (ctx.fastingHours > 0) {
+      return `Aku paham rasa lapar saat puasa bisa mengganggu, ${name}. Coba minum air putih dulu — sering kali tubuh bingung antara lapar dan haus.\n\nJika sudah melewati ${ctx.fastingHours} jam puasa dan merasa lemas, tidak apa-apa untuk memulai eating window-mu. Dengarkan tubuhmu! 🙏`;
+    }
+    return `Lapar itu wajar, ${name}! Coba cemilan sehat seperti buah, kacang almond, atau yoghurt rendah lemak.\n\nKalori masukmu saat ini ${ctx.caloriesIn} kcal. ${ctx.netDeficit >= 0 ? 'Masih ada ruang untuk cemilan sehat!' : 'Pilih cemilan rendah kalori agar tetap seimbang.'}`;
+  }
+
+  if (lower.includes('pusing') || lower.includes('lemas') || lower.includes('capek') || lower.includes('lelah')) {
+    return `Pusing atau lemas bisa disebabkan beberapa hal, ${name}:\n\n1. **Dehidrasi** — kamu baru minum ${ctx.waterGlasses}/8 gelas. Coba minum air segera.\n2. **Gula darah rendah** — jika sedang puasa ${ctx.fastingHours} jam, pertimbangkan untuk makan.\n3. **Kurang tidur** atau stres.\n\nJika berlanjut, jangan ragu untuk makan dan istirahat. Kesehatan lebih penting dari target kalori! ❤️`;
+  }
+
+  if (lower.includes('saran') || lower.includes('tips') || lower.includes('rekomendasi')) {
+    return `Berikut tips untuk hari ini, ${name}:\n\n${ctx.waterGlasses < 6 ? '💧 Tingkatkan minum air — baru ' + ctx.waterGlasses + '/8 gelas.\n' : ''}${ctx.steps < 5000 ? '🏃 Coba tambahkan jalan kaki 15 menit.\n' : ''}${ctx.netDeficit < 0 ? '🍽️ Kurangi sedikit porsi di makan berikutnya.\n' : '🟢 Defisitmu aman — pertahankan!\n'}\nKonsistensi lebih penting dari kesempurnaan. Kamu sudah di jalur yang benar! 💪`;
+  }
+
+  // Generic fallback
+  return `Terima kasih bertanya, ${name}! Saya AI Coach yang lebih optimal jika terhubung ke Gemini Cloud.\n\nSaat ini saya bisa menjawab:\n• Pertanyaan tentang **kalori makanan** (misal: "berapa kalori nasi goreng?")\n• **Data harian** kamu (langkah, air, puasa, defisit)\n• **Tips kesehatan** umum\n\nUntuk jawaban yang lebih cerdas dan personal, konfigurasi API key Gemini di halaman Profil.`;
+}
+
 export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
   visible,
   onClose,
@@ -87,8 +205,10 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     try {
       let replyText = '';
 
+      // --- 1. Try Gemini Cloud first if API key is configured ---
       if (userApiKey && userApiKey.trim() !== '') {
-        const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
+        try {
+          const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
 Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
 
 KONTEKS REAL-TIME PENGGUNA SAAT INI:
@@ -101,28 +221,47 @@ KONTEKS REAL-TIME PENGGUNA SAAT INI:
 
 PERTANYAAN PENGGUNA: "${query}"
 
-Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), SEBUTKAN KALORI DAN NUTRISI SPESIFIK MAKANAN TERSEBUT SECARA AKURAT. Berikan saran praktis 2-3 paragraf singkat.`;
+Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empati. Jika pengguna menanyakan tentang makanan spesifik (misal: pisang goreng, bakso, nasi goreng, dll), SEBUTKAN KALORI DAN NUTRISI SPESIFIK MAKANAN TERSEBUT SECARA AKURAT. Jika pengguna menanyakan data pribadinya (langkah, kalori, air, puasa), JAWAB BERDASARKAN KONTEKS REAL-TIME DI ATAS. Berikan saran praktis 2-3 paragraf singkat.`;
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-            }),
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+              }),
+              signal: controller.signal,
+            }
+          );
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = await response.json();
+            replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } catch (fetchErr) {
+          // Gemini failed (network, timeout, etc.) — continue to offline fallback
+          console.warn('Gemini Cloud chat failed, using offline fallback:', fetchErr);
         }
       }
 
+      // --- 2. Offline fallback: classify intent ---
       if (!replyText) {
-        const foodResult = await parseFoodNutritionWithAI(query, userApiKey);
-        replyText = `1 Porsi **${foodResult.name}** diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. Sisa target defisit kalori harianmu sangat terjaga 🟢!`;
+        const intent = classifyIntent(query);
+
+        if (intent === 'data_query') {
+          replyText = generateDataResponse(query, userName, userContext);
+        } else if (intent === 'food_query') {
+          const foodResult = await parseFoodNutritionWithAI(query, undefined); // force offline engine
+          replyText = `1 Porsi **${foodResult.name}** diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. ${userContext.netDeficit >= 0 ? 'Sisa target defisit kalori harianmu sangat terjaga 🟢!' : `Kamu sudah surplus ${Math.abs(userContext.netDeficit)} kcal, pertimbangkan untuk bergerak lebih aktif 🟠.`}`;
+        } else {
+          replyText = generateOfflineCoachResponse(query, userName, userContext);
+        }
       }
 
       const aiMsgId = createLocalId('chat');

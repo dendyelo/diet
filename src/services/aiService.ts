@@ -28,11 +28,15 @@ export interface AICoachResponse {
 }
 
 /**
- * Gemini & Gemma models for automatic fallback (combines 3000+ RPD free daily quota)
+ * 6 Verified Active Gemini & Gemma models for multi-model fallback chain.
+ * Provides combined daily free quota across all model buckets.
  */
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
   'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
   'gemma-4-31b-it',
   'gemma-4-26b-a4b-it',
 ];
@@ -56,7 +60,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
       isOnline: true,
       modeLabel: 'Gemini Cloud AI (Terhubung 🟢)',
       color: '#10B981',
-      description: 'Terhubung langsung ke Google AI Studio Cloud untuk estimasi gizi cerdas.',
+      description: 'Terhubung ke Multi-Model Gemini Cloud dengan estimasi gizi tinggi.',
       connectionStatus: 'connected',
     };
   }
@@ -101,7 +105,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
 }
 
 /**
- * Test Real Connection to Gemini AI API
+ * Test Real Connection to Gemini AI API (checks across verified models)
  */
 export async function testGeminiAPIConnection(userApiKey: string): Promise<AIConnectionStatus> {
   const cleanKey = userApiKey.trim();
@@ -140,7 +144,7 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
 }
 
 /**
- * Estimate nutrition from food description using Gemini AI API with Smart Fallback
+ * Estimate nutrition from food description using Gemini AI API with Multi-Model Fallback
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,

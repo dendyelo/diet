@@ -5,6 +5,34 @@ export interface AIFoodResult {
   nutrition: NutritionData;
   confidence: 'high' | 'medium' | 'low';
   aiNotes?: string;
+  isOnlineAI: boolean;
+}
+
+export interface AIStatus {
+  isOnline: boolean;
+  modeLabel: string;
+  color: string;
+  description: string;
+}
+
+/**
+ * Check AI engine current status (Online Cloud vs Smart Local Fallback)
+ */
+export function getAIStatus(userApiKey?: string): AIStatus {
+  if (userApiKey && userApiKey.trim().length > 0) {
+    return {
+      isOnline: true,
+      modeLabel: 'Gemini AI Cloud (Online)',
+      color: '#10B981',
+      description: 'Presisi tinggi menggunakan model Gemini 2.5 Flash Cloud.',
+    };
+  }
+  return {
+    isOnline: false,
+    modeLabel: 'Smart Local Engine (Offline)',
+    color: '#F59E0B',
+    description: 'Estimasi gizi cepat berbasis database kuliner lokal di memori HP.',
+  };
 }
 
 /**
@@ -62,7 +90,8 @@ function heuristicIndonesianFoodEstimator(foodText: string): AIFoodResult {
     name: foodText.trim(),
     nutrition: { calories, proteinGrams, carbsGrams, fatGrams, fiberGrams },
     confidence: 'medium',
-    aiNotes: 'Estimasi gizi berbasis database kuliner lokal.',
+    aiNotes: 'Estimasi gizi berbasis database kuliner lokal di HP.',
+    isOnlineAI: false,
   };
 }
 
@@ -130,7 +159,8 @@ Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
           fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
         },
         confidence: 'high',
-        aiNotes: parsed.aiNotes || 'Dihitung presisi oleh Gemini AI',
+        aiNotes: parsed.aiNotes || 'Dihitung presisi oleh Gemini AI Cloud',
+        isOnlineAI: true,
       };
     }
   } catch (error) {

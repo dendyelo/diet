@@ -7,12 +7,12 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
-  Alert,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { calculateBMR, calculateTDEE } from '../utils/calorieCalc';
+import { getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
-import { User, Activity, Key, Save, Moon, CheckCircle2 } from 'lucide-react-native';
+import { Key, Save, CheckCircle2, Wifi, WifiOff } from 'lucide-react-native';
 
 export const ProfileScreen: React.FC = () => {
   const { profile, updateProfile } = useApp();
@@ -30,6 +30,7 @@ export const ProfileScreen: React.FC = () => {
 
   const bmr = calculateBMR(profile);
   const tdee = calculateTDEE(profile);
+  const aiStatus = getAIStatus(apiKey);
 
   const handleSave = async () => {
     await updateProfile({
@@ -150,10 +151,26 @@ export const ProfileScreen: React.FC = () => {
         <GlassCard>
           <View style={styles.headerRow}>
             <Key size={16} color="#F59E0B" />
-            <Text style={styles.sectionHeader}>GEMINI AI API KEY (OPSIONAL)</Text>
+            <Text style={styles.sectionHeader}>GEMINI AI API KEY</Text>
           </View>
+
+          {/* AI Status Badge Container */}
+          <View style={[styles.statusBanner, { backgroundColor: aiStatus.color + '15', borderColor: aiStatus.color + '30' }]}>
+            {aiStatus.isOnline ? (
+              <Wifi size={16} color="#10B981" />
+            ) : (
+              <WifiOff size={16} color="#F59E0B" />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.statusTitle, { color: aiStatus.color }]}>
+                Status: {aiStatus.modeLabel}
+              </Text>
+              <Text style={styles.statusDesc}>{aiStatus.description}</Text>
+            </View>
+          </View>
+
           <Text style={styles.hint}>
-            Masukkan API Key Gemini AI milik Anda sendiri (Gratis dari Google AI Studio) untuk estimasi makanan tingkat tinggi.
+            Masukkan API Key Gemini AI milik Anda (Gratis dari Google AI Studio) untuk mengaktifkan Mode Online Cloud.
           </Text>
           <TextInput
             style={styles.input}
@@ -253,6 +270,24 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 1,
     marginBottom: 12,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  statusTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  statusDesc: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 1,
   },
   label: {
     fontSize: 10,

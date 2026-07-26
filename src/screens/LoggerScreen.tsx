@@ -10,9 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { parseFoodNutritionWithAI } from '../services/aiService';
+import { parseFoodNutritionWithAI, getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
-import { Sparkles, Utensils, Sliders, CheckCircle2 } from 'lucide-react-native';
+import { Sparkles, Utensils, Sliders, CheckCircle2, Wifi, WifiOff } from 'lucide-react-native';
 
 export const LoggerScreen: React.FC = () => {
   const { profile, addMealLog } = useApp();
@@ -29,6 +29,9 @@ export const LoggerScreen: React.FC = () => {
   const [carbs, setCarbs] = useState<string>('50');
   const [fat, setFat] = useState<string>('15');
 
+  // AI Status Check
+  const aiStatus = getAIStatus(profile.geminiApiKey);
+
   const handleAILog = async () => {
     if (!foodText.trim()) return;
 
@@ -38,7 +41,9 @@ export const LoggerScreen: React.FC = () => {
       const result = await parseFoodNutritionWithAI(foodText, profile.geminiApiKey);
       await addMealLog(result.name, false, result.nutrition, undefined, undefined, 'ai');
       setFoodText('');
-      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) berhasil dicatat!`);
+
+      const modeBadge = result.isOnlineAI ? '🟢 Cloud AI' : '🟡 Smart Local';
+      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) dicatat via ${modeBadge}!`);
     } catch (error) {
       console.error('Error logging meal via AI:', error);
     } finally {
@@ -70,10 +75,23 @@ export const LoggerScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.screenTitle}>PENCATAT NUTRISI & AI</Text>
-        <Text style={styles.screenSub}>
-          Hitung kalori makanan lokal dari deskripsi santai bahasa Indonesia atau input manual.
-        </Text>
+        {/* Screen Header */}
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.screenTitle}>PENCATAT NUTRISI & AI</Text>
+            <Text style={styles.screenSub}>
+              Hitung kalori makanan dari deskripsi santai atau manual.
+            </Text>
+          </View>
+
+          {/* AI Status Indicator Badge */}
+          <View style={[styles.aiStatusBadge, { backgroundColor: aiStatus.color + '18', borderColor: aiStatus.color + '40' }]}>
+            <View style={[styles.statusDot, { backgroundColor: aiStatus.color }]} />
+            <Text style={[styles.statusBadgeText, { color: aiStatus.color }]}>
+              {aiStatus.isOnline ? 'AI Online' : 'Local AI'}
+            </Text>
+          </View>
+        </View>
 
         {/* Tab Selector Mode */}
         <View style={styles.tabSelector}>
@@ -108,6 +126,21 @@ export const LoggerScreen: React.FC = () => {
 
         {inputMode === 'ai' ? (
           <GlassCard>
+            {/* AI Mode Banner */}
+            <View style={[styles.aiModeBar, { backgroundColor: aiStatus.color + '12' }]}>
+              {aiStatus.isOnline ? (
+                <Wifi size={16} color="#10B981" />
+              ) : (
+                <WifiOff size={16} color="#F59E0B" />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.aiModeTitle, { color: aiStatus.color }]}>
+                  {aiStatus.modeLabel}
+                </Text>
+                <Text style={styles.aiModeDesc}>{aiStatus.description}</Text>
+              </View>
+            </View>
+
             <Text style={styles.label}>DESKRIPSI MAKANAN (BAHASA INDONESIA)</Text>
             <TextInput
               style={styles.textArea}
@@ -217,6 +250,12 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   screenTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -226,8 +265,43 @@ const styles = StyleSheet.create({
   screenSub: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 16,
     lineHeight: 18,
+  },
+  aiStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  aiModeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  aiModeTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  aiModeDesc: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 1,
   },
   tabSelector: {
     flexDirection: 'row',

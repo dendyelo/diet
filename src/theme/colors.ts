@@ -16,17 +16,23 @@ export interface ColorTokens {
   primary: string;
   primarySubtle: string;
   primaryText: string;
+  onPrimary: string;
   success: string;
   successSubtle: string;
+  onSuccess: string;
   info: string;
   infoSubtle: string;
+  onInfo: string;
   water: string;
   warning: string;
   warningSubtle: string;
+  onWarning: string;
   danger: string;
   dangerSubtle: string;
+  onDanger: string;
   weight: string;
   weightSubtle: string;
+  onSurface: string;
 }
 
 export const darkColors: ColorTokens = {
@@ -47,17 +53,23 @@ export const darkColors: ColorTokens = {
   primary: '#10B981', // Emerald Green
   primarySubtle: 'rgba(16, 185, 129, 0.15)',
   primaryText: '#34D399',
+  onPrimary: '#FFFFFF',
   success: '#10B981',
   successSubtle: 'rgba(16, 185, 129, 0.15)',
+  onSuccess: '#FFFFFF',
   info: '#3B82F6',
   infoSubtle: 'rgba(59, 130, 246, 0.15)',
+  onInfo: '#FFFFFF',
   water: '#3B82F6',
   warning: '#F59E0B',
   warningSubtle: 'rgba(245, 158, 11, 0.15)',
+  onWarning: '#FFFFFF',
   danger: '#EF4444',
   dangerSubtle: 'rgba(239, 68, 68, 0.15)',
+  onDanger: '#FFFFFF',
   weight: '#A855F7',
   weightSubtle: 'rgba(168, 85, 247, 0.15)',
+  onSurface: '#FFFFFF',
 };
 
 export const lightColors: ColorTokens = {
@@ -78,15 +90,21 @@ export const lightColors: ColorTokens = {
   primary: '#10B981',
   primarySubtle: 'rgba(16, 185, 129, 0.12)',
   primaryText: '#059669',
+  onPrimary: '#FFFFFF',
   success: '#10B981',
   successSubtle: 'rgba(16, 185, 129, 0.12)',
+  onSuccess: '#FFFFFF',
   info: '#2563EB',
   infoSubtle: 'rgba(37, 99, 235, 0.12)',
+  onInfo: '#FFFFFF',
   water: '#2563EB',
   warning: '#D97706',
   warningSubtle: 'rgba(217, 119, 6, 0.12)',
+  onWarning: '#FFFFFF',
   danger: '#DC2626',
   dangerSubtle: 'rgba(220, 38, 38, 0.12)',
+  onDanger: '#FFFFFF',
   weight: '#9333EA',
   weightSubtle: 'rgba(147, 51, 234, 0.12)',
+  onSurface: '#18181B',
 };

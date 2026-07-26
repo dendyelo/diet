@@ -1,5 +1,6 @@
 import { WeightLog, WeightTrend } from '../types';
 import { getLocalDateString } from './date';
+import { ColorTokens } from '../theme/colors';
 
 export interface ChartDataPoint {
   dateLabel: string; // "26/07"
@@ -58,7 +59,7 @@ export function getLatestWeight(logs: WeightLog[]): number | null {
 }
 
 /**
- * Get the earliest weight log entry
+ * Get the earliest weight log entry (starting weight)
  */
 export function getStartWeight(logs: WeightLog[]): number | null {
   if (logs.length === 0) return null;
@@ -67,133 +68,122 @@ export function getStartWeight(logs: WeightLog[]): number | null {
 }
 
 /**
- * Calculate change from the first recorded weight to the latest
- * Positive = gained, Negative = lost
+ * Calculate weight change from earliest log to latest log
  */
 export function getChangeFromStart(logs: WeightLog[]): number | null {
   if (logs.length < 2) return null;
   const sorted = sortByDate(logs);
-  const first = sorted[0].weightKg;
-  const last = sorted[sorted.length - 1].weightKg;
-  return Math.round((last - first) * 10) / 10;
+  const startWeight = sorted[0].weightKg;
+  const latestWeight = sorted[sorted.length - 1].weightKg;
+  return Math.round((latestWeight - startWeight) * 10) / 10;
 }
 
 /**
- * Calculate progress toward target weight as percentage (0-100)
- * Works for both weight loss and weight gain targets
+ * Check if the user's target weight represents a weight gain goal
+ */
+export function isGainGoal(logs: WeightLog[], targetKg: number): boolean {
+  if (logs.length === 0) return false;
+  const sorted = sortByDate(logs);
+  const startWeight = sorted[0].weightKg;
+  return targetKg > startWeight;
+}
+
+/**
+ * Calculate percentage progress toward target weight
  */
 export function getProgressToTarget(logs: WeightLog[], targetKg: number): number {
   if (logs.length === 0) return 0;
   const sorted = sortByDate(logs);
   const startWeight = sorted[0].weightKg;
-  const latestWeight = sorted[sorted.length - 1].weightKg;
+  const currentWeight = sorted[sorted.length - 1].weightKg;
 
-  const totalToLose = startWeight - targetKg;
-  if (Math.abs(totalToLose) < 0.1) return 100; // Already at target
+  const totalNeeded = Math.abs(targetKg - startWeight);
+  if (totalNeeded === 0) return 100;
 
-  const actualLost = startWeight - latestWeight;
-  const progress = (actualLost / totalToLose) * 100;
-  return Math.max(0, Math.min(100, Math.round(progress)));
+  const achieved = isGainGoal(logs, targetKg)
+    ? currentWeight - startWeight
+    : startWeight - currentWeight;
+
+  const pct = Math.round((achieved / totalNeeded) * 100);
+  return Math.min(100, Math.max(0, pct));
 }
 
 /**
- * Determine if the user's goal is weight gain (target > start weight)
+ * Calculate 7-day moving average
  */
-export function isGainGoal(logs: WeightLog[], targetKg: number): boolean {
-  const start = getStartWeight(logs);
-  if (start === null) return false;
-  return targetKg > start;
-}
+export function getMovingAverage(logs: WeightLog[], windowDays: number = 7): number | null {
+  const daily = groupByDay(logs);
+  if (daily.length === 0) return null;
 
-/**
- * Calculate N-day moving average using one representative weight per day.
- * Groups multiple logs per day to the latest entry for that day,
- * then averages the last N daily values.
- */
-export function getMovingAverage(logs: WeightLog[], days: number = 7): number | null {
-  if (logs.length === 0) return null;
-
-  const dailyWeights = groupByDay(logs);
-  if (dailyWeights.length === 0) return null;
-
-  const now = new Date();
-  const cutoff = new Date(now);
-  cutoff.setDate(cutoff.getDate() - days);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - windowDays);
   const cutoffStr = getLocalDateString(cutoff);
 
-  const recentDays = dailyWeights.filter((d) => d.dateStr >= cutoffStr);
+  const filtered = daily.filter((d) => d.dateStr >= cutoffStr);
+  const recent = filtered.length > 0 ? filtered : daily.slice(-windowDays);
 
-  if (recentDays.length === 0) {
-    // Fallback: use last N daily entries if no days within window
-    const lastN = dailyWeights.slice(-days);
-    const sum = lastN.reduce((acc, d) => acc + d.weightKg, 0);
-    return Math.round((sum / lastN.length) * 10) / 10;
-  }
-
-  const sum = recentDays.reduce((acc, d) => acc + d.weightKg, 0);
-  return Math.round((sum / recentDays.length) * 10) / 10;
+  const sum = recent.reduce((acc, curr) => acc + curr.weightKg, 0);
+  return Math.round((sum / recent.length) * 10) / 10;
 }
 
 /**
- * Detect weight trend by comparing short-term MA (3 days) vs longer-term MA (7 days)
- * Both MAs use daily-grouped data to avoid per-entry bias.
- * - down: MA-3 < MA-7 by more than 0.2 kg
- * - up: MA-3 > MA-7 by more than 0.2 kg
- * - stable: within ±0.2 kg
+ * Detect weight trend over recent entries (down, stable, up)
  */
 export function detectTrend(logs: WeightLog[]): WeightTrend {
-  if (logs.length < 3) return 'stable';
+  const daily = groupByDay(logs);
+  if (daily.length < 2) return 'stable';
 
-  const ma3 = getMovingAverage(logs, 3);
-  const ma7 = getMovingAverage(logs, 7);
+  const recent = daily.slice(-7);
+  if (recent.length < 2) return 'stable';
 
-  if (ma3 === null || ma7 === null) return 'stable';
+  const firstHalf = recent.slice(0, Math.floor(recent.length / 2));
+  const secondHalf = recent.slice(Math.floor(recent.length / 2));
 
-  const diff = ma3 - ma7;
-  if (diff < -0.2) return 'down';
-  if (diff > 0.2) return 'up';
+  const avg1 = firstHalf.reduce((acc, curr) => acc + curr.weightKg, 0) / firstHalf.length;
+  const avg2 = secondHalf.reduce((acc, curr) => acc + curr.weightKg, 0) / secondHalf.length;
+
+  const diff = avg2 - avg1;
+  if (diff < -0.3) return 'down';
+  if (diff > 0.3) return 'up';
   return 'stable';
 }
 
 /**
- * Prepare data points for the chart, filtered to the last N days
- * Groups multiple logs per day to the latest entry for that day
+ * Prepare chart data points for the last N days
  */
-export function prepareChartData(logs: WeightLog[], days: number = 7): ChartDataPoint[] {
-  if (logs.length === 0) return [];
+export function prepareChartData(logs: WeightLog[], days: number): ChartDataPoint[] {
+  const daily = groupByDay(logs);
 
-  const now = new Date();
-  const cutoff = new Date(now);
+  const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = getLocalDateString(cutoff);
 
-  const dailyWeights = groupByDay(logs).filter((d) => d.dateStr >= cutoffStr);
+  const filtered = daily.filter((d) => d.dateStr >= cutoffStr);
 
-  return dailyWeights.map(({ dateStr, weightKg }) => {
-    const [, month, day] = dateStr.split('-');
+  return filtered.map((item) => {
+    const parts = item.dateStr.split('-');
+    const dateLabel = parts.length === 3 ? `${parts[2]}/${parts[1]}` : item.dateStr;
     return {
-      dateLabel: `${day}/${month}`,
-      dateStr,
-      weightKg,
+      dateLabel,
+      dateStr: item.dateStr,
+      weightKg: item.weightKg,
     };
   });
 }
 
 /**
- * Prepare moving average line data for chart overlay.
- * Uses daily-grouped weights and rolling N-day window.
+ * Prepare 7-day moving average series for chart matching daily points
  */
-export function prepareMAChartData(logs: WeightLog[], days: number = 7, maWindow: number = 7): ChartDataPoint[] {
-  const chartData = prepareChartData(logs, days);
-  if (chartData.length < 2) return [];
+export function prepareMAChartData(logs: WeightLog[], days: number): ChartDataPoint[] {
+  const rawChartData = prepareChartData(logs, days);
+  const daily = groupByDay(logs);
 
-  const allDailyWeights = groupByDay(logs);
+  return rawChartData.map((point) => {
+    const pointIdx = daily.findIndex((d) => d.dateStr === point.dateStr);
+    if (pointIdx < 0) return point;
 
-  return chartData.map((point) => {
-    // Get all daily weights up to and including this date
-    const dailiesUpTo = allDailyWeights.filter((d) => d.dateStr <= point.dateStr);
-    const windowDays = dailiesUpTo.slice(-maWindow);
-    const avg = windowDays.reduce((sum, d) => sum + d.weightKg, 0) / windowDays.length;
+    const windowSlice = daily.slice(Math.max(0, pointIdx - 6), pointIdx + 1);
+    const avg = windowSlice.reduce((sum, item) => sum + item.weightKg, 0) / windowSlice.length;
 
     return {
       dateLabel: point.dateLabel,
@@ -217,14 +207,17 @@ export function buildWeightSummary(logs: WeightLog[], targetKg: number): WeightS
   };
 }
 
+export type StatusKey = 'success' | 'warning' | 'danger';
+
 /**
  * Get context-aware trend display info.
- * Colors reflect whether the trend direction is favorable for the user's goal.
+ * Resolves color dynamically using theme ColorTokens.
  */
 export function getTrendInfo(
   trend: WeightTrend,
-  gainGoal: boolean
-): { label: string; emoji: string; color: string } {
+  gainGoal: boolean,
+  themeColors?: ColorTokens
+): { label: string; emoji: string; status: StatusKey; color: string } {
   const labels: Record<WeightTrend, { label: string; emoji: string }> = {
     down: { label: 'Turun', emoji: '⬇️' },
     stable: { label: 'Stabil', emoji: '➡️' },
@@ -233,36 +226,37 @@ export function getTrendInfo(
 
   const { label, emoji } = labels[trend];
 
-  // Determine if trend is favorable based on goal direction
-  let color: string;
+  let status: StatusKey;
   if (trend === 'stable') {
-    color = '#F59E0B'; // amber for stable
+    status = 'warning';
   } else if (gainGoal) {
-    // Goal is to gain weight
-    color = trend === 'up' ? '#10B981' : '#EF4444'; // up=good(green), down=bad(red)
+    status = trend === 'up' ? 'success' : 'danger';
   } else {
-    // Goal is to lose weight (default)
-    color = trend === 'down' ? '#10B981' : '#EF4444'; // down=good(green), up=bad(red)
+    status = trend === 'down' ? 'success' : 'danger';
   }
 
-  return { label, emoji, color };
+  const fallbackMap = { success: '#10B981', warning: '#F59E0B', danger: '#EF4444' };
+  const color = themeColors ? themeColors[status] : fallbackMap[status];
+
+  return { label, emoji, status, color };
 }
 
 /**
- * Get context-aware color for weight change.
- * Positive change is green when gaining is the goal, red when losing is the goal.
+ * Get context-aware status and color for weight change.
  */
-export function getChangeColor(change: number | null, gainGoal: boolean): string {
-  if (change === null || change === 0) return '#F59E0B'; // amber
+export function getChangeColor(change: number | null, gainGoal: boolean, themeColors?: ColorTokens): string {
+  if (change === null || change === 0) return themeColors ? themeColors.warning : '#F59E0B';
+  let status: StatusKey;
   if (gainGoal) {
-    return change > 0 ? '#10B981' : '#EF4444'; // gain goal: + is good, - is bad
+    status = change > 0 ? 'success' : 'danger';
+  } else {
+    status = change < 0 ? 'success' : 'danger';
   }
-  return change < 0 ? '#10B981' : '#EF4444'; // loss goal: - is good, + is bad
+  return themeColors ? themeColors[status] : (status === 'success' ? '#10B981' : '#EF4444');
 }
 
 /**
- * @deprecated Use getTrendInfo() for context-aware colors instead.
- * Kept for backward compatibility but should not be used in new code.
+ * Legacy compatibility export
  */
 export const TREND_INFO: Record<WeightTrend, { label: string; emoji: string; color: string }> = {
   down: { label: 'Turun', emoji: '⬇️', color: '#10B981' },

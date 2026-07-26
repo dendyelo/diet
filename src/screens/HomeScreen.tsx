@@ -6,47 +6,33 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  StatusBar,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { calculateEnergyBalance } from '../utils/calorieCalc';
-import { EnergyGauge } from '../components/EnergyGauge';
 import { EatingTimer } from '../components/EatingTimer';
-import { AICoachBanner } from '../components/AICoachBanner';
-import { AICoachChatModal } from '../components/AICoachChatModal';
+import { EnergyGauge } from '../components/EnergyGauge';
 import { HabitRings } from '../components/HabitRings';
 import { MealCard } from '../components/MealCard';
 import { SnackModal } from '../components/SnackModal';
 import { AddMealModal } from '../components/AddMealModal';
 import { EditMealModal } from '../components/EditMealModal';
-import { WelcomeBackModal } from '../components/WelcomeBackModal';
+import { AICoachBanner } from '../components/AICoachBanner';
+import { AICoachChatModal } from '../components/AICoachChatModal';
 import { GlassCard } from '../components/GlassCard';
-import { MealLog, NutritionData, TriggerType, FoodItemBreakdown } from '../types';
-import {
-  Utensils,
-  Cookie,
-  Droplet,
-  Footprints,
-  Sparkles,
-  PartyPopper,
-  MessageCircle,
-} from 'lucide-react-native';
+import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
+import { Droplet, Footprints, Utensils, Cookie, Sparkles } from 'lucide-react-native';
 
 export const HomeScreen: React.FC = () => {
   const {
     profile,
     mealLogs,
-    waterGlasses,
+    fastingState,
     steps,
-    elapsedSeconds,
-    showWelcomeBackModal,
-    dismissWelcomeBackModal,
+    waterGlasses,
+    energy,
     addMealLog,
     updateMealLog,
     deleteMealLog,
     addWaterGlass,
-    toggleCheatDay,
-    freshStartToday,
   } = useApp();
 
   const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
@@ -54,48 +40,38 @@ export const HomeScreen: React.FC = () => {
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
 
-  // Filter today's meal logs
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayLogs = mealLogs.filter((m) => m.timestamp.startsWith(todayStr));
+  const todayLogs = mealLogs.filter((log) => log.timestamp.startsWith(todayStr));
 
-  // Calculate total calories IN today
-  const totalCaloriesIn = todayLogs.reduce((sum, m) => sum + m.nutrition.calories, 0);
-  const snackCount = todayLogs.filter((m) => m.isSnack).length;
+  const totalCaloriesIn = todayLogs.reduce((acc, item) => acc + item.nutrition.calories, 0);
+  const snackCount = todayLogs.filter((item) => item.isSnack).length;
 
-  // Calculate Real-time Synchronized Energy Balance (Gradually accumulating BMR throughout the day)
-  const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps, new Date());
+  const elapsedSeconds = fastingState.elapsedSeconds || 0;
 
-  const handleAddSnackSubmit = (
+  const handleAddSnackSubmit = async (
     name: string,
     nutrition: NutritionData,
     trigger: TriggerType,
     itemsBreakdown?: FoodItemBreakdown[]
   ) => {
-    addMealLog(name, true, nutrition, trigger, undefined, 'ai', itemsBreakdown);
+    await addMealLog(name, true, nutrition, trigger, undefined, 'ai', itemsBreakdown);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#09090B" />
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
+        {/* Header Title Bar */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Halo, {profile.name || 'Teman Diet'} 👋</Text>
-            <Text style={styles.subGreeting}>
-              {profile.isCheatDay ? '🎉 Mode Cheat Day Aktif' : ' Target: Defisit Kalori & Habit Control'}
-            </Text>
+            <Text style={styles.greeting} numberOfLines={1}>Halo, {profile.name}! 👋</Text>
+            <Text style={styles.subGreeting} numberOfLines={1}>Jaga defisit kalori & habit kesehatanmu hari ini.</Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.cheatBtn, profile.isCheatDay && styles.cheatBtnActive]}
-            onPress={toggleCheatDay}
-          >
-            <PartyPopper size={16} color={profile.isCheatDay ? '#FFFFFF' : '#F59E0B'} />
-            <Text style={[styles.cheatBtnText, profile.isCheatDay && styles.cheatBtnTextActive]}>
-              {profile.isCheatDay ? 'Cheat Day' : 'Normal'}
-            </Text>
-          </TouchableOpacity>
+          {profile.isCheatDay && (
+            <View style={styles.cheatBadge}>
+              <Text style={styles.cheatBadgeText} numberOfLines={1}> cheat day 🍕</Text>
+            </View>
+          )}
         </View>
 
         {/* 1. Fasting Timer */}
@@ -135,13 +111,13 @@ export const HomeScreen: React.FC = () => {
         {/* Quick Action Bar */}
         <View style={styles.quickBar}>
           <TouchableOpacity style={styles.mealActionBtn} onPress={() => setShowAddMealModal(true)}>
-            <Utensils size={18} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>+ Makan Utama</Text>
+            <Utensils size={16} color="#FFFFFF" />
+            <Text style={styles.actionBtnText} numberOfLines={1}>+ Makan Utama</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.snackActionBtn} onPress={() => setShowSnackModal(true)}>
-            <Cookie size={18} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>🍿 Catat Ngemil</Text>
+            <Cookie size={16} color="#FFFFFF" />
+            <Text style={styles.actionBtnText} numberOfLines={1}>🍿 Catat Ngemil</Text>
           </TouchableOpacity>
         </View>
 
@@ -159,25 +135,25 @@ export const HomeScreen: React.FC = () => {
           {/* Water Widget */}
           <GlassCard style={styles.widgetCard}>
             <View style={styles.widgetHeader}>
-              <Droplet size={18} color="#3B82F6" />
-              <Text style={styles.widgetTitle}>HIDRASI AIR</Text>
+              <Droplet size={16} color="#3B82F6" />
+              <Text style={styles.widgetTitle} numberOfLines={1}>HIDRASI AIR</Text>
             </View>
-            <Text style={styles.widgetValue}>{waterGlasses} / 8 Gelas</Text>
+            <Text style={styles.widgetValue} numberOfLines={1}>{waterGlasses} / 8 Gelas</Text>
             <TouchableOpacity style={styles.widgetBtn} onPress={addWaterGlass}>
-              <Text style={styles.widgetBtnText}>+ 1 Gelas Air</Text>
+              <Text style={styles.widgetBtnText} numberOfLines={1}>+ 1 Gelas Air</Text>
             </TouchableOpacity>
           </GlassCard>
 
           {/* Steps Widget (100% Automated Sensor Sync) */}
           <GlassCard style={styles.widgetCard}>
             <View style={styles.widgetHeader}>
-              <Footprints size={18} color="#10B981" />
-              <Text style={styles.widgetTitle}>LANGKAH (PEDOMETER)</Text>
+              <Footprints size={16} color="#10B981" />
+              <Text style={styles.widgetTitle} numberOfLines={1}>LANGKAH KAKI</Text>
             </View>
-            <Text style={styles.widgetValue}>{steps.toLocaleString()} Steps</Text>
+            <Text style={styles.widgetValue} numberOfLines={1}>{steps.toLocaleString()} Steps</Text>
             <View style={styles.autoSensorBadge}>
               <View style={styles.sensorDot} />
-              <Text style={styles.autoSensorText}>Otomatis Sensor HP</Text>
+              <Text style={styles.autoSensorText} numberOfLines={1}>Sensor Otomatis</Text>
             </View>
           </GlassCard>
         </View>
@@ -187,7 +163,7 @@ export const HomeScreen: React.FC = () => {
           <GlassCard style={styles.adviceCard}>
             <View style={styles.adviceHeader}>
               <Sparkles size={16} color="#F59E0B" />
-              <Text style={styles.adviceTitle}>SARAN AKTIVITAS PINTAR</Text>
+              <Text style={styles.adviceTitle} numberOfLines={1}>SARAN AKTIVITAS PINTAR</Text>
             </View>
             <Text style={styles.adviceText}>
               Kalori masukmu hari ini sudah {totalCaloriesIn} kcal, tetapi langkah kaki baru {steps} steps.
@@ -197,7 +173,7 @@ export const HomeScreen: React.FC = () => {
         )}
 
         {/* Today's Meal Timeline Feed */}
-        <Text style={styles.feedTitle}>RIWAYAT MAKAN HARI INI ({todayLogs.length})</Text>
+        <Text style={styles.feedTitle} numberOfLines={1}>RIWAYAT MAKAN HARI INI ({todayLogs.length})</Text>
         {todayLogs.length === 0 ? (
           <GlassCard style={styles.emptyCard}>
             <Text style={styles.emptyText}>Belum ada makanan atau cemilan tercatat hari ini.</Text>
@@ -248,12 +224,6 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setEditingLog(null)}
         onSaveUpdate={(id, fields) => updateMealLog(id, fields)}
       />
-
-      <WelcomeBackModal
-        visible={showWelcomeBackModal}
-        onFreshStart={freshStartToday}
-        onDismiss={dismissWelcomeBackModal}
-      />
     </SafeAreaView>
   );
 };
@@ -268,7 +238,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#09090B',
   },
   scrollContent: {
-    padding: 16,
+    padding: 14,
     paddingBottom: 40,
   },
   header: {
@@ -283,59 +253,51 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   subGreeting: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 2,
   },
-  cheatBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  cheatBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderColor: '#F59E0B',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
   },
-  cheatBtnActive: {
-    backgroundColor: '#F59E0B',
-  },
-  cheatBtnText: {
-    fontSize: 12,
+  cheatBadgeText: {
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#F59E0B',
-  },
-  cheatBtnTextActive: {
-    color: '#FFFFFF',
+    textTransform: 'uppercase',
   },
   quickBar: {
     flexDirection: 'row',
     gap: 10,
-    marginVertical: 6,
+    marginVertical: 10,
   },
   mealActionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: '#3B82F6',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
   },
   snackActionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: '#F59E0B',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
   },
   actionBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
@@ -346,7 +308,7 @@ const styles = StyleSheet.create({
   },
   widgetCard: {
     flex: 1,
-    padding: 14,
+    padding: 12,
   },
   widgetHeader: {
     flexDirection: 'row',
@@ -356,9 +318,10 @@ const styles = StyleSheet.create({
   },
   widgetTitle: {
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: 'bold',
     color: 'rgba(255, 255, 255, 0.6)',
+    letterSpacing: 0.8,
+    flex: 1,
   },
   widgetValue: {
     fontSize: 16,
@@ -367,23 +330,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   widgetBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     paddingVertical: 6,
     borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
   widgetBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#60A5FA',
   },
   autoSensorBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingVertical: 6,
     paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 10,
     alignSelf: 'flex-start',
   },
@@ -395,12 +360,13 @@ const styles = StyleSheet.create({
   },
   autoSensorText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#10B981',
   },
   adviceCard: {
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
     backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    marginVertical: 8,
   },
   adviceHeader: {
     flexDirection: 'row',
@@ -409,22 +375,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   adviceTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#F59E0B',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   adviceText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    lineHeight: 18,
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 16,
   },
   feedTitle: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.1,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginTop: 16,
+    fontWeight: 'bold',
+    color: 'rgba(255, 255, 255, 0.5)',
+    letterSpacing: 1,
+    marginTop: 14,
     marginBottom: 8,
   },
   emptyCard: {
@@ -433,8 +399,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   emptySub: {
     fontSize: 11,

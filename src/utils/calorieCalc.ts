@@ -1,4 +1,4 @@
-import { UserProfile, ActivityLevel } from '../types';
+import { UserProfile, ActivityLevel, BodyType } from '../types';
 
 export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -8,9 +8,36 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   very_active: 1.9,
 };
 
+export const BODY_TYPE_MULTIPLIERS: Record<BodyType, number> = {
+  easy_gain: 0.93, // Slow metabolism / Endomorph (-7% adjustment)
+  normal: 1.0,    // Normal metabolism / Mesomorph
+  hard_gain: 1.07, // Fast metabolism / Ectomorph (+7% adjustment)
+};
+
+export const BODY_TYPE_INFO: Record<BodyType, { label: string; emoji: string; desc: string; color: string }> = {
+  easy_gain: {
+    label: 'Mudah Naik Berat (Lambat)',
+    emoji: '🐢',
+    desc: 'Metabolisme cenderung efisien menyimpan lemak. Target kalori disesuaikan presisi.',
+    color: '#F59E0B',
+  },
+  normal: {
+    label: 'Normal / Seimbang',
+    emoji: '⚖️',
+    desc: 'Metabolisme seimbang. Perhitungan BMR & TDEE standar presisi.',
+    color: '#10B981',
+  },
+  hard_gain: {
+    label: 'Susah Naik Berat (Cepat)',
+    emoji: '⚡',
+    desc: 'Metabolisme cenderung cepat membakar kalori (NEAT tinggi).',
+    color: '#60A5FA',
+  },
+};
+
 /**
  * Calculate Basal Metabolic Rate (BMR) for 24 hours using Mifflin-St Jeor Formula
- * Sanitized to realistic human physiological bounds (900 kcal - 2800 kcal).
+ * Fine-tuned with personalized Body Type Metabolic Adjustment.
  */
 export function calculateBMR(profile: UserProfile): number {
   let weightKg = Number(profile.weightKg);
@@ -29,16 +56,18 @@ export function calculateBMR(profile: UserProfile): number {
   }
 
   const gender = profile.gender === 'female' ? 'female' : 'male';
-
   const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
   const rawBMR = Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
 
-  return Math.min(2800, Math.max(900, rawBMR));
+  // Apply Body Type Metabolic Multiplier
+  const bodyMultiplier = BODY_TYPE_MULTIPLIERS[profile.bodyType || 'normal'] || 1.0;
+  const adjustedBMR = Math.round(rawBMR * bodyMultiplier);
+
+  return Math.min(2800, Math.max(900, adjustedBMR));
 }
 
 /**
  * Calculate Pro-Rated BMR accumulated up to the current minute of the day.
- * E.g., at 12:00 PM (noon), exactly 50% of the 24-hour BMR has been burned.
  */
 export function calculateElapsedBMR(dailyBMR: number, dateObj: Date = new Date()): number {
   const hours = dateObj.getHours();
@@ -62,8 +91,7 @@ export function calculateTDEE(profile: UserProfile): number {
 }
 
 /**
- * Calculate active calories burned directly from steps matching Apple Health / Garmin:
- * ~287 kcal per 10,000 steps for 70kg adult
+ * Calculate active calories burned directly from steps matching Apple Health / Garmin
  */
 export function calculateStepCalories(steps: number, weightKg: number): number {
   if (!steps || steps <= 0) return 0;
@@ -77,7 +105,6 @@ export function calculateStepCalories(steps: number, weightKg: number): number {
 
 /**
  * Real-time Synchronized Energy Balance
- * Calorie OUT = Pro-rated Elapsed BMR (Ticks minute-by-minute) + Active Step Calories
  */
 export function calculateEnergyBalance(
   profile: UserProfile,
@@ -89,9 +116,8 @@ export function calculateEnergyBalance(
   const elapsedBMR = calculateElapsedBMR(dailyBMR, dateObj);
   const stepCalories = calculateStepCalories(steps, profile.weightKg);
 
-  // Gradually accumulating BMR + Step Burn
   const totalCaloriesOut = elapsedBMR + stepCalories;
-  const netBalance = totalCaloriesOut - totalCaloriesIn; // Positive = Deficit, Negative = Surplus
+  const netBalance = totalCaloriesOut - totalCaloriesIn;
   const targetDeficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
 
   const isDeficit = netBalance >= 0;

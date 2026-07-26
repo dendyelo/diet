@@ -9,10 +9,11 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { calculateBMR, calculateTDEE } from '../utils/calorieCalc';
+import { calculateBMR, calculateTDEE, BODY_TYPE_INFO } from '../utils/calorieCalc';
 import { getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
-import { Key, Save, CheckCircle2, Wifi, Sparkles } from 'lucide-react-native';
+import { BodyType } from '../types';
+import { Key, Save, CheckCircle2, Wifi, Activity } from 'lucide-react-native';
 
 export const ProfileScreen: React.FC = () => {
   const { profile, updateProfile } = useApp();
@@ -23,13 +24,14 @@ export const ProfileScreen: React.FC = () => {
   const [height, setHeight] = useState<string>(profile.heightCm.toString());
   const [weight, setWeight] = useState<string>(profile.weightKg.toString());
   const [targetWeight, setTargetWeight] = useState<string>(profile.targetWeightKg.toString());
+  const [bodyType, setBodyType] = useState<BodyType>(profile.bodyType || 'normal');
   const [targetDeficit, setTargetDeficit] = useState<string>(profile.targetDeficitKcal.toString());
-  const [bedtime, setBedtime] = useState<string>(profile.bedtimeHour.toString());
+  const [fastingTarget, setFastingTarget] = useState<string>((profile.fastingTargetHours || 16).toString());
   const [apiKey, setApiKey] = useState<string>(profile.geminiApiKey || '');
   const [savedMsg, setSavedMsg] = useState<string>('');
 
-  const bmr = calculateBMR(profile);
-  const tdee = calculateTDEE(profile);
+  const bmr = calculateBMR({ ...profile, weightKg: Number(weight) || 70, heightCm: Number(height) || 170, age: Number(age) || 26, gender, bodyType });
+  const tdee = calculateTDEE({ ...profile, weightKg: Number(weight) || 70, heightCm: Number(height) || 170, age: Number(age) || 26, gender, bodyType });
   const aiStatus = getAIStatus(apiKey);
 
   const handleSave = async () => {
@@ -38,6 +40,7 @@ export const ProfileScreen: React.FC = () => {
     const parsedWeight = Math.min(250, Math.max(30, parseFloat(weight) || 70));
     const parsedTargetWeight = Math.min(250, Math.max(30, parseFloat(targetWeight) || 65));
     const parsedDeficit = Math.min(1500, Math.max(100, parseInt(targetDeficit, 10) || 500));
+    const parsedFastingTarget = Math.min(24, Math.max(8, parseInt(fastingTarget, 10) || 16));
 
     await updateProfile({
       name: name.trim() || 'Teman Diet',
@@ -46,12 +49,13 @@ export const ProfileScreen: React.FC = () => {
       heightCm: parsedHeight,
       weightKg: parsedWeight,
       targetWeightKg: parsedTargetWeight,
+      bodyType,
       targetDeficitKcal: parsedDeficit,
-      bedtimeHour: parseInt(bedtime, 10) || 23,
+      fastingTargetHours: parsedFastingTarget,
       geminiApiKey: apiKey.trim(),
     });
 
-    setSavedMsg('✓ Pengaturan profil & BMR berhasil diperbarui!');
+    setSavedMsg('✓ Pengaturan profil & metabolisme berhasil diperbarui!');
     setTimeout(() => setSavedMsg(''), 3000);
   };
 
@@ -60,7 +64,7 @@ export const ProfileScreen: React.FC = () => {
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.screenTitle} numberOfLines={1}>PROFIL & PENGATURAN ENERGI</Text>
         <Text style={styles.screenSub}>
-          Konfigurasi data fisik untuk kalkulasi presisi BMR, TDEE, dan API Key Gemini AI.
+          Konfigurasi tipe metabolisme & data fisik untuk kalkulasi presisi BMR, TDEE, dan AI.
         </Text>
 
         {savedMsg !== '' && (
@@ -85,9 +89,51 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
+        {/* 3 Tipe Metabolisme Berat Badan Selector */}
+        <GlassCard>
+          <View style={styles.headerRow}>
+            <Activity size={16} color="#F59E0B" />
+            <Text style={styles.sectionHeader} numberOfLines={1}>TIPE METABOLISME TUBUH</Text>
+          </View>
+
+          <View style={styles.bodyTypeGrid}>
+            {(['easy_gain', 'normal', 'hard_gain'] as BodyType[]).map((typeKey) => {
+              const info = BODY_TYPE_INFO[typeKey];
+              const isSelected = bodyType === typeKey;
+              return (
+                <TouchableOpacity
+                  key={typeKey}
+                  style={[
+                    styles.bodyTypeCard,
+                    isSelected && {
+                      backgroundColor: info.color + '20',
+                      borderColor: info.color,
+                    },
+                  ]}
+                  onPress={() => setBodyType(typeKey)}
+                >
+                  <Text style={styles.bodyTypeEmoji}>{info.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.bodyTypeLabel,
+                      isSelected && { color: info.color, fontWeight: 'bold' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {info.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.bodyTypeDesc}>
+            💡 {BODY_TYPE_INFO[bodyType].desc}
+          </Text>
+        </GlassCard>
+
         {/* Profile Inputs */}
         <GlassCard>
-          <Text style={styles.sectionHeader} numberOfLines={1}>PROFIL FISIK</Text>
+          <Text style={styles.sectionHeader} numberOfLines={1}>PROFIL FISIK & TARGET</Text>
 
           <Text style={styles.label} numberOfLines={1}>NAMA PANGGILAN</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} />
@@ -133,16 +179,6 @@ export const ProfileScreen: React.FC = () => {
 
           <View style={styles.grid2}>
             <View style={styles.gridItem}>
-              <Text style={styles.label} numberOfLines={1}>TARGET BERAT (KG)</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                value={targetWeight}
-                onChangeText={setTargetWeight}
-                maxLength={4}
-              />
-            </View>
-            <View style={styles.gridItem}>
               <Text style={styles.label} numberOfLines={1}>TARGET DEFISIT (KCAL)</Text>
               <TextInput
                 style={styles.input}
@@ -150,6 +186,16 @@ export const ProfileScreen: React.FC = () => {
                 value={targetDeficit}
                 onChangeText={setTargetDeficit}
                 maxLength={4}
+              />
+            </View>
+            <View style={styles.gridItem}>
+              <Text style={styles.label} numberOfLines={1}>TARGET PUASA (JAM)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                value={fastingTarget}
+                onChangeText={setFastingTarget}
+                maxLength={2}
               />
             </View>
           </View>
@@ -174,7 +220,7 @@ export const ProfileScreen: React.FC = () => {
           </View>
 
           <Text style={styles.hint}>
-            Masukkan API Key Gemini AI milik Anda (Gratis dari Google AI Studio) untuk mengaktifkan Mode Online Cloud.
+            Masukkan API Key Gemini AI milik Anda (Gratis dari Google AI Studio) untuk mengaktifkan obrolan AI Coach Cloud.
           </Text>
           <TextInput
             style={styles.input}
@@ -268,13 +314,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 10,
   },
   sectionHeader: {
     fontSize: 11,
     fontWeight: 'bold',
     color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 0.8,
+  },
+  bodyTypeGrid: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 10,
+  },
+  bodyTypeCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  bodyTypeEmoji: {
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  bodyTypeLabel: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+  bodyTypeDesc: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    lineHeight: 16,
   },
   statusBanner: {
     flexDirection: 'row',

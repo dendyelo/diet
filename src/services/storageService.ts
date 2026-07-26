@@ -17,8 +17,10 @@ export const DEFAULT_PROFILE: UserProfile = {
   weightKg: 70,
   targetWeightKg: 65,
   activityLevel: 'light',
+  bodyType: 'normal',
   targetDeficitKcal: 500,
   bedtimeHour: 23,
+  fastingTargetHours: 16,
   lastMealTimestamp: new Date().toISOString(),
   geminiApiKey: '',
   isCheatDay: false,
@@ -31,7 +33,7 @@ export async function loadUserProfile(): Promise<UserProfile> {
       const parsed = JSON.parse(data);
       const profile: UserProfile = { ...DEFAULT_PROFILE, ...parsed };
 
-      // Sanitize loaded profile values from any accidental typos/overflows
+      // Sanitize loaded profile values
       if (typeof profile.weightKg !== 'number' || profile.weightKg < 30 || profile.weightKg > 250) {
         profile.weightKg = DEFAULT_PROFILE.weightKg;
       }
@@ -40,6 +42,9 @@ export async function loadUserProfile(): Promise<UserProfile> {
       }
       if (typeof profile.age !== 'number' || profile.age < 10 || profile.age > 100) {
         profile.age = DEFAULT_PROFILE.age;
+      }
+      if (!['easy_gain', 'normal', 'hard_gain'].includes(profile.bodyType)) {
+        profile.bodyType = 'normal';
       }
 
       return profile;

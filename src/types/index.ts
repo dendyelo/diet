@@ -10,6 +10,8 @@ export interface TriggerOption {
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 
+export type BodyType = 'easy_gain' | 'normal' | 'hard_gain';
+
 export interface UserProfile {
   name: string;
   age: number;
@@ -18,8 +20,10 @@ export interface UserProfile {
   weightKg: number;
   targetWeightKg: number;
   activityLevel: ActivityLevel;
+  bodyType: BodyType; // easy_gain | normal | hard_gain
   targetDeficitKcal: number; // e.g. 500 kcal
   bedtimeHour: number; // 24-hr format, e.g. 23 (11 PM)
+  fastingTargetHours: number; // e.g. 16 hours
   lastMealTimestamp: string; // ISO String
   geminiApiKey: string;
   isCheatDay: boolean;

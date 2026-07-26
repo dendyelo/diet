@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { GlassCard } from './GlassCard';
 import { generateAICoachMessageWithAI } from '../services/aiService';
-import { Sparkles, MessageCircle, Utensils, Cookie, Droplet, RefreshCw } from 'lucide-react-native';
+import { Sparkles, MessageCircle, RefreshCw } from 'lucide-react-native';
 
 interface AICoachBannerProps {
   elapsedSeconds: number;
@@ -12,9 +12,6 @@ interface AICoachBannerProps {
   waterGlasses: number;
   userName: string;
   userApiKey?: string;
-  onOpenAddMeal: () => void;
-  onOpenSnack: () => void;
-  onAddWater: () => void;
   onOpenChat: () => void;
 }
 
@@ -26,9 +23,6 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
   waterGlasses,
   userName,
   userApiKey,
-  onOpenAddMeal,
-  onOpenSnack,
-  onAddWater,
   onOpenChat,
 }) => {
   const fastingHours = Math.floor(elapsedSeconds / 3600);
@@ -105,157 +99,94 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
     <GlassCard style={styles.bannerContainer}>
       <View style={styles.headerRow}>
         <View style={styles.aiBadge}>
-          <Sparkles size={12} color="#10B981" />
-          <Text style={styles.aiBadgeText} numberOfLines={1}>
-            GEMINI AI HEALTH COACH 🟢
-          </Text>
+          <Sparkles size={13} color="#10B981" />
+          <Text style={styles.aiBadgeText} numberOfLines={1}>AI HEALTH COACH</Text>
         </View>
 
-        <View style={styles.rightIcons}>
+        <View style={styles.rightGroup}>
           {userApiKey && (
             <TouchableOpacity onPress={fetchAICoachGreeting} disabled={loadingAI} style={styles.refreshBtn}>
               {loadingAI ? (
                 <ActivityIndicator size="small" color="#10B981" />
               ) : (
-                <RefreshCw size={14} color="rgba(255, 255, 255, 0.5)" />
+                <RefreshCw size={13} color="rgba(255, 255, 255, 0.4)" />
               )}
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.chatHeaderBtn} onPress={onOpenChat}>
-            <MessageCircle size={14} color="#10B981" />
-            <Text style={styles.chatHeaderBtnText} numberOfLines={1}>Chat Coach</Text>
+          <TouchableOpacity style={styles.chatPillBtn} onPress={onOpenChat}>
+            <MessageCircle size={13} color="#10B981" />
+            <Text style={styles.chatPillText} numberOfLines={1}>Tanya AI</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <Text style={styles.coachMessage}>{displayMessage}</Text>
-      <Text style={styles.questionPrompt}>{displayQuestion}</Text>
-
-      {/* Interactive Quick Answer Buttons */}
-      <View style={styles.actionGrid}>
-        <TouchableOpacity style={[styles.actionBtn, styles.btnChat]} onPress={onOpenChat}>
-          <MessageCircle size={13} color="#FFFFFF" />
-          <Text style={styles.btnText} numberOfLines={1}>💬 Chat AI</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.actionBtn, styles.btnMeal]} onPress={onOpenAddMeal}>
-          <Utensils size={13} color="#FFFFFF" />
-          <Text style={styles.btnText} numberOfLines={1}>🥗 Makan</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.actionBtn, styles.btnSnack]} onPress={onOpenSnack}>
-          <Cookie size={13} color="#FFFFFF" />
-          <Text style={styles.btnText} numberOfLines={1}>🍿 Ngemil</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.actionBtn, styles.btnWater]} onPress={onAddWater}>
-          <Droplet size={13} color="#FFFFFF" />
-          <Text style={styles.btnText} numberOfLines={1}>💧 Air</Text>
-        </TouchableOpacity>
-      </View>
+      {displayQuestion !== '' && (
+        <Text style={styles.questionPrompt}>{displayQuestion}</Text>
+      )}
     </GlassCard>
   );
 };
 
 const styles = StyleSheet.create({
   bannerContainer: {
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-    backgroundColor: 'rgba(16, 185, 129, 0.06)',
-    marginBottom: 12,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    marginBottom: 10,
     padding: 14,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-    gap: 6,
+    marginBottom: 10,
   },
-  rightIcons: {
+  rightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    flexShrink: 1,
+    gap: 5,
   },
   aiBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#10B981',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
   refreshBtn: {
-    padding: 4,
+    padding: 2,
   },
-  chatHeaderBtn: {
+  chatPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
   },
-  chatHeaderBtnText: {
-    fontSize: 10,
+  chatPillText: {
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#10B981',
   },
   coachMessage: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#FFFFFF',
-    lineHeight: 18,
-    fontWeight: '600',
+    lineHeight: 19,
   },
   questionPrompt: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#34D399',
-    marginTop: 4,
-    marginBottom: 10,
+    marginTop: 6,
     fontWeight: 'bold',
     fontStyle: 'italic',
-  },
-  actionGrid: {
-    flexDirection: 'row',
-    gap: 6,
-    width: '100%',
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 7,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-  },
-  btnChat: {
-    backgroundColor: '#10B981',
-  },
-  btnMeal: {
-    backgroundColor: '#3B82F6',
-  },
-  btnSnack: {
-    backgroundColor: '#F59E0B',
-  },
-  btnWater: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  btnText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
   },
 });

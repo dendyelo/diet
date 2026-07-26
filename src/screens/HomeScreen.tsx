@@ -46,7 +46,6 @@ export const HomeScreen: React.FC = () => {
   const totalCaloriesIn = todayLogs.reduce((acc, item) => acc + (item.nutrition?.calories || 0), 0);
   const snackCount = todayLogs.filter((item) => item.isSnack).length;
 
-  // Optional chaining fix to prevent 'Cannot read property elapsedSeconds of undefined'
   const elapsedSeconds = fastingState?.elapsedSeconds || 0;
 
   const handleAddSnackSubmit = async (
@@ -81,7 +80,7 @@ export const HomeScreen: React.FC = () => {
           onEditTimePress={() => setShowAddMealModal(true)}
         />
 
-        {/* 2. Interactive AI Health Coach Proactive Banner */}
+        {/* 2. Sleek Minimalist AI Health Coach Banner */}
         <AICoachBanner
           elapsedSeconds={elapsedSeconds}
           caloriesIn={totalCaloriesIn}
@@ -90,9 +89,6 @@ export const HomeScreen: React.FC = () => {
           waterGlasses={waterGlasses}
           userName={profile?.name || 'Teman Diet'}
           userApiKey={profile?.geminiApiKey}
-          onOpenAddMeal={() => setShowAddMealModal(true)}
-          onOpenSnack={() => setShowSnackModal(true)}
-          onAddWater={addWaterGlass}
           onOpenChat={() => setShowChatModal(true)}
         />
 
@@ -113,7 +109,7 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.quickBar}>
           <TouchableOpacity style={styles.mealActionBtn} onPress={() => setShowAddMealModal(true)}>
             <Utensils size={16} color="#FFFFFF" />
-            <Text style={styles.actionBtnText} numberOfLines={1}>+ Makan Utama</Text>
+            <Text style={styles.actionBtnText} numberOfLines={1}>+ Catat Makanan</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.snackActionBtn} onPress={() => setShowSnackModal(true)}>
@@ -178,7 +174,7 @@ export const HomeScreen: React.FC = () => {
         {todayLogs.length === 0 ? (
           <GlassCard style={styles.emptyCard}>
             <Text style={styles.emptyText}>Belum ada makanan atau cemilan tercatat hari ini.</Text>
-            <Text style={styles.emptySub}>Klik "+ Makan Utama" atau "🍿 Catat Ngemil" di atas.</Text>
+            <Text style={styles.emptySub}>Klik "+ Catat Makanan" atau "🍿 Catat Ngemil" di atas.</Text>
           </GlassCard>
         ) : (
           todayLogs.map((log) => (
@@ -275,7 +271,7 @@ const styles = StyleSheet.create({
   quickBar: {
     flexDirection: 'row',
     gap: 10,
-    marginVertical: 10,
+    marginVertical: 8,
   },
   mealActionBtn: {
     flex: 1,

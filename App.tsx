@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Alert } from 'react-native';
 import {
   AppProvider,
   useProfile,
@@ -7,11 +7,11 @@ import {
   useWeight,
   useHealth,
   useAI,
+  useTheme,
 } from './src/context/AppContext';
 import { LivingTimelineHome } from './src/screens/LivingTimelineHome';
 import { ProgressHubScreen } from './src/screens/ProgressHubScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { LoggerScreen } from './src/screens/LoggerScreen';
 import { QuickAddMealModal } from './src/components/QuickAddMealModal';
 import { AddWeightModal } from './src/components/AddWeightModal';
 import { AICoachChatModal } from './src/components/AICoachChatModal';
@@ -33,8 +33,8 @@ const MainNavigator: React.FC = () => {
   const { waterGlasses, steps, fastingState, addWaterGlass, resetFastingTimer } = useHealth();
   const { weightLogs, addWeightLog } = useWeight();
   const { userApiKey, parseFoodNutrition } = useAI();
+  const { colors, isDark } = useTheme();
 
-  // Point 4 & Point 5: Safe Fasting action with explicit confirmation alert
   const handleSelectQuickAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
     switch (action) {
       case 'food':
@@ -95,30 +95,34 @@ const MainNavigator: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#09090B" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <View style={styles.screenContainer}>{renderScreen()}</View>
 
-      {/* Simplified 4-Tab Bottom Navigation Bar with Prominent (+) Center Button */}
-      <View style={styles.tabBar}>
+      {/* Simplified 4-Tab Bottom Navigation Bar with Dynamic Theme Support */}
+      <View style={[styles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.divider }]}>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('home')}>
-          <Home size={20} color={activeTab === 'home' ? '#10B981' : 'rgba(255, 255, 255, 0.4)'} />
-          <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>Home</Text>
+          <Home size={20} color={activeTab === 'home' ? colors.primary : colors.textTertiary} />
+          <Text style={[styles.tabLabel, { color: activeTab === 'home' ? colors.primary : colors.textTertiary }]}>Home</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('progress')}>
-          <TrendingUp size={20} color={activeTab === 'progress' ? '#10B981' : 'rgba(255, 255, 255, 0.4)'} />
-          <Text style={[styles.tabLabel, activeTab === 'progress' && styles.tabLabelActive]}>Progress</Text>
+          <TrendingUp size={20} color={activeTab === 'progress' ? colors.primary : colors.textTertiary} />
+          <Text style={[styles.tabLabel, { color: activeTab === 'progress' ? colors.primary : colors.textTertiary }]}>Progress</Text>
         </TouchableOpacity>
 
         {/* Center Prominent (+) Action Button */}
-        <TouchableOpacity style={styles.plusCenterBtn} onPress={() => setShowQuickActionMenu(true)} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.plusCenterBtn, { backgroundColor: colors.primary, borderColor: colors.background }]}
+          onPress={() => setShowQuickActionMenu(true)}
+          activeOpacity={0.85}
+        >
           <Plus size={26} color="#FFFFFF" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('profile')}>
-          <User size={20} color={activeTab === 'profile' ? '#10B981' : 'rgba(255, 255, 255, 0.4)'} />
-          <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>Profil</Text>
+          <User size={20} color={activeTab === 'profile' ? colors.primary : colors.textTertiary} />
+          <Text style={[styles.tabLabel, { color: activeTab === 'profile' ? colors.primary : colors.textTertiary }]}>Profil</Text>
         </TouchableOpacity>
       </View>
 
@@ -154,7 +158,7 @@ const MainNavigator: React.FC = () => {
         lastWeight={latestWeight}
       />
 
-      {/* AI Coach Chat Modal (opened only when user explicitly taps 'Tanya Coach') */}
+      {/* AI Coach Chat Modal */}
       <AICoachChatModal
         visible={showAICoachChat}
         onClose={() => setShowAICoachChat(false)}
@@ -183,16 +187,13 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#09090B',
   },
   screenContainer: {
     flex: 1,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#121215',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     paddingVertical: 10,
     paddingBottom: 20,
     alignItems: 'center',
@@ -207,24 +208,14 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -20,
     borderWidth: 3,
-    borderColor: '#09090B',
     elevation: 8,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
   },
   tabLabel: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.4)',
-  },
-  tabLabelActive: {
-    color: '#10B981',
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });

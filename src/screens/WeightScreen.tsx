@@ -2,13 +2,12 @@ import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { useProfile, useWeight } from '../context/AppContext';
-import { GlassCard } from '../components/GlassCard';
+import { useProfile, useWeight, useTheme } from '../context/AppContext';
+import { Surface } from '../components/Surface';
 import { WeightChart } from '../components/WeightChart';
 import { AddWeightModal } from '../components/AddWeightModal';
 import { EditWeightModal } from '../components/EditWeightModal';
@@ -17,7 +16,6 @@ import {
   buildWeightSummary,
   prepareChartData,
   prepareMAChartData,
-  getLatestWeight,
   getTrendInfo,
   getChangeColor,
 } from '../utils/weightAnalytics';
@@ -39,6 +37,7 @@ function formatDateID(isoString: string) {
 export const WeightScreen: React.FC = () => {
   const { profile } = useProfile();
   const { weightLogs, addWeightLog, updateWeightLog, deleteWeightLog } = useWeight();
+  const { colors, spacing, radius, typography } = useTheme();
 
   const [chartPeriod, setChartPeriod] = useState<7 | 30 | 90>(30);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -58,211 +57,121 @@ export const WeightScreen: React.FC = () => {
   );
 
   const maChartData = useMemo(
-    () => prepareMAChartData(weightLogs, chartPeriod, 7),
+    () => prepareMAChartData(weightLogs, chartPeriod),
     [weightLogs, chartPeriod]
   );
 
-  const sortedLogs = useMemo(
-    () =>
-      [...weightLogs]
-        .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
-        .slice(0, 20),
-    [weightLogs]
-  );
+  const latestW = summary.latestWeight;
 
-  // Context-aware display info
-  const trendInfo = useMemo(
-    () => getTrendInfo(summary.trend, summary.isGainGoal),
-    [summary.trend, summary.isGainGoal]
-  );
-
-  const changeColor = useMemo(
-    () => getChangeColor(summary.changeFromStart, summary.isGainGoal),
-    [summary.changeFromStart, summary.isGainGoal]
-  );
-
-  const lastWeight = getLatestWeight(weightLogs);
-  const isOnlyLog = weightLogs.length <= 1;
-
-  const handleEdit = (log: WeightLog) => {
+  const handleOpenEdit = (log: WeightLog) => {
     setSelectedLog(log);
     setShowEditModal(true);
   };
 
-  const handleAddSave = async (weightKg: number, note?: string) => {
-    await addWeightLog(weightKg, note);
-    setShowAddModal(false);
-  };
-
-  const handleEditSave = async (id: string, updatedFields: { weightKg?: number; note?: string }) => {
-    await updateWeightLog(id, updatedFields);
-    setShowEditModal(false);
-    setSelectedLog(null);
-  };
-
-  const handleDelete = async (id: string): Promise<boolean> => {
-    const deleted = await deleteWeightLog(id);
-    if (deleted) {
-      setShowEditModal(false);
-      setSelectedLog(null);
-    }
-    return deleted;
-  };
-
-  const renderHistoryDiff = (index: number) => {
-    if (index === sortedLogs.length - 1) return null;
-    const current = sortedLogs[index].weightKg;
-    const previous = sortedLogs[index + 1].weightKg;
-    const diff = Math.round((current - previous) * 10) / 10;
-
-    const diffColor = getChangeColor(diff, summary.isGainGoal);
-
-    return (
-      <Text style={[styles.diffText, { color: diff === 0 ? 'rgba(255,255,255,0.4)' : diffColor }]}>
-        {diff > 0 ? '+' : ''}{diff === 0 ? '0' : diff.toFixed(1)} kg
-      </Text>
-    );
-  };
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.sm, paddingBottom: 100 }}>
         {/* Header */}
-        <Text style={styles.headerTitle} numberOfLines={1}>PELACAKAN BERAT BADAN</Text>
-        <Text style={styles.headerSubtitle}>Pantau progres berat badan dan tren Anda</Text>
+        <View style={{ marginBottom: spacing.xs }}>
+          <Text style={{ ...typography.h1, color: colors.textPrimary }}>Pelacakan Berat Badan</Text>
+          <Text style={{ ...typography.caption, color: colors.textTertiary, marginTop: 2 }}>Pantau progres dan tren berat badan Anda</Text>
+        </View>
 
-        {/* Summary Card */}
-        <GlassCard>
-          <View style={styles.sectionHeader}>
-            <Scale size={16} color="#60A5FA" />
-            <Text style={styles.sectionTitle}>RINGKASAN BERAT</Text>
+        {/* Ringkasan Berat */}
+        <Surface style={{ padding: spacing.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md }}>
+            <Scale size={16} color={colors.primary} />
+            <Text style={{ ...typography.caption, fontWeight: '700', color: colors.primaryText, textTransform: 'uppercase' }}>
+              Ringkasan Berat
+            </Text>
           </View>
 
-          <View style={styles.grid2}>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>BERAT TERBARU</Text>
-              <Text style={[styles.statValue, { color: '#FFFFFF' }]}>
-                {summary.latestWeight !== null ? summary.latestWeight.toFixed(1) : '-'}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
+            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>BERAT TERBARU</Text>
+              <Text style={{ ...typography.h1, color: colors.textPrimary, marginTop: 4 }}>
+                {latestW !== null ? `${latestW.toFixed(1)} kg` : '-'}
               </Text>
-              <Text style={styles.statSub}>kg</Text>
             </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>PERUBAHAN</Text>
-              <Text style={[styles.statValue, { color: changeColor }]}>
-                {summary.changeFromStart !== null
-                  ? `${summary.changeFromStart > 0 ? '+' : ''}${summary.changeFromStart.toFixed(1)}`
-                  : '-'}
+
+            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>PERUBAHAN</Text>
+              <Text style={{ ...typography.h1, color: getChangeColor(summary.changeFromStart, true), marginTop: 4 }}>
+                {summary.changeFromStart !== null ? `${summary.changeFromStart > 0 ? '+' : ''}${summary.changeFromStart.toFixed(1)} kg` : '-'}
               </Text>
-              <Text style={styles.statSub}>kg dari awal</Text>
             </View>
           </View>
 
-          <View style={styles.grid2}>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>MA-7 HARI</Text>
-              <Text style={[styles.statValue, { color: '#22D3EE' }]}>
-                {summary.movingAverage7 !== null ? summary.movingAverage7.toFixed(1) : '-'}
-              </Text>
-              <Text style={styles.statSub}>kg rata-rata</Text>
+          {/* Progres Target */}
+          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: 4 }}>Progres Menuju Target ({targetKg} kg)</Text>
+          <View style={{ height: 8, backgroundColor: colors.surfaceElevated, borderRadius: 4, overflow: 'hidden' }}>
+            <View style={{ height: '100%', backgroundColor: colors.primary, width: `${Math.min(100, Math.max(0, summary.progressPercent))}%` }} />
+          </View>
+        </Surface>
+
+        {/* Chart Card */}
+        <Surface style={{ padding: spacing.md }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Activity size={16} color={colors.primary} />
+              <Text style={{ ...typography.caption, fontWeight: '700', color: colors.primaryText, textTransform: 'uppercase' }}>Grafik Tren</Text>
             </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>TREN</Text>
-              <Text style={[styles.statValue, { color: trendInfo.color }]}>
-                {trendInfo.emoji}
-              </Text>
-              <Text style={[styles.statSub, { color: trendInfo.color }]}>{trendInfo.label}</Text>
+
+            <View style={{ flexDirection: 'row', backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, padding: 2 }}>
+              {([7, 30, 90] as const).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm - 4, backgroundColor: chartPeriod === p ? colors.primary : 'transparent' }}
+                  onPress={() => setChartPeriod(p)}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: chartPeriod === p ? '#FFFFFF' : colors.textTertiary }}>{p}H</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressLabel}>Progres Menuju {targetKg} kg</Text>
-            <View style={styles.progressBarWrapper}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${summary.progressPercent}%` }]} />
-              </View>
-              <Text style={styles.progressText}>{summary.progressPercent}%</Text>
-            </View>
-          </View>
-        </GlassCard>
+          <WeightChart dataPoints={chartData} maDataPoints={maChartData} targetKg={targetKg} />
+        </Surface>
 
-        {/* Chart Section */}
-        <GlassCard>
-          <View style={styles.sectionHeader}>
-            <Activity size={16} color="#34D399" />
-            <Text style={styles.sectionTitle}>GRAFIK TREN</Text>
-          </View>
-
-          {/* Period Selector */}
-          <View style={styles.tabContainer}>
-            {([7, 30, 90] as const).map((period) => (
-              <TouchableOpacity
-                key={period}
-                style={[styles.tab, chartPeriod === period && styles.tabActive]}
-                onPress={() => setChartPeriod(period)}
-              >
-                <Text style={[styles.tabText, chartPeriod === period && styles.tabTextActive]}>
-                  {period}H
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <WeightChart
-            dataPoints={chartData}
-            maDataPoints={maChartData}
-            targetKg={targetKg}
-          />
-        </GlassCard>
-
-        {/* Add Button */}
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)}>
-          <Plus size={20} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Catat Berat Badan</Text>
+        {/* Catat Berat Button */}
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: radius.md }}
+          onPress={() => setShowAddModal(true)}
+        >
+          <Plus size={18} color="#FFFFFF" />
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>Catat Berat Badan</Text>
         </TouchableOpacity>
 
-        {/* History */}
-        <GlassCard>
-          <View style={styles.sectionHeader}>
-            <Scale size={16} color="#F472B6" />
-            <Text style={styles.sectionTitle}>RIWAYAT PENCATATAN</Text>
-          </View>
+        {/* Riwayat */}
+        <Surface style={{ padding: spacing.md }}>
+          <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
+            Riwayat Pencatatan
+          </Text>
 
-          {sortedLogs.length > 0 ? (
-            sortedLogs.map((log, index) => (
-              <TouchableOpacity
-                key={log.id}
-                style={styles.historyRow}
-                onPress={() => handleEdit(log)}
-              >
-                <View style={styles.historyLeft}>
-                  <Text style={styles.historyDate}>{formatDateID(log.recordedAt)}</Text>
-                  {log.note ? (
-                    <Text style={styles.historyNote} numberOfLines={1}>{log.note}</Text>
-                  ) : null}
-                </View>
-                <View style={styles.historyRight}>
-                  {renderHistoryDiff(index)}
-                  <Text style={styles.historyWeight}>{log.weightKg.toFixed(1)} kg</Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Scale size={40} color="rgba(255,255,255,0.2)" />
-              <Text style={styles.emptyText}>Belum ada data berat badan</Text>
-              <Text style={styles.emptySubText}>Tekan tombol di atas untuk mulai mencatat</Text>
-            </View>
-          )}
-        </GlassCard>
+          {weightLogs.slice(0, 20).map((log) => (
+            <TouchableOpacity
+              key={log.id}
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider }}
+              onPress={() => handleOpenEdit(log)}
+            >
+              <View>
+                <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>{formatDateID(log.recordedAt)}</Text>
+                {log.note ? <Text style={{ ...typography.caption, color: colors.textTertiary, fontStyle: 'italic', marginTop: 2 }}>{log.note}</Text> : null}
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>{log.weightKg.toFixed(1)} kg</Text>
+            </TouchableOpacity>
+          ))}
+        </Surface>
       </ScrollView>
 
-      {/* Modals */}
       <AddWeightModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSave={handleAddSave}
-        lastWeight={lastWeight}
+        onSave={(wKg, note) => {
+          addWeightLog(wKg, note);
+          setShowAddModal(false);
+        }}
+        lastWeight={latestW}
       />
 
       <EditWeightModal
@@ -271,205 +180,22 @@ export const WeightScreen: React.FC = () => {
           setShowEditModal(false);
           setSelectedLog(null);
         }}
-        onSave={handleEditSave}
-        onDelete={handleDelete}
+        onSave={(id, updated) => {
+          updateWeightLog(id, updated);
+          setShowEditModal(false);
+          setSelectedLog(null);
+        }}
+        onDelete={async (id) => {
+          const res = await deleteWeightLog(id);
+          if (res) {
+            setShowEditModal(false);
+            setSelectedLog(null);
+          }
+          return res;
+        }}
         weightLog={selectedLog}
-        isOnlyLog={isOnlyLog}
+        isOnlyLog={weightLogs.length <= 1}
       />
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#09090B',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#09090B',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
-    letterSpacing: 0.8,
-  },
-  grid2: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  statLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 0.8,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 4,
-    color: '#FFFFFF',
-  },
-  statSub: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.4)',
-    marginTop: 2,
-  },
-  progressContainer: {
-    marginTop: 4,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  progressLabel: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 8,
-  },
-  progressBarWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  progressTrack: {
-    flex: 1,
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3B82F6',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
-    minWidth: 36,
-    textAlign: 'right',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 14,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 6,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  tabActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  tabText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 8,
-    marginVertical: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  historyLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  historyDate: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  historyNote: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  historyRight: {
-    alignItems: 'flex-end',
-  },
-  diffText: {
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  historyWeight: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 28,
-    gap: 6,
-  },
-  emptyText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  emptySubText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-});

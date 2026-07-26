@@ -3,7 +3,6 @@ import {
   Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -11,8 +10,8 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { MealLog, NutritionData } from '../types';
-import { Sparkles, Utensils, Clock, Plus, X } from 'lucide-react-native';
-import { createLocalId } from '../utils/id';
+import { Sparkles, Clock, Plus, X } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface QuickAddMealModalProps {
   visible: boolean;
@@ -29,6 +28,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
   recentMeals,
   onParseAI,
 }) => {
+  const { colors, spacing, radius, typography } = useTheme();
   const [inputText, setInputText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [quickCalories, setQuickCalories] = useState<string>('');
@@ -114,32 +114,72 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.75)', justifyContent: 'flex-end' }}>
           <TouchableWithoutFeedback>
-            <View style={styles.sheetContainer}>
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: radius.lg,
+                borderTopRightRadius: radius.lg,
+                padding: spacing.md,
+                maxHeight: '80%',
+                borderWidth: 1,
+                borderColor: colors.divider,
+              }}
+            >
               {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.sheetTitle}>Catat Makanan Cepat</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                  <X size={20} color="rgba(255, 255, 255, 0.7)" />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: spacing.md,
+                  paddingBottom: spacing.sm,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.divider,
+                }}
+              >
+                <Text style={{ ...typography.h2, color: colors.textPrimary }}>Catat Makanan Cepat</Text>
+                <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+                  <X size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
                 {/* AI Text Input */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>Ketik / Bicara Makanan</Text>
-                  <View style={styles.inputRow}>
+                <View style={{ gap: spacing.xs }}>
+                  <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Ketik / Bicara Makanan
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <TextInput
-                      style={styles.textInput}
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.surfaceElevated,
+                        borderRadius: radius.md,
+                        borderWidth: 1,
+                        borderColor: colors.divider,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        color: colors.textPrimary,
+                        fontSize: 13,
+                      }}
                       placeholder="misal: Nasi uduk komplit + telur"
-                      placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                      placeholderTextColor={colors.textTertiary}
                       value={inputText}
                       onChangeText={setInputText}
                       onSubmitEditing={handleSubmitAI}
                     />
                     <TouchableOpacity
-                      style={[styles.submitBtn, (!inputText.trim() || loading) && styles.submitBtnDisabled]}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: (!inputText.trim() || loading) ? 0.4 : 1,
+                      }}
                       onPress={handleSubmitAI}
                       disabled={!inputText.trim() || loading}
                     >
@@ -154,21 +194,35 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
 
                 {/* 1-Tap Duplicate Recent Meals */}
                 {uniqueRecentMeals.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>1-Tap Duplikat Makanan Terakhir</Text>
-                    <View style={styles.recentGrid}>
+                  <View style={{ gap: spacing.xs }}>
+                    <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      1-Tap Duplikat Makanan Terakhir
+                    </Text>
+                    <View style={{ gap: spacing.xs }}>
                       {uniqueRecentMeals.map((meal) => (
                         <TouchableOpacity
                           key={meal.id}
-                          style={styles.recentChip}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: spacing.sm,
+                            backgroundColor: colors.primarySubtle,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderRadius: radius.sm,
+                            borderWidth: 1,
+                            borderColor: colors.primarySubtle,
+                          }}
                           onPress={() => handleDuplicateRecent(meal)}
                           activeOpacity={0.7}
                         >
-                          <Clock size={12} color="#10B981" />
-                          <Text style={styles.recentName} numberOfLines={1}>
+                          <Clock size={12} color={colors.primary} />
+                          <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary }} numberOfLines={1}>
                             {meal.name}
                           </Text>
-                          <Text style={styles.recentCal}>{meal.nutrition.calories} kcal</Text>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primaryText }}>
+                            {meal.nutrition.calories} kcal
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -176,24 +230,45 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                 )}
 
                 {/* Quick Calories Input */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionLabel}>Input Kalori Langsung</Text>
-                  <View style={styles.inputRow}>
+                <View style={{ gap: spacing.xs }}>
+                  <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Input Kalori Langsung
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <TextInput
-                      style={styles.textInput}
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.surfaceElevated,
+                        borderRadius: radius.md,
+                        borderWidth: 1,
+                        borderColor: colors.divider,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        color: colors.textPrimary,
+                        fontSize: 13,
+                      }}
                       placeholder="Jumlah kalori (misal: 450)"
-                      placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                      placeholderTextColor={colors.textTertiary}
                       keyboardType="number-pad"
                       value={quickCalories}
                       onChangeText={setQuickCalories}
                     />
                     <TouchableOpacity
-                      style={[styles.quickCalBtn, !quickCalories.trim() && styles.submitBtnDisabled]}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: colors.primary,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: radius.md,
+                        opacity: !quickCalories.trim() ? 0.4 : 1,
+                      }}
                       onPress={handleQuickCalories}
                       disabled={!quickCalories.trim()}
                     >
                       <Plus size={18} color="#FFFFFF" />
-                      <Text style={styles.quickCalText}>Tambah</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Tambah</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -205,115 +280,3 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    backgroundColor: '#18181B',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '80%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  scrollContent: {
-    gap: 16,
-  },
-  section: {
-    gap: 8,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 13,
-  },
-  submitBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnDisabled: {
-    opacity: 0.4,
-  },
-  recentGrid: {
-    gap: 8,
-  },
-  recentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  recentName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  recentCal: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#34D399',
-  },
-  quickCalBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#10B981',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-  },
-  quickCalText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-});

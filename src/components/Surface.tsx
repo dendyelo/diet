@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewProps } from 'react-native';
-import { theme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 export interface SurfaceProps extends ViewProps {
   children: React.ReactNode;
@@ -13,11 +13,19 @@ export const Surface: React.FC<SurfaceProps> = ({
   style,
   ...props
 }) => {
+  const { colors, radius, spacing } = useTheme();
+
   return (
     <View
       style={[
-        styles.card,
-        variant === 'subtle' && styles.cardSubtle,
+        {
+          backgroundColor: variant === 'subtle' ? colors.surfaceElevated : colors.surface,
+          borderRadius: radius.lg,
+          borderWidth: 1,
+          borderColor: variant === 'subtle' ? colors.divider : colors.border,
+          padding: spacing.md,
+          marginVertical: spacing.xs,
+        },
         style,
       ]}
       {...props}
@@ -26,18 +34,3 @@ export const Surface: React.FC<SurfaceProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing.md,
-    marginVertical: theme.spacing.xs,
-  },
-  cardSubtle: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderColor: theme.colors.borderSubtle,
-  },
-});

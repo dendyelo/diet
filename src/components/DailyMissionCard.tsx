@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { CheckCircle2, Circle, Plus } from 'lucide-react-native';
 import { Surface } from './Surface';
-import { theme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 export interface DailyMissionItem {
   id: string;
@@ -29,6 +29,8 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
   todayMealsCount,
   onAddWater,
 }) => {
+  const { colors, spacing, radius, typography } = useTheme();
+
   const isDeficitAchieved = todayMealsCount > 0 && netDeficit >= 0;
 
   const missions: DailyMissionItem[] = [
@@ -59,28 +61,40 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
   const completedCount = missions.filter((m) => m.isCompleted).length;
 
   return (
-    <Surface style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Misi Hari Ini</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{completedCount}/4 Selesai</Text>
+    <Surface style={{ padding: spacing.md, marginVertical: spacing.xs }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+        <Text style={{ ...typography.h3, color: colors.textPrimary }}>Misi Hari Ini</Text>
+        <View
+          style={{
+            backgroundColor: colors.primarySubtle,
+            paddingHorizontal: spacing.sm + 2,
+            paddingVertical: spacing.xs,
+            borderRadius: radius.sm,
+            borderWidth: 1,
+            borderColor: colors.primarySubtle,
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>
+            {completedCount}/4 Selesai
+          </Text>
         </View>
       </View>
 
-      <View style={styles.missionList}>
+      <View style={{ gap: spacing.sm }}>
         {missions.map((mission) => (
-          <View key={mission.id} style={styles.missionItem}>
-            <View style={styles.missionLeft}>
+          <View key={mission.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, flex: 1 }}>
               {mission.isCompleted ? (
-                <CheckCircle2 size={18} color={theme.colors.primary} />
+                <CheckCircle2 size={18} color={colors.primary} />
               ) : (
-                <Circle size={18} color={theme.colors.textMuted} />
+                <Circle size={18} color={colors.textTertiary} />
               )}
               <Text
-                style={[
-                  styles.missionText,
-                  mission.isCompleted && styles.completedText,
-                ]}
+                style={{
+                  ...typography.body,
+                  color: mission.isCompleted ? colors.textTertiary : colors.textSecondary,
+                  textDecorationLine: mission.isCompleted ? 'line-through' : 'none',
+                }}
               >
                 {mission.title}
               </Text>
@@ -88,12 +102,22 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
 
             {mission.id === 'water' && waterGlasses < 8 && (
               <TouchableOpacity
-                style={styles.waterPlusBtn}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 2,
+                  backgroundColor: colors.primarySubtle,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.xs,
+                  borderRadius: radius.sm,
+                  borderWidth: 1,
+                  borderColor: colors.primarySubtle,
+                }}
                 onPress={onAddWater}
                 activeOpacity={0.7}
               >
-                <Plus size={12} color={theme.colors.primary} />
-                <Text style={styles.waterPlusText}>+1</Text>
+                <Plus size={12} color={colors.primary} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>+1</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -102,74 +126,3 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
     </Surface>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    padding: theme.spacing.md,
-    marginVertical: theme.spacing.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  badge: {
-    backgroundColor: theme.colors.primarySubtle,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.primaryText,
-  },
-  missionList: {
-    gap: 10,
-  },
-  missionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  missionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  missionText: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  completedText: {
-    color: theme.colors.textMuted,
-    textDecorationLine: 'line-through',
-  },
-  waterPlusBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: theme.colors.primarySubtle,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  waterPlusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.primaryText,
-  },
-});

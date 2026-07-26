@@ -3,12 +3,11 @@ import {
   Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from 'react-native';
 import { Utensils, Droplets, Scale, Timer, X } from 'lucide-react-native';
-import { theme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface QuickActionMenuProps {
   visible: boolean;
@@ -21,6 +20,8 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   onClose,
   onSelectAction,
 }) => {
+  const { colors, spacing, radius, typography } = useTheme();
+
   if (!visible) return null;
 
   const handleAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
@@ -33,57 +34,150 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   return (
     <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            paddingBottom: 90,
+          }}
+        >
           <TouchableWithoutFeedback>
-            <View style={styles.menuContainer}>
-              <Text style={styles.menuTitle}>Catat Sesuatu</Text>
+            <View
+              style={{
+                width: '90%',
+                backgroundColor: colors.surface,
+                borderRadius: radius.lg,
+                padding: spacing.md,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: colors.divider,
+              }}
+            >
+              <Text
+                style={{
+                  ...typography.caption,
+                  fontWeight: '700',
+                  color: colors.textTertiary,
+                  letterSpacing: 0.5,
+                  marginBottom: spacing.md,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Catat Sesuatu
+              </Text>
 
               {/* Quick Action Grid Buttons */}
-              <View style={styles.gridContainer}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                  gap: spacing.sm + 4,
+                  width: '100%',
+                }}
+              >
                 {/* Food */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: theme.colors.primarySubtle, borderColor: theme.colors.primary }]}
+                  style={{
+                    width: '48%',
+                    paddingVertical: 18,
+                    paddingHorizontal: 12,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    backgroundColor: colors.primarySubtle,
+                    borderColor: colors.primary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: spacing.sm,
+                  }}
                   onPress={() => handleAction('food')}
                   activeOpacity={0.7}
                 >
-                  <Utensils size={24} color={theme.colors.primary} />
-                  <Text style={[styles.actionLabel, { color: theme.colors.primaryText }]}>Makan</Text>
+                  <Utensils size={24} color={colors.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryText }}>Makan</Text>
                 </TouchableOpacity>
 
                 {/* Water */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: theme.colors.waterSubtle, borderColor: theme.colors.water }]}
+                  style={{
+                    width: '48%',
+                    paddingVertical: 18,
+                    paddingHorizontal: 12,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    backgroundColor: colors.infoSubtle,
+                    borderColor: colors.info,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: spacing.sm,
+                  }}
                   onPress={() => handleAction('water')}
                   activeOpacity={0.7}
                 >
-                  <Droplets size={24} color={theme.colors.water} />
-                  <Text style={[styles.actionLabel, { color: '#60A5FA' }]}>Air Minum</Text>
+                  <Droplets size={24} color={colors.info} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.info }}>Air Minum</Text>
                 </TouchableOpacity>
 
                 {/* Weight */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: theme.colors.weightSubtle, borderColor: theme.colors.weight }]}
+                  style={{
+                    width: '48%',
+                    paddingVertical: 18,
+                    paddingHorizontal: 12,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    backgroundColor: colors.weightSubtle,
+                    borderColor: colors.weight,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: spacing.sm,
+                  }}
                   onPress={() => handleAction('weight')}
                   activeOpacity={0.7}
                 >
-                  <Scale size={24} color={theme.colors.weight} />
-                  <Text style={[styles.actionLabel, { color: '#C084FC' }]}>Berat Badan</Text>
+                  <Scale size={24} color={colors.weight} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.weight }}>Berat Badan</Text>
                 </TouchableOpacity>
 
                 {/* Fasting */}
                 <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: theme.colors.warningSubtle, borderColor: theme.colors.warning }]}
+                  style={{
+                    width: '48%',
+                    paddingVertical: 18,
+                    paddingHorizontal: 12,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    backgroundColor: colors.warningSubtle,
+                    borderColor: colors.warning,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: spacing.sm,
+                  }}
                   onPress={() => handleAction('fasting')}
                   activeOpacity={0.7}
                 >
-                  <Timer size={24} color={theme.colors.warning} />
-                  <Text style={[styles.actionLabel, { color: '#FBBF24' }]}>Puasa</Text>
+                  <Timer size={24} color={colors.warning} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning }}>Puasa</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Close Button */}
-              <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-                <X size={20} color={theme.colors.textMuted} />
+              <TouchableOpacity
+                style={{
+                  marginTop: spacing.md,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.surfaceElevated,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={onClose}
+                activeOpacity={0.7}
+              >
+                <X size={20} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
@@ -92,60 +186,3 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 90,
-  },
-  menuContainer: {
-    width: '90%',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  menuTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: theme.spacing.md,
-    textTransform: 'uppercase',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-    width: '100%',
-  },
-  actionBtn: {
-    width: '48%',
-    paddingVertical: 18,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  actionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  closeBtn: {
-    marginTop: theme.spacing.md,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.colors.surfaceSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

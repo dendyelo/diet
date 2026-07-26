@@ -5,10 +5,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 interface AddWeightModalProps {
   visible: boolean;
@@ -23,6 +23,7 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
   onSave,
   lastWeight,
 }) => {
+  const { colors, spacing, radius, typography } = useTheme();
   const [weight, setWeight] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
@@ -41,7 +42,7 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
       setError('Berat badan harus antara 20 dan 300 kg');
       return;
     }
-    
+
     onSave(parsedWeight, note.trim() !== '' ? note.trim() : undefined);
     setWeight('');
     setNote('');
@@ -56,13 +57,15 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
       onRequestClose={onClose}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.overlay}>
-          <View style={styles.container}>
-            <Text style={styles.title}>⚖️ Catat Berat Badan</Text>
-            
-            <View style={styles.inputContainer}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: spacing.md }}>
+          <View style={{ width: '100%', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.divider }}>
+            <Text style={{ ...typography.h2, color: colors.textPrimary, marginBottom: spacing.lg, textAlign: 'center' }}>
+              ⚖️ Catat Berat Badan
+            </Text>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
               <TextInput
-                style={styles.weightInput}
+                style={{ fontSize: 32, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center', minWidth: 100 }}
                 value={weight}
                 onChangeText={(text) => {
                   setWeight(text);
@@ -70,35 +73,35 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
                 }}
                 keyboardType="decimal-pad"
                 placeholder={lastWeight ? lastWeight.toString() : '0.0'}
-                placeholderTextColor="rgba(255,255,255,0.3)"
+                placeholderTextColor={colors.textTertiary}
               />
-              <Text style={styles.unitText}>kg</Text>
+              <Text style={{ fontSize: 24, color: colors.textTertiary, marginLeft: 8, marginTop: 4 }}>kg</Text>
             </View>
-            
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            
+
+            {error ? <Text style={{ color: colors.danger, textAlign: 'center', marginBottom: spacing.md }}>{error}</Text> : null}
+
             <TextInput
-              style={styles.noteInput}
+              style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, padding: spacing.md, color: colors.textPrimary, fontSize: 16, minHeight: 80, textAlignVertical: 'top', marginBottom: spacing.lg }}
               value={note}
               onChangeText={setNote}
               placeholder="Catatan opsional..."
-              placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholderTextColor={colors.textTertiary}
               multiline
             />
-            
-            <View style={styles.buttonContainer}>
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={{ flex: 1, height: 48, borderRadius: radius.md, backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }}
                 onPress={onClose}
               >
-                <Text style={styles.cancelButtonText}>Batal</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 16, fontWeight: '600' }}>Batal</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.button, styles.saveButton]}
+                style={{ flex: 1, height: 48, borderRadius: radius.md, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}
                 onPress={handleSave}
               >
-                <Text style={styles.saveButtonText}>Simpan</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>Simpan</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -107,89 +110,3 @@ export const AddWeightModal: React.FC<AddWeightModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  container: {
-    width: '100%',
-    backgroundColor: 'rgba(24,24,27,0.95)',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  weightInput: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    minWidth: 100,
-  },
-  unitText: {
-    fontSize: 24,
-    color: 'rgba(255,255,255,0.6)',
-    marginLeft: 8,
-    marginTop: 4,
-  },
-  noteInput: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    marginBottom: 24,
-  },
-  errorText: {
-    color: '#EF4444',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  saveButton: {
-    backgroundColor: '#3B82F6',
-  },
-  cancelButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});

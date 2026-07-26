@@ -1,30 +1,34 @@
 import React, { ReactNode } from 'react';
+import { ThemeProvider, useTheme } from './ThemeContext';
 import { ProfileProvider, useProfile } from './ProfileContext';
 import { MealProvider, useMeals } from './MealContext';
 import { WeightProvider, useWeight } from './WeightContext';
 import { HealthProvider, useHealth } from './HealthContext';
 import { AIProvider, useAI } from './AIContext';
 
-export { useProfile, useMeals, useWeight, useHealth, useAI };
+export { ThemeProvider, useTheme, useProfile, useMeals, useWeight, useHealth, useAI };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
-    <ProfileProvider>
-      <MealProvider>
-        <WeightProvider>
-          <HealthProvider>
-            <AIProvider>{children}</AIProvider>
-          </HealthProvider>
-        </WeightProvider>
-      </MealProvider>
-    </ProfileProvider>
+    <ThemeProvider>
+      <ProfileProvider>
+        <MealProvider>
+          <WeightProvider>
+            <HealthProvider>
+              <AIProvider>{children}</AIProvider>
+            </HealthProvider>
+          </WeightProvider>
+        </MealProvider>
+      </ProfileProvider>
+    </ThemeProvider>
   );
 };
 
 /**
- * Backward-compatible facade hook aggregating all 5 modular contexts
+ * Backward-compatible facade hook aggregating all modular contexts
  */
 export const useApp = () => {
+  const themeCtx = useTheme();
   const profileCtx = useProfile();
   const mealCtx = useMeals();
   const weightCtx = useWeight();
@@ -32,6 +36,12 @@ export const useApp = () => {
   const aiCtx = useAI();
 
   return {
+    // ThemeContext
+    themeMode: themeCtx.themeMode,
+    setThemeMode: themeCtx.setThemeMode,
+    isDark: themeCtx.isDark,
+    colors: themeCtx.colors,
+
     // ProfileContext
     profile: profileCtx.profile,
     updateProfile: profileCtx.updateProfile,

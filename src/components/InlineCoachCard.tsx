@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Surface } from './Surface';
-import { theme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -20,94 +20,58 @@ export const InlineCoachCard: React.FC<InlineCoachCardProps> = ({
   onActionPress,
   onOpenChatPress,
 }) => {
-  // Smooth LayoutAnimation on advice change (Directive 4)
+  const { colors, radius, spacing, typography } = useTheme();
+
+  // Smooth LayoutAnimation on advice change
   useEffect(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   }, [adviceText]);
 
   return (
-    <Surface style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.titleText}>Coach</Text>
+    <Surface style={{ borderColor: colors.primarySubtle, marginVertical: spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+        <Text style={{ ...typography.caption, color: colors.primaryText, fontWeight: '700', letterSpacing: 0.3 }}>
+          Coach
+        </Text>
       </View>
 
-      <Text style={styles.adviceText}>{adviceText}</Text>
+      <Text style={{ ...typography.bodyMedium, color: colors.textPrimary, marginBottom: spacing.sm }}>
+        {adviceText}
+      </Text>
 
-      <View style={styles.btnRow}>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
         {actionLabel && onActionPress && (
           <TouchableOpacity
-            style={styles.primaryActionBtn}
+            style={{
+              backgroundColor: colors.primary,
+              paddingHorizontal: spacing.md - 2,
+              paddingVertical: spacing.xs + 4,
+              borderRadius: radius.sm,
+            }}
             onPress={onActionPress}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryActionText}>{actionLabel}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>{actionLabel}</Text>
           </TouchableOpacity>
         )}
 
         {onOpenChatPress && (
           <TouchableOpacity
-            style={styles.secondaryActionBtn}
+            style={{
+              backgroundColor: colors.surfaceElevated,
+              paddingHorizontal: spacing.md - 2,
+              paddingVertical: spacing.xs + 4,
+              borderRadius: radius.sm,
+              borderWidth: 1,
+              borderColor: colors.divider,
+            }}
             onPress={onOpenChatPress}
             activeOpacity={0.8}
           >
-            <Text style={styles.secondaryActionText}>Tanya Coach</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>Tanya Coach</Text>
           </TouchableOpacity>
         )}
       </View>
     </Surface>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    borderColor: 'rgba(16, 185, 129, 0.25)',
-    marginVertical: theme.spacing.sm,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  titleText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.primaryText,
-    letterSpacing: 0.3,
-  },
-  adviceText: {
-    fontSize: 14,
-    color: theme.colors.text,
-    fontWeight: '600',
-    lineHeight: 20,
-    marginBottom: theme.spacing.sm,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  primaryActionBtn: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: theme.radius.sm,
-  },
-  primaryActionText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  secondaryActionBtn: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  secondaryActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-});

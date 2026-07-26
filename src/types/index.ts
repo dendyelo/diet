@@ -33,6 +33,11 @@ export interface NutritionData {
   fiberGrams?: number;
 }
 
+export interface FoodItemBreakdown {
+  name: string;
+  calories: number;
+}
+
 export interface MealLog {
   id: string;
   timestamp: string; // ISO string
@@ -41,6 +46,7 @@ export interface MealLog {
   trigger?: TriggerType;
   nutrition: NutritionData;
   source: 'ai' | 'manual';
+  itemsBreakdown?: FoodItemBreakdown[];
   notes?: string;
 }
 

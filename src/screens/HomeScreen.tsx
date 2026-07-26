@@ -191,8 +191,8 @@ export const HomeScreen: React.FC = () => {
       <AddMealModal
         visible={showAddMealModal}
         onClose={() => setShowAddMealModal(false)}
-        onSaveMeal={(name, nutrition, customTimestamp) =>
-          addMealLog(name, false, nutrition, undefined, customTimestamp)
+        onSaveMeal={(name, nutrition, customTimestamp, itemsBreakdown) =>
+          addMealLog(name, false, nutrition, undefined, customTimestamp, 'ai', itemsBreakdown)
         }
         userApiKey={profile.geminiApiKey}
       />
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#F59E0B',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 16,
   },
   actionBtnText: {

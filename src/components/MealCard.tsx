@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MealLog } from '../types';
 import { TRIGGER_OPTIONS } from '../utils/habitAnalytics';
-import { Trash2, Cookie, Utensils } from 'lucide-react-native';
+import { Trash2, Cookie, Utensils, ChevronRight } from 'lucide-react-native';
 
 interface MealCardProps {
   log: MealLog;
@@ -41,8 +41,21 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onDelete }) => {
             <Text style={styles.time}>{timeStr}</Text>
           </View>
 
+          {/* Itemized Food Calorie Breakdown List */}
+          {log.itemsBreakdown && log.itemsBreakdown.length > 0 && (
+            <View style={styles.breakdownContainer}>
+              {log.itemsBreakdown.map((item, index) => (
+                <View key={index} style={styles.breakdownItem}>
+                  <Text style={styles.breakdownDot}>•</Text>
+                  <Text style={styles.breakdownName}>{item.name}:</Text>
+                  <Text style={styles.breakdownCal}>{item.calories} kcal</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={styles.macroRow}>
-            <Text style={styles.calBadge}>{log.nutrition.calories} kcal</Text>
+            <Text style={styles.calBadge}>Total: {log.nutrition.calories} kcal</Text>
             <Text style={styles.macroText}>P: {log.nutrition.proteinGrams}g</Text>
             <Text style={styles.macroText}>K: {log.nutrition.carbsGrams}g</Text>
             <Text style={styles.macroText}>L: {log.nutrition.fatGrams}g</Text>
@@ -69,7 +82,7 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onDelete }) => {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: 16,
@@ -99,7 +112,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   name: {
     fontSize: 14,
@@ -111,6 +124,35 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.4)',
+  },
+  breakdownContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 10,
+    padding: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginVertical: 2,
+  },
+  breakdownDot: {
+    color: '#3B82F6',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  breakdownName: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.85)',
+    flex: 1,
+  },
+  breakdownCal: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#60A5FA',
   },
   macroRow: {
     flexDirection: 'row',

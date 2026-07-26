@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserProfile, MealLog, TriggerType, NutritionData } from '../types';
+import { UserProfile, MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
 import {
   DEFAULT_PROFILE,
   loadUserProfile,
@@ -33,7 +33,8 @@ interface AppContextType {
     nutrition: NutritionData,
     trigger?: TriggerType,
     customTimestamp?: string,
-    source?: 'ai' | 'manual'
+    source?: 'ai' | 'manual',
+    itemsBreakdown?: FoodItemBreakdown[]
   ) => Promise<void>;
   deleteMealLog: (id: string) => Promise<void>;
   addWaterGlass: () => Promise<void>;
@@ -138,7 +139,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     nutrition: NutritionData,
     trigger?: TriggerType,
     customTimestamp?: string,
-    source: 'ai' | 'manual' = 'ai'
+    source: 'ai' | 'manual' = 'ai',
+    itemsBreakdown?: FoodItemBreakdown[]
   ) => {
     const timestamp = customTimestamp || new Date().toISOString();
     const newLog: MealLog = {
@@ -149,6 +151,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       trigger,
       nutrition,
       source,
+      itemsBreakdown,
     };
 
     const updatedLogs = [newLog, ...mealLogs];

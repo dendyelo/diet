@@ -1,4 +1,4 @@
-import { NutritionData } from '../types';
+import { NutritionData, FoodItemBreakdown } from '../types';
 
 export interface AIFoodResult {
   name: string;
@@ -7,6 +7,7 @@ export interface AIFoodResult {
   aiNotes?: string;
   isOnlineAI: boolean;
   portionMultiplier?: number;
+  itemsBreakdown: FoodItemBreakdown[];
 }
 
 export interface AIStatus {
@@ -25,99 +26,101 @@ export function getAIStatus(userApiKey?: string): AIStatus {
       isOnline: true,
       modeLabel: 'Gemini AI Cloud (Online)',
       color: '#10B981',
-      description: 'Presisi tinggi menggunakan model Gemini 2.5 Flash Cloud dengan analisis porsi.',
+      description: 'Presisi tinggi menggunakan model Gemini 2.5 Flash Cloud dengan analisis rincian per item.',
     };
   }
   return {
     isOnline: false,
     modeLabel: 'Smart Local Engine (Offline)',
     color: '#F59E0B',
-    description: 'Estimasi gizi akurat berbasis database porsi masakan Indonesia di memori HP.',
+    description: 'Estimasi gizi akurat berbasis rincian item kuliner lokal di memori HP.',
   };
 }
 
 /**
- * Smart Fallback Estimator for local Indonesian foods with refined portion accuracy
+ * Smart Fallback Estimator for local Indonesian foods with refined portion accuracy and itemized breakdown
  */
 function heuristicIndonesianFoodEstimator(foodText: string): AIFoodResult {
   const lower = foodText.toLowerCase();
 
-  let calories = 320;
-  let proteinGrams = 15;
-  let carbsGrams = 40;
-  let fatGrams = 10;
-  let fiberGrams = 3;
+  const items: FoodItemBreakdown[] = [];
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFat = 0;
 
-  // Portion multiplier detection
-  let multiplier = 1.0;
-  if (lower.includes('setengah') || lower.includes('1/2') || lower.includes('dikit') || lower.includes('kecil')) {
-    multiplier = 0.6;
-  } else if (lower.includes('2 porsi') || lower.includes('banyak') || lower.includes('double') || lower.includes('besar')) {
-    multiplier = 1.6;
+  // Split input by comma or 'pake' or '+' or 'dan'
+  const rawParts = foodText.split(/,|\+|\spake\s|\sdan\s/i).map((p) => p.trim()).filter(Boolean);
+
+  if (rawParts.length > 0) {
+    rawParts.forEach((part) => {
+      const pLower = part.toLowerCase();
+      let itemCal = 150;
+
+      if (pLower.includes('nasi')) {
+        itemCal = pLower.includes('setengah') ? 100 : 200;
+        totalCarbs += 44;
+        totalProtein += 4;
+      } else if (pLower.includes('telur')) {
+        itemCal = pLower.includes('goreng') || pLower.includes('dadar') ? 110 : 80;
+        totalProtein += 7;
+        totalFat += 7;
+      } else if (pLower.includes('ayam')) {
+        itemCal = pLower.includes('bakar') ? 220 : pLower.includes('goreng') ? 250 : 200;
+        totalProtein += 25;
+        totalFat += 10;
+      } else if (pLower.includes('tahu') || pLower.includes('tempe')) {
+        itemCal = 90;
+        totalProtein += 6;
+        totalFat += 5;
+      } else if (pLower.includes('sambal')) {
+        itemCal = 35;
+        totalFat += 3;
+      } else if (pLower.includes('sayur') || pLower.includes('sop') || pLower.includes('buncis')) {
+        itemCal = 65;
+        totalCarbs += 8;
+        totalProtein += 2;
+      } else if (pLower.includes('rendang')) {
+        itemCal = 240;
+        totalProtein += 18;
+        totalFat += 16;
+      } else if (pLower.includes('kerupuk')) {
+        itemCal = 60;
+        totalCarbs += 8;
+        totalFat += 3;
+      }
+
+      items.push({ name: part, calories: itemCal });
+      totalCalories += itemCal;
+    });
   }
 
-  if (lower.includes('padang') || lower.includes('rendang')) {
-    calories = 620;
-    proteinGrams = 28;
-    carbsGrams = 68;
-    fatGrams = 24;
-  } else if (lower.includes('soto') || lower.includes('sop')) {
-    calories = 340;
-    proteinGrams = 20;
-    carbsGrams = 30;
-    fatGrams = 12;
-  } else if (lower.includes('gorengan') || lower.includes('bakwan') || lower.includes('tahu isi')) {
-    calories = 140; // per potong
-    proteinGrams = 3;
-    carbsGrams = 16;
-    fatGrams = 8;
-  } else if (lower.includes('boba') || lower.includes('kopi manis') || lower.includes('boba milk')) {
-    calories = 360;
-    proteinGrams = 3;
-    carbsGrams = 58;
-    fatGrams = 12;
-  } else if (lower.includes('gado') || lower.includes('pecel') || lower.includes('salad')) {
-    calories = 290;
-    proteinGrams = 12;
-    carbsGrams = 28;
-    fatGrams = 14;
-    fiberGrams = 7;
-  } else if (lower.includes('ayam bakar') || lower.includes('ayam dada')) {
-    calories = 340;
-    proteinGrams = 35;
-    carbsGrams = 20;
-    fatGrams = 10;
-  } else if (lower.includes('nasi putih')) {
-    calories = 200; // 1 centong (150g)
-    proteinGrams = 4;
-    carbsGrams = 44;
-    fatGrams = 0.5;
-  } else if (lower.includes('buah') || lower.includes('apel') || lower.includes('pisang')) {
-    calories = 90;
-    proteinGrams = 1;
-    carbsGrams = 23;
-    fatGrams = 0;
-    fiberGrams = 3;
+  // Fallback if no parts matched
+  if (items.length === 0) {
+    items.push({ name: foodText, calories: 350 });
+    totalCalories = 350;
+    totalProtein = 15;
+    totalCarbs = 40;
+    totalFat = 10;
   }
-
-  // Apply portion multiplier
-  calories = Math.round(calories * multiplier);
-  proteinGrams = Math.round(proteinGrams * multiplier);
-  carbsGrams = Math.round(carbsGrams * multiplier);
-  fatGrams = Math.round(fatGrams * multiplier);
 
   return {
     name: foodText.trim(),
-    nutrition: { calories, proteinGrams, carbsGrams, fatGrams, fiberGrams },
+    nutrition: {
+      calories: totalCalories,
+      proteinGrams: Math.max(10, totalProtein),
+      carbsGrams: Math.max(15, totalCarbs),
+      fatGrams: Math.max(5, totalFat),
+    },
     confidence: 'medium',
-    aiNotes: `Estimasi gizi kuliner lokal (Porsi: ${multiplier}x).`,
+    aiNotes: 'Estimasi rincian per item kuliner lokal di HP.',
     isOnlineAI: false,
-    portionMultiplier: multiplier,
+    itemsBreakdown: items,
   };
 }
 
 /**
- * Estimate nutrition from food description using Gemini AI API with portion precision
+ * Estimate nutrition from food description using Gemini AI API with itemized breakdown per ingredient
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -134,18 +137,23 @@ export async function parseFoodNutritionWithAI(
   }
 
   try {
-    const prompt = `Anda adalah ahli gizi spesialis kuliner Indonesia & internasional dengan tingkat presisi tinggi.
+    const prompt = `Anda adalah ahli gizi spesialis kuliner Indonesia & internasional dengan presisi tinggi.
 Analisis deskripsi makanan/cemilan ini: "${cleanInput}".
-Perhatikan baik-baik porsi (misal 1 centong nasi = 200 kcal, setengah porsi = 0.5x, ayam bakar dada = 220 kcal, minyak goreng, gula manis).
+PISAHKAN setiap item makanan/lauk/minuman dan hitung kalori masing-masing secara rinci.
 Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
 {
-  "name": "nama makanan yang rapi",
-  "calories": 420,
-  "proteinGrams": 24,
+  "name": "nama gabungan makanan yang rapi",
+  "calories": 540,
+  "proteinGrams": 32,
   "carbsGrams": 48,
-  "fatGrams": 12,
+  "fatGrams": 18,
   "fiberGrams": 4,
-  "aiNotes": "catatan nutrisi presisi porsi 1 kalimat"
+  "itemsBreakdown": [
+    { "name": "Nasi Putih (1 centong)", "calories": 200 },
+    { "name": "Telur Dadar", "calories": 110 },
+    { "name": "Ayam Bakar Dada", "calories": 230 }
+  ],
+  "aiNotes": "catatan nutrisi presisi 1 kalimat"
 }`;
 
     const response = await fetch(
@@ -171,18 +179,29 @@ Kembalikan HANYA format JSON tanpa teks lain atau markdown codeblock formatting:
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
+
+      const items: FoodItemBreakdown[] = Array.isArray(parsed.itemsBreakdown)
+        ? parsed.itemsBreakdown.map((it: any) => ({
+            name: it.name || 'Item',
+            calories: Math.max(0, parseInt(it.calories, 10) || 100),
+          }))
+        : [{ name: cleanInput, calories: Math.max(0, parseInt(parsed.calories, 10) || 300) }];
+
+      const sumCalories = items.reduce((acc, it) => acc + it.calories, 0);
+
       return {
         name: parsed.name || cleanInput,
         nutrition: {
-          calories: Math.max(0, parseInt(parsed.calories, 10) || 300),
+          calories: sumCalories || Math.max(0, parseInt(parsed.calories, 10) || 300),
           proteinGrams: Math.max(0, parseInt(parsed.proteinGrams, 10) || 15),
           carbsGrams: Math.max(0, parseInt(parsed.carbsGrams, 10) || 40),
           fatGrams: Math.max(0, parseInt(parsed.fatGrams, 10) || 10),
           fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
         },
         confidence: 'high',
-        aiNotes: parsed.aiNotes || 'Dihitung presisi porsi oleh Gemini AI Cloud',
+        aiNotes: parsed.aiNotes || 'Rincian item dihitung presisi oleh Gemini AI Cloud',
         isOnlineAI: true,
+        itemsBreakdown: items,
       };
     }
   } catch (error) {

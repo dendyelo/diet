@@ -12,13 +12,18 @@ import {
   Platform,
 } from 'react-native';
 import { parseFoodNutritionWithAI } from '../services/aiService';
-import { NutritionData } from '../types';
+import { NutritionData, FoodItemBreakdown } from '../types';
 import { X, Sparkles, Clock, Utensils } from 'lucide-react-native';
 
 interface AddMealModalProps {
   visible: boolean;
   onClose: () => void;
-  onSaveMeal: (name: string, nutrition: NutritionData, customTimestamp?: string) => void;
+  onSaveMeal: (
+    name: string,
+    nutrition: NutritionData,
+    customTimestamp?: string,
+    itemsBreakdown?: FoodItemBreakdown[]
+  ) => void;
   userApiKey?: string;
 }
 
@@ -49,7 +54,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
       // Calculate timestamp based on back-dating selection
       const timestamp = new Date(Date.now() - selectedTimeOffset * 60 * 1000).toISOString();
 
-      onSaveMeal(result.name, result.nutrition, timestamp);
+      onSaveMeal(result.name, result.nutrition, timestamp, result.itemsBreakdown);
       setFoodText('');
       onClose();
     } catch (error) {
@@ -101,7 +106,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
             <Text style={styles.sectionLabel}>APA YANG ANDA MAKAN?</Text>
             <TextInput
               style={styles.textArea}
-              placeholder="Contoh: Nasi padang pake rendang, perkedel 1, dan daun singkong"
+              placeholder="Contoh: Nasi, telur dadar, ayam bakar, dan sambal"
               placeholderTextColor="rgba(255, 255, 255, 0.3)"
               multiline={true}
               numberOfLines={4}
@@ -109,7 +114,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
               onChangeText={setFoodText}
             />
             <Text style={styles.hintText}>
-              💡 AI akan otomatis menghitung estimasi Kalori, Karbo, Protein, dan Lemak.
+              💡 AI akan otomatis merinci kalori masing-masing item (nasi: x kcal, telur: x kcal, ayam: x kcal).
             </Text>
 
             {/* Submit Button */}

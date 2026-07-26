@@ -43,15 +43,17 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     async function initApiKey() {
-      // Auto-migrate legacy key from AsyncStorage if present
       const migratedKey = await migrateApiKeyFromAsyncStorage();
-      if (migratedKey) {
-        setUserApiKey(migratedKey);
-        setConnectionStatus('connected');
+      const targetKey = migratedKey || (await getGeminiApiKey());
+
+      if (targetKey && targetKey.trim().length > 0) {
+        setUserApiKey(targetKey);
+        setConnectionStatus('checking');
+        const realStatus = await testGeminiAPIConnection(targetKey);
+        setConnectionStatus(realStatus);
       } else {
-        const key = await getGeminiApiKey();
-        setUserApiKey(key);
-        setConnectionStatus(key ? 'connected' : 'not_configured');
+        setUserApiKey('');
+        setConnectionStatus('not_configured');
       }
     }
     initApiKey();

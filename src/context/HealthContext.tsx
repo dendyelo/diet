@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useProfile } from './ProfileContext';
 import { useMeals } from './MealContext';
 import {
@@ -6,10 +6,10 @@ import {
   saveWaterGlasses,
   loadStepRecord,
   saveStepRecord,
-  StepRecord,
 } from '../services/storageService';
 import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
 import { calculateEnergyBalance } from '../utils/calorieCalc';
+import { getLocalDateString } from '../utils/date';
 
 interface FastingState {
   elapsedSeconds: number;
@@ -52,13 +52,29 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { profile, updateProfile } = useProfile();
   const { totalCaloriesIn } = useMeals();
 
+  const [todayStr, setTodayStr] = useState<string>(getLocalDateString());
   const [waterGlasses, setWaterGlasses] = useState<number>(0);
   const [sensorSteps, setSensorSteps] = useState<number>(0);
   const [manualSteps, setManualSteps] = useState<number>(0);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState<boolean>(false);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const manualStepsRef = useRef<number>(manualSteps);
+  useEffect(() => {
+    manualStepsRef.current = manualSteps;
+  }, [manualSteps]);
+
+  // Daily Midnight Rollover Check (Check every 10 seconds)
+  useEffect(() => {
+    const checkDateRollover = () => {
+      const currentLocal = getLocalDateString();
+      if (currentLocal !== todayStr) {
+        setTodayStr(currentLocal);
+      }
+    };
+    const interval = setInterval(checkDateRollover, 10000);
+    return () => clearInterval(interval);
+  }, [todayStr]);
 
   // Initial load for water glasses & step record
   useEffect(() => {
@@ -81,7 +97,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     }
     initHealthData();
-  }, [profile.lastMealTimestamp]);
+  }, [todayStr, profile.lastMealTimestamp]);
 
   // Real-time Fasting Clock Timer tick (Every 1 second)
   useEffect(() => {
@@ -102,7 +118,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => clearInterval(interval);
   }, [profile.lastMealTimestamp]);
 
-  // Sync Pedometer sensor steps with StepRecord persistence
+  // Sync Pedometer sensor steps strictly with [todayStr] dependency
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
     let baseSteps = 0;
@@ -112,12 +128,12 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (status.isAvailable) {
         baseSteps = status.stepCount;
         setSensorSteps(baseSteps);
-        saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps });
+        saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps: manualStepsRef.current });
 
         sub = subscribeStepCount((sessionSteps) => {
           const totalSensor = baseSteps + sessionSteps;
           setSensorSteps(totalSensor);
-          saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps });
+          saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps: manualStepsRef.current });
         });
       }
     }
@@ -127,7 +143,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => {
       if (sub && sub.remove) sub.remove();
     };
-  }, [todayStr, manualSteps]);
+  }, [todayStr]);
 
   const addWaterGlass = async () => {
     setWaterGlasses((prevWater) => {

@@ -1,13 +1,36 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadStepRecord, loadMealLogs } from '../storageService';
+import { getLocalDateString, isSameLocalDay, getLatestMealTimestamp } from '../../utils/date';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
-describe('Storage Service & Migration Suite', () => {
+describe('Storage Service & Date Utility Suite', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
+  });
+
+  test('getLocalDateString returns YYYY-MM-DD matching local timezone', () => {
+    const testDate = new Date(2026, 6, 26, 23, 55, 0); // Local Date: July 26, 2026
+    const localStr = getLocalDateString(testDate);
+    expect(localStr).toBe('2026-07-26');
+  });
+
+  test('isSameLocalDay identifies same day correctly near midnight', () => {
+    const nightDate = new Date(2026, 6, 26, 23, 59, 59); // 11:59:59 PM Local
+    const noonDate = new Date(2026, 6, 26, 12, 0, 0);    // 12:00:00 PM Local
+    expect(isSameLocalDay(nightDate.toISOString(), noonDate)).toBe(true);
+  });
+
+  test('getLatestMealTimestamp returns latest timestamp or null when logs empty', () => {
+    const logs = [
+      { timestamp: '2026-07-26T10:00:00.000Z' },
+      { timestamp: '2026-07-26T14:30:00.000Z' },
+      { timestamp: '2026-07-26T08:15:00.000Z' },
+    ];
+    expect(getLatestMealTimestamp(logs)).toBe('2026-07-26T14:30:00.000Z');
+    expect(getLatestMealTimestamp([])).toBeNull();
   });
 
   test('loadStepRecord migrates legacy step count to StepRecord seamlessly', async () => {
@@ -27,7 +50,7 @@ describe('Storage Service & Migration Suite', () => {
       { id: '1', name: 'Nasi Goreng', nutrition: { calories: 450 } },
       { id: null, name: 'Invalid Log' },
       null,
-      { id: '3', name: 'Ayam Bakar' }, // missing nutrition
+      { id: '3', name: 'Ayam Bakar' },
     ]);
 
     await AsyncStorage.setItem('@habitdiet_meal_logs', rawCorruptedData);

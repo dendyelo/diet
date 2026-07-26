@@ -229,16 +229,17 @@ Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Ji
           'gemini-3.6-flash',
           'gemini-3.5-flash-lite',
           'gemini-3.1-flash-lite',
-          'gemini-3.1-flash-lite-preview',
-          'gemini-3-flash-preview',
-          'gemini-flash-latest',
-          'gemini-flash-lite-latest',
           'gemma-4-31b-it',
           'gemma-4-26b-a4b-it',
         ];
+
+        let attempts = 0;
         for (const model of modelsToTry) {
+          if (attempts >= 3) break;
+          attempts++;
+
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
           try {
             const response = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -258,8 +259,10 @@ Instruksi: Jawablah pertanyaan pengguna secara informatif, ramah, dan empati. Ji
               if (replyText) break;
             }
             if (response.status === 401 || response.status === 403) break;
+            if (response.status !== 429 && response.status < 500) break;
           } catch (fetchErr) {
-            console.warn(`Gemini Cloud chat for ${model} failed:`, fetchErr);
+            console.warn(`Gemini Cloud chat for ${model} failed (network/timeout):`, fetchErr);
+            break; // Stop immediately on network error
           } finally {
             clearTimeout(timeoutId);
           }

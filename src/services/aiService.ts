@@ -28,8 +28,7 @@ export interface AICoachResponse {
 }
 
 /**
- * 6 Verified Active Gemini & Gemma models for multi-model fallback chain.
- * Provides combined daily free quota across all model buckets.
+ * Verified active Gemini & Gemma models for fallback chain
  */
 const GEMINI_MODELS = [
   'gemini-2.5-flash',
@@ -44,6 +43,16 @@ const GEMINI_MODELS = [
   'gemma-4-31b-it',
   'gemma-4-26b-a4b-it',
 ];
+
+/**
+ * Maximum model attempts during rate-limit fallback to prevent excessive wait time
+ */
+const MAX_FALLBACK_ATTEMPTS = 3;
+
+/**
+ * Per-request timeout in milliseconds
+ */
+const REQUEST_TIMEOUT_MS = 8000;
 
 /**
  * Check Gemini AI Cloud API Connection Status dynamically
@@ -64,7 +73,7 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
       isOnline: true,
       modeLabel: 'Gemini Cloud AI (Terhubung 🟢)',
       color: '#10B981',
-      description: 'Terhubung ke Multi-Model Gemini Cloud dengan estimasi gizi tinggi.',
+      description: 'Terhubung ke Multi-Model Gemini Cloud untuk estimasi gizi cerdas.',
       connectionStatus: 'connected',
     };
   }
@@ -109,15 +118,19 @@ export function getAIStatus(userApiKey?: string, connectionStatus: AIConnectionS
 }
 
 /**
- * Test Real Connection to Gemini AI API (checks across verified models)
+ * Test Real Connection to Gemini AI API
  */
 export async function testGeminiAPIConnection(userApiKey: string): Promise<AIConnectionStatus> {
   const cleanKey = userApiKey.trim();
   if (!cleanKey) return 'not_configured';
 
+  let attempts = 0;
   for (const model of GEMINI_MODELS) {
+    if (attempts >= MAX_FALLBACK_ATTEMPTS) break;
+    attempts++;
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`,
@@ -137,8 +150,14 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
       if (response.status === 401 || response.status === 403) {
         return 'invalid_key';
       }
+      // If 429 or 5xx, continue loop up to MAX_FALLBACK_ATTEMPTS
+      if (response.status !== 429 && response.status < 500) {
+        return 'offline';
+      }
     } catch (error) {
-      console.warn(`Test connection error for ${model}:`, error);
+      // Network failure or timeout -> stop immediately! All models will fail if offline.
+      console.warn(`Test connection network error for ${model}:`, error);
+      return 'offline';
     } finally {
       clearTimeout(timeoutId);
     }
@@ -148,7 +167,9 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
 }
 
 /**
- * Estimate nutrition from food description using Gemini AI API with Multi-Model Fallback
+ * Estimate nutrition from food description using Gemini AI API with Smart Fallback
+ * Smart loop: Breaks IMMEDIATELY on network error / offline / timeout to avoid user lag.
+ * Only loops on HTTP 429 (rate limit) or 5xx (server error), up to max 3 attempts.
  */
 export async function parseFoodNutritionWithAI(
   foodInput: string,
@@ -187,9 +208,13 @@ Kembalikan HANYA format JSON valid tanpa markdown:
   "aiNotes": "Catatan gizi ringkas 1 kalimat"
 }`;
 
+    let attempts = 0;
     for (const model of GEMINI_MODELS) {
+      if (attempts >= MAX_FALLBACK_ATTEMPTS) break;
+      attempts++;
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
       try {
         const response = await fetch(
@@ -238,14 +263,20 @@ Kembalikan HANYA format JSON valid tanpa markdown:
 
         if (response.status === 401 || response.status === 403) {
           lastErrorReason = 'invalid_key';
-          break;
+          break; // Key invalid -> stop immediately
         }
         if (response.status === 429) {
           lastErrorReason = 'rate_limited';
+          // Continue to next model for 429 rate limit
+        } else if (response.status < 500) {
+          break; // Other 4xx error -> stop
         }
       } catch (error) {
+        // Network failure / offline / timeout -> STOP IMMEDIATELY!
+        // Do not waste time looping through models when offline.
         lastErrorReason = 'network_error';
-        console.warn(`Gemini Cloud API call for ${model} failed:`, error);
+        console.warn(`Gemini Cloud network/timeout error (${model}):`, error);
+        break;
       } finally {
         clearTimeout(timeoutId);
       }
@@ -267,6 +298,7 @@ Kembalikan HANYA format JSON valid tanpa markdown:
 
 /**
  * Generate Dynamic Creative AI Coach Greeting & Question using Gemini AI Cloud API
+ * Smart loop: Stops immediately on network error or max 3 attempts on rate limits.
  */
 export async function generateAICoachMessageWithAI(
   userData: {
@@ -303,9 +335,13 @@ Kembalikan HANYA format JSON valid:
   "recommendedAction": "meal"
 }`;
 
+    let attempts = 0;
     for (const model of GEMINI_MODELS) {
+      if (attempts >= MAX_FALLBACK_ATTEMPTS) break;
+      attempts++;
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
       try {
         const response = await fetch(
@@ -334,8 +370,10 @@ Kembalikan HANYA format JSON valid:
           }
         }
         if (response.status === 401 || response.status === 403) break;
+        if (response.status !== 429 && response.status < 500) break;
       } catch (err) {
         console.error(`Error generating AI Coach message with ${model}:`, err);
+        break; // Stop immediately on network error
       } finally {
         clearTimeout(timeoutId);
       }

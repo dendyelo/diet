@@ -24,10 +24,10 @@ import { Droplet, Footprints, Utensils, Cookie, Sparkles } from 'lucide-react-na
 export const HomeScreen: React.FC = () => {
   const {
     profile,
-    mealLogs,
+    mealLogs = [],
     fastingState,
-    steps,
-    waterGlasses,
+    steps = 0,
+    waterGlasses = 0,
     energy,
     addMealLog,
     updateMealLog,
@@ -41,12 +41,13 @@ export const HomeScreen: React.FC = () => {
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayLogs = mealLogs.filter((log) => log.timestamp.startsWith(todayStr));
+  const todayLogs = (mealLogs || []).filter((log) => log.timestamp && log.timestamp.startsWith(todayStr));
 
-  const totalCaloriesIn = todayLogs.reduce((acc, item) => acc + item.nutrition.calories, 0);
+  const totalCaloriesIn = todayLogs.reduce((acc, item) => acc + (item.nutrition?.calories || 0), 0);
   const snackCount = todayLogs.filter((item) => item.isSnack).length;
 
-  const elapsedSeconds = fastingState.elapsedSeconds || 0;
+  // Optional chaining fix to prevent 'Cannot read property elapsedSeconds of undefined'
+  const elapsedSeconds = fastingState?.elapsedSeconds || 0;
 
   const handleAddSnackSubmit = async (
     name: string,
@@ -63,13 +64,13 @@ export const HomeScreen: React.FC = () => {
         {/* Header Title Bar */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting} numberOfLines={1}>Halo, {profile.name}! 👋</Text>
+            <Text style={styles.greeting} numberOfLines={1}>Halo, {profile?.name || 'Teman Diet'}! 👋</Text>
             <Text style={styles.subGreeting} numberOfLines={1}>Jaga defisit kalori & habit kesehatanmu hari ini.</Text>
           </View>
 
-          {profile.isCheatDay && (
+          {profile?.isCheatDay && (
             <View style={styles.cheatBadge}>
-              <Text style={styles.cheatBadgeText} numberOfLines={1}> cheat day 🍕</Text>
+              <Text style={styles.cheatBadgeText} numberOfLines={1}>cheat day 🍕</Text>
             </View>
           )}
         </View>
@@ -84,11 +85,11 @@ export const HomeScreen: React.FC = () => {
         <AICoachBanner
           elapsedSeconds={elapsedSeconds}
           caloriesIn={totalCaloriesIn}
-          netDeficit={energy.netBalance}
+          netDeficit={energy?.netBalance || 0}
           steps={steps}
           waterGlasses={waterGlasses}
-          userName={profile.name}
-          userApiKey={profile.geminiApiKey}
+          userName={profile?.name || 'Teman Diet'}
+          userApiKey={profile?.geminiApiKey}
           onOpenAddMeal={() => setShowAddMealModal(true)}
           onOpenSnack={() => setShowSnackModal(true)}
           onAddWater={addWaterGlass}
@@ -98,14 +99,14 @@ export const HomeScreen: React.FC = () => {
         {/* 3. Live Synchronized Energy Balance Gauge */}
         <EnergyGauge
           caloriesIn={totalCaloriesIn}
-          caloriesOut={energy.totalCaloriesOut}
-          dailyBMR={energy.dailyBMR}
-          elapsedBMR={energy.elapsedBMR}
-          stepCalories={energy.stepCalories}
-          netBalance={energy.netBalance}
-          targetDeficit={energy.targetDeficit}
-          isDeficit={energy.isDeficit}
-          isCheatDay={profile.isCheatDay}
+          caloriesOut={energy?.totalCaloriesOut || 1600}
+          dailyBMR={energy?.dailyBMR || 1600}
+          elapsedBMR={energy?.elapsedBMR || 800}
+          stepCalories={energy?.stepCalories || 0}
+          netBalance={energy?.netBalance || 0}
+          targetDeficit={energy?.targetDeficit || 500}
+          isDeficit={energy?.isDeficit ?? true}
+          isCheatDay={profile?.isCheatDay}
         />
 
         {/* Quick Action Bar */}
@@ -123,7 +124,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* 4. Daily Habit Rings */}
         <HabitRings
-          percentageDeficit={energy.percentageToGoal}
+          percentageDeficit={energy?.percentageToGoal || 0}
           snackCount={snackCount}
           maxSnacksAllowed={2}
           waterGlasses={waterGlasses}
@@ -190,12 +191,12 @@ export const HomeScreen: React.FC = () => {
       <AICoachChatModal
         visible={showChatModal}
         onClose={() => setShowChatModal(false)}
-        userName={profile.name}
-        userApiKey={profile.geminiApiKey}
+        userName={profile?.name || 'Teman Diet'}
+        userApiKey={profile?.geminiApiKey}
         userContext={{
           fastingHours: Math.floor(elapsedSeconds / 3600),
           caloriesIn: totalCaloriesIn,
-          netDeficit: energy.netBalance,
+          netDeficit: energy?.netBalance || 0,
           steps,
           waterGlasses,
         }}
@@ -206,7 +207,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setShowSnackModal(false)}
         onSubmitSnack={handleAddSnackSubmit}
         onDrinkWater={addWaterGlass}
-        userApiKey={profile.geminiApiKey}
+        userApiKey={profile?.geminiApiKey}
       />
 
       <AddMealModal
@@ -215,7 +216,7 @@ export const HomeScreen: React.FC = () => {
         onSaveMeal={(name, nutrition, customTimestamp, itemsBreakdown) =>
           addMealLog(name, false, nutrition, undefined, customTimestamp, 'ai', itemsBreakdown)
         }
-        userApiKey={profile.geminiApiKey}
+        userApiKey={profile?.geminiApiKey}
       />
 
       <EditMealModal

@@ -13,7 +13,11 @@ import { useMeals, useAI } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { Sparkles, Utensils, Sliders, CheckCircle2, Wifi, AlertCircle } from 'lucide-react-native';
 
-export const LoggerScreen: React.FC = () => {
+interface LoggerScreenProps {
+  onDone?: () => void;
+}
+
+export const LoggerScreen: React.FC<LoggerScreenProps> = ({ onDone }) => {
   const { addMealLog } = useMeals();
   const { parseFoodNutrition, aiStatus, userApiKey } = useAI();
 

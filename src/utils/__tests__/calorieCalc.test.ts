@@ -2,6 +2,7 @@ import {
   calculateBMR,
   calculateElapsedBMR,
   calculateTDEE,
+  calculateTargetCalories,
   calculateStepCalories,
   calculateEnergyBalance,
   BODY_TYPE_MULTIPLIERS,
@@ -67,5 +68,13 @@ describe('Calorie Calculation Utility Suite', () => {
     const surplusResult = calculateEnergyBalance(MOCK_MALE_PROFILE, 2500, 0, noon);
     expect(surplusResult.isDeficit).toBe(false);
     expect(surplusResult.netBalance).toBeLessThan(0);
+  });
+
+  test('calculateTargetCalories applies deficit and cheat day correctly', () => {
+    const normalTarget = calculateTargetCalories(MOCK_MALE_PROFILE);
+    const cheatDayTarget = calculateTargetCalories({ ...MOCK_MALE_PROFILE, isCheatDay: true });
+
+    expect(normalTarget).toBe(calculateTDEE(MOCK_MALE_PROFILE) - 500);
+    expect(cheatDayTarget).toBe(calculateTDEE(MOCK_MALE_PROFILE));
   });
 });

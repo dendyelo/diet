@@ -1,27 +1,25 @@
-import React, { ReactNode } from 'react';
-import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, ViewProps } from 'react-native';
 
-interface GlassCardProps {
-  children: ReactNode;
-  style?: StyleProp<ViewStyle>;
+interface GlassCardProps extends ViewProps {
+  children: React.ReactNode;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ children, style }) => {
-  return <View style={[styles.card, style]}>{children}</View>;
+export const GlassCard: React.FC<GlassCardProps> = ({ children, style, ...props }) => {
+  return (
+    <View style={[styles.card, style]} {...props}>
+      {children}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 20,
+    backgroundColor: '#18181B',
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 18,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    marginVertical: 4,
   },
 });

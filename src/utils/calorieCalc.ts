@@ -90,6 +90,15 @@ export function calculateTDEE(profile: UserProfile): number {
 }
 
 /**
+ * Calculate target daily calorie intake after applying deficit
+ */
+export function calculateTargetCalories(profile: UserProfile): number {
+  const tdee = calculateTDEE(profile);
+  const deficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
+  return Math.max(1200, tdee - deficit);
+}
+
+/**
  * Calculate active calories burned directly from steps matching Apple Health / Garmin
  */
 export function calculateStepCalories(steps: number, weightKg: number): number {

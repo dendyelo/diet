@@ -16,8 +16,10 @@ import { HabitRings } from '../components/HabitRings';
 import { MealCard } from '../components/MealCard';
 import { SnackModal } from '../components/SnackModal';
 import { AddMealModal } from '../components/AddMealModal';
+import { EditMealModal } from '../components/EditMealModal';
 import { WelcomeBackModal } from '../components/WelcomeBackModal';
 import { GlassCard } from '../components/GlassCard';
+import { MealLog } from '../types';
 import {
   Utensils,
   Cookie,
@@ -37,15 +39,16 @@ export const HomeScreen: React.FC = () => {
     showWelcomeBackModal,
     dismissWelcomeBackModal,
     addMealLog,
+    updateMealLog,
     deleteMealLog,
     addWaterGlass,
-    resetFastingTimer,
     toggleCheatDay,
     freshStartToday,
   } = useApp();
 
   const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
   const [showAddMealModal, setShowAddMealModal] = useState<boolean>(false);
+  const [editingLog, setEditingLog] = useState<MealLog | null>(null);
 
   // Filter today's meal logs
   const todayStr = new Date().toISOString().split('T')[0];
@@ -175,7 +178,7 @@ export const HomeScreen: React.FC = () => {
           </GlassCard>
         ) : (
           todayLogs.map((log) => (
-            <MealCard key={log.id} log={log} onDelete={deleteMealLog} />
+            <MealCard key={log.id} log={log} onEdit={(item) => setEditingLog(item)} onDelete={deleteMealLog} />
           ))
         )}
       </ScrollView>
@@ -195,6 +198,13 @@ export const HomeScreen: React.FC = () => {
           addMealLog(name, false, nutrition, undefined, customTimestamp, 'ai', itemsBreakdown)
         }
         userApiKey={profile.geminiApiKey}
+      />
+
+      <EditMealModal
+        visible={editingLog !== null}
+        log={editingLog}
+        onClose={() => setEditingLog(null)}
+        onSaveUpdate={(id, fields) => updateMealLog(id, fields)}
       />
 
       <WelcomeBackModal
@@ -279,7 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#F59E0B',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 16,
   },
   actionBtnText: {

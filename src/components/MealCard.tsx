@@ -2,14 +2,15 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MealLog } from '../types';
 import { TRIGGER_OPTIONS } from '../utils/habitAnalytics';
-import { Trash2, Cookie, Utensils, ChevronRight } from 'lucide-react-native';
+import { Trash2, Cookie, Utensils, Edit3 } from 'lucide-react-native';
 
 interface MealCardProps {
   log: MealLog;
+  onEdit: (log: MealLog) => void;
   onDelete: (id: string) => void;
 }
 
-export const MealCard: React.FC<MealCardProps> = ({ log, onDelete }) => {
+export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => {
   const triggerInfo = log.trigger
     ? TRIGGER_OPTIONS.find((t) => t.type === log.trigger)
     : null;
@@ -72,9 +73,15 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onDelete }) => {
         </View>
       </View>
 
-      <TouchableOpacity onPress={() => onDelete(log.id)} style={styles.deleteBtn}>
-        <Trash2 size={16} color="rgba(255, 255, 255, 0.3)" />
-      </TouchableOpacity>
+      <View style={styles.actionsRow}>
+        <TouchableOpacity onPress={() => onEdit(log)} style={styles.actionBtn}>
+          <Edit3 size={16} color="#60A5FA" />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => onDelete(log.id)} style={styles.actionBtn}>
+          <Trash2 size={16} color="rgba(255, 255, 255, 0.3)" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -186,8 +193,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  deleteBtn: {
-    padding: 8,
-    marginLeft: 8,
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 6,
+  },
+  actionBtn: {
+    padding: 6,
   },
 });

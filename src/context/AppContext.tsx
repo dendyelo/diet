@@ -36,6 +36,7 @@ interface AppContextType {
     source?: 'ai' | 'manual',
     itemsBreakdown?: FoodItemBreakdown[]
   ) => Promise<void>;
+  updateMealLog: (id: string, updatedFields: Partial<MealLog>) => Promise<void>;
   deleteMealLog: (id: string) => Promise<void>;
   addWaterGlass: () => Promise<void>;
   addStepsManual: (addedSteps: number) => Promise<void>;
@@ -164,6 +165,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await saveUserProfile(updatedProfile);
   };
 
+  const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
+    const updatedLogs = mealLogs.map((log) => {
+      if (log.id === id) {
+        return { ...log, ...updatedFields };
+      }
+      return log;
+    });
+
+    setMealLogs(updatedLogs);
+    await saveMealLogs(updatedLogs);
+  };
+
   const deleteMealLog = async (id: string) => {
     const updatedLogs = mealLogs.filter((m) => m.id !== id);
     setMealLogs(updatedLogs);
@@ -217,6 +230,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dismissWelcomeBackModal,
         updateProfile,
         addMealLog,
+        updateMealLog,
         deleteMealLog,
         addWaterGlass,
         addStepsManual,

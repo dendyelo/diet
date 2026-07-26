@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Linking,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useProfile, useAI } from '../context/AppContext';
 import { calculateBMR, calculateTDEE, BODY_TYPE_INFO } from '../utils/calorieCalc';
@@ -18,7 +19,7 @@ import { Key, Save, CheckCircle2, Wifi, Activity, ExternalLink, RefreshCw, Trash
 
 export const ProfileScreen: React.FC = () => {
   const { profile, updateProfile } = useProfile();
-  const { userApiKey, aiStatus, connectionStatus, updateApiKey, deleteApiKey, testConnection } = useAI();
+  const { userApiKey, aiStatus, updateApiKey, deleteApiKey, testConnection } = useAI();
 
   const [name, setName] = useState<string>(profile.name);
   const [age, setAge] = useState<string>(profile.age.toString());
@@ -81,9 +82,14 @@ export const ProfileScreen: React.FC = () => {
       await updateApiKey(apiKeyInput.trim());
     }
 
-    setSavedMsg('✓ Pengaturan profil & SecureStore API key berhasil disimpan!');
+    setSavedMsg('✓ Pengaturan profil & API Key berhasil disimpan!');
     setTimeout(() => setSavedMsg(''), 3000);
   };
+
+  const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
+  const storageLabelText = isNative
+    ? 'Terenkripsi di SecureStore OS (Keychain/Keystore)'
+    : 'Penyimpanan Web Session (Non-Terenkripsi Web)';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -227,11 +233,11 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        {/* Gemini API Key (Encrypted SecureStore) */}
+        {/* Gemini API Key */}
         <GlassCard>
           <View style={styles.headerRow}>
             <Key size={16} color="#F59E0B" />
-            <Text style={styles.sectionHeader} numberOfLines={1}>GEMINI AI API KEY (SECURE STORE)</Text>
+            <Text style={styles.sectionHeader} numberOfLines={1}>GEMINI AI API KEY</Text>
           </View>
 
           {/* AI Status Banner Container */}
@@ -253,7 +259,7 @@ export const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
 
           <Text style={styles.hint}>
-            API Key Anda tersimpan terenkripsi di SecureStore OS.
+            Status Penyimpanan: <Text style={{ color: '#10B981', fontWeight: 'bold' }}>{storageLabelText}</Text>
           </Text>
           <TextInput
             style={styles.input}

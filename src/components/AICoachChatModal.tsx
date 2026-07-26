@@ -71,8 +71,9 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     const query = textToSend || inputText.trim();
     if (!query || loading) return;
 
+    const userMsgId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const userMsg: ChatMessage = {
-      id: Date.now().toString(),
+      id: userMsgId,
       sender: 'user',
       text: query,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -85,7 +86,6 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
     try {
       let replyText = '';
 
-      // If user has a Gemini API Key, try Cloud Conversational Chat AI
       if (userApiKey && userApiKey.trim() !== '') {
         const prompt = `Anda adalah Pakar Gizi, Personal Trainer & AI Health Coach pribadi bernama HabitDiet Coach.
 Karakter Anda: Sangat ramah, empati, bijak, hangat, humoris santai, dan paham kuliner Indonesia.
@@ -119,14 +119,14 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
         }
       }
 
-      // Smart Fail-Proof Engine for ANY food / nutrition query (Guaranteed 100% accurate food calculation without error)
       if (!replyText) {
         const foodResult = await parseFoodNutritionWithAI(query, userApiKey);
         replyText = `1 Porsi **${foodResult.name}** diperkirakan mengandung sekitar **${foodResult.nutrition.calories} kcal** (Protein: ${foodResult.nutrition.proteinGrams}g, Karbo: ${foodResult.nutrition.carbsGrams}g, Lemak: ${foodResult.nutrition.fatGrams}g).\n\nKalori masukmu saat ini ${userContext.caloriesIn} kcal. Sisa target defisit kalori harianmu sangat terjaga 🟢!`;
       }
 
+      const aiMsgId = `${Date.now() + 1}-${Math.random().toString(36).slice(2, 10)}`;
       const aiMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: aiMsgId,
         sender: 'ai',
         text: replyText.trim(),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -134,8 +134,9 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
 
       setMessages((prev) => [...prev, aiMsg]);
     } catch (error: any) {
+      const errMsgId = `${Date.now() + 1}-${Math.random().toString(36).slice(2, 10)}`;
       const errBubble: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: errMsgId,
         sender: 'ai',
         text: '⚠️ Terjadi gangguan koneksi. Mohon periksa jaringan internet Anda.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -160,8 +161,8 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
                 <Bot size={20} color="#10B981" />
               </View>
               <View>
-                <Text style={styles.sheetTitle}>Chat AI Health Coach</Text>
-                <Text style={styles.sheetSub}>Tanya bebas kondisi & konsultasi gizi real-time</Text>
+                <Text style={styles.sheetTitle} numberOfLines={1}>Chat AI Health Coach</Text>
+                <Text style={styles.sheetSub} numberOfLines={1}>Tanya bebas kondisi & konsultasi gizi real-time</Text>
               </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -183,7 +184,7 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
                 onPress={() => handleSendMessage(prompt)}
               >
                 <Sparkles size={12} color="#10B981" />
-                <Text style={styles.quickPromptText}>{prompt}</Text>
+                <Text style={styles.quickPromptText} numberOfLines={1}>{prompt}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -211,10 +212,10 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
                     ) : (
                       <Bot size={12} color="#10B981" />
                     )}
-                    <Text style={styles.bubbleSender}>
+                    <Text style={styles.bubbleSender} numberOfLines={1}>
                       {isUser ? userName : 'AI Health Coach'}
                     </Text>
-                    <Text style={styles.bubbleTime}>{msg.timestamp}</Text>
+                    <Text style={styles.bubbleTime} numberOfLines={1}>{msg.timestamp}</Text>
                   </View>
                   <Text style={styles.bubbleText}>{msg.text}</Text>
                 </View>
@@ -224,7 +225,7 @@ Instruksi: Jawablah pertanyaan pengguna secara presisi, akurat, ramah, dan empat
             {loading && (
               <View style={[styles.messageBubble, styles.aiBubble, styles.loadingBubble]}>
                 <ActivityIndicator size="small" color="#10B981" />
-                <Text style={styles.loadingText}>AI Coach sedang menganalisis...</Text>
+                <Text style={styles.loadingText} numberOfLines={1}>AI Coach sedang menganalisis...</Text>
               </View>
             )}
           </ScrollView>

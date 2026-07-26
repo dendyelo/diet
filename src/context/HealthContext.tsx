@@ -9,7 +9,7 @@ import {
 } from '../services/storageService';
 import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
 import { calculateEnergyBalance } from '../utils/calorieCalc';
-import { getLocalDateString } from '../utils/date';
+import { getLocalDateString, msUntilMidnight } from '../utils/date';
 
 interface FastingState {
   elapsedSeconds: number;
@@ -64,17 +64,20 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     manualStepsRef.current = manualSteps;
   }, [manualSteps]);
 
-  // Daily Midnight Rollover Check (Check every 10 seconds)
+  // Efficient Midnight Date Rollover Timeout
   useEffect(() => {
-    const checkDateRollover = () => {
-      const currentLocal = getLocalDateString();
-      if (currentLocal !== todayStr) {
-        setTodayStr(currentLocal);
-      }
+    let timer: NodeJS.Timeout;
+    const scheduleMidnightRollover = () => {
+      const delay = msUntilMidnight();
+      timer = setTimeout(() => {
+        setTodayStr(getLocalDateString());
+        scheduleMidnightRollover();
+      }, delay);
     };
-    const interval = setInterval(checkDateRollover, 10000);
-    return () => clearInterval(interval);
-  }, [todayStr]);
+
+    scheduleMidnightRollover();
+    return () => clearTimeout(timer);
+  }, []);
 
   // Initial load for water glasses & step record
   useEffect(() => {
@@ -128,12 +131,12 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (status.isAvailable) {
         baseSteps = status.stepCount;
         setSensorSteps(baseSteps);
-        saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps: manualStepsRef.current });
+        await saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps: manualStepsRef.current });
 
-        sub = subscribeStepCount((sessionSteps) => {
+        sub = subscribeStepCount(async (sessionSteps) => {
           const totalSensor = baseSteps + sessionSteps;
           setSensorSteps(totalSensor);
-          saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps: manualStepsRef.current });
+          await saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps: manualStepsRef.current });
         });
       }
     }
@@ -146,20 +149,16 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [todayStr]);
 
   const addWaterGlass = async () => {
-    setWaterGlasses((prevWater) => {
-      const updated = prevWater + 1;
-      saveWaterGlasses(todayStr, updated);
-      return updated;
-    });
+    const updated = waterGlasses + 1;
+    setWaterGlasses(updated);
+    await saveWaterGlasses(todayStr, updated);
   };
 
   const addStepsManual = async (addedSteps: number) => {
     const validAdded = Math.max(0, addedSteps);
-    setManualSteps((prevManual) => {
-      const updatedManual = prevManual + validAdded;
-      saveStepRecord(todayStr, { sensorSteps, manualSteps: updatedManual });
-      return updatedManual;
-    });
+    const updatedManual = manualSteps + validAdded;
+    setManualSteps(updatedManual);
+    await saveStepRecord(todayStr, { sensorSteps, manualSteps: updatedManual });
   };
 
   const resetFastingTimer = async (timestamp?: string | null) => {

@@ -19,8 +19,8 @@ describe('Storage Service & Date Utility Suite', () => {
 
   test('isSameLocalDay identifies same day correctly near midnight', () => {
     const nightDate = new Date(2026, 6, 26, 23, 59, 59); // 11:59:59 PM Local
-    const noonDate = new Date(2026, 6, 26, 12, 0, 0);    // 12:00:00 PM Local
-    expect(isSameLocalDay(nightDate.toISOString(), noonDate)).toBe(true);
+    const noonDateStr = getLocalDateString(new Date(2026, 6, 26, 12, 0, 0)); // 2026-07-26
+    expect(isSameLocalDay(nightDate.toISOString(), noonDateStr)).toBe(true);
   });
 
   test('getLatestMealTimestamp returns latest timestamp or null when logs empty', () => {

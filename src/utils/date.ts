@@ -5,10 +5,15 @@ export function getLocalDateString(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function isSameLocalDay(isoTimestamp: string, date: Date = new Date()): boolean {
+export function isSameLocalDay(isoTimestamp: string, targetDateStr?: string): boolean {
   const parsed = new Date(isoTimestamp);
   if (Number.isNaN(parsed.getTime())) return false;
-  return getLocalDateString(parsed) === getLocalDateString(date);
+
+  const logDayStr = getLocalDateString(parsed);
+  if (targetDateStr) {
+    return logDayStr === targetDateStr;
+  }
+  return logDayStr === getLocalDateString();
 }
 
 export function getLatestMealTimestamp(logs: { timestamp: string }[]): string | null {
@@ -24,4 +29,13 @@ export function getLatestMealTimestamp(logs: { timestamp: string }[]): string | 
   }
 
   return latest;
+}
+
+/**
+ * Calculate milliseconds remaining until midnight local time
+ */
+export function msUntilMidnight(now: Date = new Date()): number {
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  return Math.max(1000, midnight.getTime() - now.getTime());
 }

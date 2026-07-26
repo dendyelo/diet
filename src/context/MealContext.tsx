@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
 import { loadMealLogs, saveMealLogs } from '../services/storageService';
 import { useProfile } from './ProfileContext';
-import { getLocalDateString, isSameLocalDay, getLatestMealTimestamp } from '../utils/date';
+import { getLocalDateString, isSameLocalDay, getLatestMealTimestamp, msUntilMidnight } from '../utils/date';
 
 interface MealContextType {
   mealLogs: MealLog[];
@@ -31,17 +31,20 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [todayStr, setTodayStr] = useState<string>(getLocalDateString());
 
-  // Daily Midnight Rollover Check (Check every 10 seconds)
+  // Efficient Midnight Date Rollover Timeout
   useEffect(() => {
-    const checkDateRollover = () => {
-      const currentLocal = getLocalDateString();
-      if (currentLocal !== todayStr) {
-        setTodayStr(currentLocal);
-      }
+    let timer: NodeJS.Timeout;
+    const scheduleMidnightRollover = () => {
+      const delay = msUntilMidnight();
+      timer = setTimeout(() => {
+        setTodayStr(getLocalDateString());
+        scheduleMidnightRollover();
+      }, delay);
     };
-    const interval = setInterval(checkDateRollover, 10000);
-    return () => clearInterval(interval);
-  }, [todayStr]);
+
+    scheduleMidnightRollover();
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     async function initMealLogs() {
@@ -52,14 +55,6 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     initMealLogs();
   }, []);
-
-  const persistLogsSafely = async (updatedLogs: MealLog[]) => {
-    try {
-      await saveMealLogs(updatedLogs);
-    } catch (error) {
-      console.error('Error persisting meal logs:', error);
-    }
-  };
 
   const addMealLog = async (
     name: string,
@@ -84,50 +79,39 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       itemsBreakdown,
     };
 
-    let latestTimestamp: string | null = null;
+    const updatedLogs = [newLog, ...mealLogs];
+    setMealLogs(updatedLogs);
 
-    setMealLogs((prevLogs) => {
-      const updatedLogs = [newLog, ...prevLogs];
-      latestTimestamp = getLatestMealTimestamp(updatedLogs);
-      persistLogsSafely(updatedLogs);
-      return updatedLogs;
-    });
-
+    const latestTimestamp = getLatestMealTimestamp(updatedLogs);
+    await saveMealLogs(updatedLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
   const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
-    let latestTimestamp: string | null = null;
-
-    setMealLogs((prevLogs) => {
-      const updatedLogs = prevLogs.map((log) => {
-        if (log.id === id) {
-          return { ...log, ...updatedFields };
-        }
-        return log;
-      });
-      latestTimestamp = getLatestMealTimestamp(updatedLogs);
-      persistLogsSafely(updatedLogs);
-      return updatedLogs;
+    const updatedLogs = mealLogs.map((log) => {
+      if (log.id === id) {
+        return { ...log, ...updatedFields };
+      }
+      return log;
     });
 
+    setMealLogs(updatedLogs);
+
+    const latestTimestamp = getLatestMealTimestamp(updatedLogs);
+    await saveMealLogs(updatedLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
   const deleteMealLog = async (id: string) => {
-    let latestTimestamp: string | null = null;
+    const updatedLogs = mealLogs.filter((m) => m.id !== id);
+    setMealLogs(updatedLogs);
 
-    setMealLogs((prevLogs) => {
-      const updatedLogs = prevLogs.filter((m) => m.id !== id);
-      latestTimestamp = getLatestMealTimestamp(updatedLogs);
-      persistLogsSafely(updatedLogs);
-      return updatedLogs;
-    });
-
+    const latestTimestamp = getLatestMealTimestamp(updatedLogs);
+    await saveMealLogs(updatedLogs);
     await updateProfile({ lastMealTimestamp: latestTimestamp });
   };
 
-  const todayLogs = mealLogs.filter((log) => log.timestamp && isSameLocalDay(log.timestamp));
+  const todayLogs = mealLogs.filter((log) => log.timestamp && isSameLocalDay(log.timestamp, todayStr));
   const totalCaloriesIn = todayLogs.reduce((acc, log) => acc + (log.nutrition?.calories || 0), 0);
   const snackCount = todayLogs.filter((log) => log.isSnack).length;
 

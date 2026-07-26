@@ -138,8 +138,8 @@ export async function parseFoodNutritionWithAI(
   }
 
   if (userApiKey && userApiKey.trim().length > 0) {
-    try {
-      const prompt = `Anda adalah Pakar Gizi & Ahli Kuliner Spesialis Makanan Indonesia & Internasional dengan presisi tinggi.
+    const key = userApiKey.trim();
+    const prompt = `Anda adalah Pakar Gizi & Ahli Kuliner Spesialis Makanan Indonesia & Internasional dengan presisi tinggi.
 Tugas Anda adalah melakukan bedah nutrisi ultra-presisi terhadap input pengguna: "${cleanInput}".
 
 ATURAN ANALISIS PINTAR:
@@ -163,54 +163,77 @@ Kembalikan HANYA format JSON valid tanpa markdown:
   "aiNotes": "Catatan gizi pintar 1 kalimat"
 }`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey.trim()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
+    const makeCall = async (attempt: number): Promise<AIFoodResult | null> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (response.status === 429 && attempt === 1) {
+          // Rate limited (5 RPM limit): wait 2 seconds and retry once
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          return makeCall(2);
         }
-      );
 
-      if (response.ok) {
-        const data = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          const items: FoodItemBreakdown[] = Array.isArray(parsed.itemsBreakdown)
-            ? parsed.itemsBreakdown.map((it: any) => ({
-                name: it.name || 'Item',
-                calories: Math.max(0, parseInt(it.calories, 10) || 100),
-              }))
-            : [{ name: cleanInput, calories: Math.max(0, parseInt(parsed.calories, 10) || 300) }];
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            const items: FoodItemBreakdown[] = Array.isArray(parsed.itemsBreakdown)
+              ? parsed.itemsBreakdown.map((it: any) => ({
+                  name: it.name || 'Item',
+                  calories: Math.max(0, parseInt(it.calories, 10) || 100),
+                }))
+              : [{ name: cleanInput, calories: Math.max(0, parseInt(parsed.calories, 10) || 300) }];
 
-          const sumCalories = items.reduce((acc, it) => acc + it.calories, 0);
+            const sumCalories = items.reduce((acc, it) => acc + it.calories, 0);
 
-          return {
-            name: parsed.name || cleanInput,
-            nutrition: {
-              calories: sumCalories || Math.max(0, parseInt(parsed.calories, 10) || 300),
-              proteinGrams: Math.max(0, parseInt(parsed.proteinGrams, 10) || 15),
-              carbsGrams: Math.max(0, parseInt(parsed.carbsGrams, 10) || 40),
-              fatGrams: Math.max(0, parseInt(parsed.fatGrams, 10) || 10),
-              fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
-            },
-            confidence: 'high',
-            aiNotes: parsed.aiNotes || 'Analisis 100% presisi Cloud oleh Gemini 2.5 Flash AI',
-            isOnlineAI: true,
-            itemsBreakdown: items,
-          };
+            return {
+              name: parsed.name || cleanInput,
+              nutrition: {
+                calories: sumCalories || Math.max(0, parseInt(parsed.calories, 10) || 300),
+                proteinGrams: Math.max(0, parseInt(parsed.proteinGrams, 10) || 15),
+                carbsGrams: Math.max(0, parseInt(parsed.carbsGrams, 10) || 40),
+                fatGrams: Math.max(0, parseInt(parsed.fatGrams, 10) || 10),
+                fiberGrams: Math.max(0, parseInt(parsed.fiberGrams, 10) || 3),
+              },
+              confidence: 'high',
+              aiNotes: parsed.aiNotes || 'Analisis 100% presisi Cloud oleh Gemini 2.5 Flash AI',
+              isOnlineAI: true,
+              itemsBreakdown: items,
+            };
+          }
         }
+      } catch (error) {
+        console.warn(`Gemini Cloud API call attempt ${attempt} failed:`, error);
       }
-    } catch (error) {
-      console.warn('Gemini Cloud API call failed, using Smart Culinary Engine:', error);
-    }
+      return null;
+    };
+
+    const cloudResult = await makeCall(1);
+    if (cloudResult) return cloudResult;
   }
 
-  return smartIndonesianCulinaryEngine(cleanInput);
+  const fallbackResult = smartIndonesianCulinaryEngine(cleanInput);
+  if (userApiKey && userApiKey.trim().length > 0) {
+    fallbackResult.aiNotes = '⚠️ Kuota Gemini (5 req/menit) penuh. Menggunakan Engine Kuliner Offline.';
+  }
+  return fallbackResult;
 }
 
 /**

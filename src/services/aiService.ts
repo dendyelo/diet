@@ -170,11 +170,9 @@ export async function testGeminiAPIConnection(userApiKey: string): Promise<AICon
       }
       if (response.status === 429) {
         hasRateLimitError = true;
-      } else if (response.status < 500) {
-        return 'offline';
       }
     } catch (error) {
-      // Network failure / offline / timeout -> stop immediately! Do NOT mark as rate_limited when offline.
+      // Network failure / offline / timeout -> stop immediately!
       console.warn(`Test connection network error for ${model}:`, error);
       return 'offline';
     } finally {
@@ -405,7 +403,7 @@ export async function generateAICoachMessageWithAI(
   if (userApiKey && userApiKey.trim().length > 0) {
     const key = userApiKey.trim();
     const balanceStatus = userData.netDeficit >= 0
-      ? `DEFISIT ${userData.netDeficit} kcal (Baguss 🟢)`
+      ? `DEFISIT ${userData.netDeficit} kcal (Bagus 🟢)`
       : `SURPLUS ${Math.abs(userData.netDeficit)} kcal (PERINGATAN SURPLUS 🔴)`;
 
     const prompt = `Anda adalah AI Health Coach pribadi bernama HabitDiet Coach.

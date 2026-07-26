@@ -1,19 +1,29 @@
 import React from 'react';
 import {
   Modal,
-  View,
+  Pressable,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
-import { Utensils, Droplets, Scale, Timer, X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+
+type QuickAction = 'food' | 'activity' | 'water' | 'weight' | 'fasting';
 
 interface QuickActionMenuProps {
   visible: boolean;
   onClose: () => void;
-  onSelectAction: (action: 'food' | 'water' | 'weight' | 'fasting') => void;
+  onSelectAction: (action: QuickAction) => void;
 }
+
+const ACTIONS: { action: QuickAction; label: string; detail: string }[] = [
+  { action: 'food', label: 'Makan atau snack', detail: 'Catat asupan' },
+  { action: 'activity', label: 'Aktivitas', detail: 'Ceritakan ke AI' },
+  { action: 'water', label: 'Air minum', detail: 'Tambah satu gelas' },
+  { action: 'weight', label: 'Berat badan', detail: 'Perbarui progres' },
+  { action: 'fasting', label: 'Puasa', detail: 'Mulai atau akhiri' },
+];
 
 export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   visible,
@@ -21,168 +31,157 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   onSelectAction,
 }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
 
   if (!visible) return null;
 
-  const handleAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
+  const handleAction = (action: QuickAction) => {
     onClose();
-    requestAnimationFrame(() => {
-      onSelectAction(action);
-    });
+    requestAnimationFrame(() => onSelectAction(action));
   };
 
   return (
-    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      statusBarTranslucent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={{ flex: 1 }} onPress={onClose}>
         <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
             justifyContent: 'flex-end',
-            alignItems: 'center',
-            paddingBottom: 90,
+            backgroundColor: colors.overlay,
           }}
         >
-          <TouchableWithoutFeedback>
+          <Pressable onPress={(event) => event.stopPropagation()}>
             <View
               style={{
-                width: '90%',
-                backgroundColor: colors.surface,
-                borderRadius: radius.lg,
-                padding: spacing.md,
-                alignItems: 'center',
+                width: '100%',
+                maxWidth: 560,
+                alignSelf: 'center',
+                paddingHorizontal: spacing.md,
+                paddingTop: spacing.sm,
+                paddingBottom: Math.max(spacing.md, insets.bottom),
+                borderTopLeftRadius: radius.xl,
+                borderTopRightRadius: radius.xl,
                 borderWidth: 1,
+                borderBottomWidth: 0,
                 borderColor: colors.divider,
+                backgroundColor: colors.surface,
               }}
             >
-              <Text
+              <View
                 style={{
-                  ...typography.caption,
-                  fontWeight: '700',
-                  color: colors.textTertiary,
-                  letterSpacing: 0.5,
+                  width: 38,
+                  height: 4,
+                  borderRadius: 2,
+                  alignSelf: 'center',
+                  backgroundColor: colors.divider,
                   marginBottom: spacing.md,
-                  textTransform: 'uppercase',
                 }}
-              >
-                Catat Sesuatu
-              </Text>
+              />
 
-              {/* Quick Action Grid Buttons */}
               <View
                 style={{
                   flexDirection: 'row',
-                  flexWrap: 'wrap',
                   justifyContent: 'space-between',
-                  gap: spacing.sm + 4,
-                  width: '100%',
+                  alignItems: 'flex-start',
+                  marginBottom: spacing.md,
                 }}
               >
-                {/* Food */}
+                <View>
+                  <Text style={{ ...typography.h2, color: colors.textPrimary }}>Tambah</Text>
+                  <Text
+                    style={{
+                      ...typography.caption,
+                      color: colors.textTertiary,
+                      marginTop: 3,
+                    }}
+                  >
+                    Pilih satu catatan.
+                  </Text>
+                </View>
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Tutup menu tambah"
+                  onPress={onClose}
                   style={{
-                    width: '48%',
-                    paddingVertical: 18,
-                    paddingHorizontal: 12,
-                    borderRadius: radius.md,
-                    borderWidth: 1,
-                    backgroundColor: colors.primarySubtle,
-                    borderColor: colors.primary,
+                    minWidth: 44,
+                    minHeight: 44,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: spacing.sm,
                   }}
-                  onPress={() => handleAction('food')}
-                  activeOpacity={0.7}
                 >
-                  <Utensils size={24} color={colors.primary} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primaryText }}>Makan</Text>
-                </TouchableOpacity>
-
-                {/* Water */}
-                <TouchableOpacity
-                  style={{
-                    width: '48%',
-                    paddingVertical: 18,
-                    paddingHorizontal: 12,
-                    borderRadius: radius.md,
-                    borderWidth: 1,
-                    backgroundColor: colors.infoSubtle,
-                    borderColor: colors.info,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: spacing.sm,
-                  }}
-                  onPress={() => handleAction('water')}
-                  activeOpacity={0.7}
-                >
-                  <Droplets size={24} color={colors.info} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.info }}>Air Minum</Text>
-                </TouchableOpacity>
-
-                {/* Weight */}
-                <TouchableOpacity
-                  style={{
-                    width: '48%',
-                    paddingVertical: 18,
-                    paddingHorizontal: 12,
-                    borderRadius: radius.md,
-                    borderWidth: 1,
-                    backgroundColor: colors.weightSubtle,
-                    borderColor: colors.weight,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: spacing.sm,
-                  }}
-                  onPress={() => handleAction('weight')}
-                  activeOpacity={0.7}
-                >
-                  <Scale size={24} color={colors.weight} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.weight }}>Berat Badan</Text>
-                </TouchableOpacity>
-
-                {/* Fasting */}
-                <TouchableOpacity
-                  style={{
-                    width: '48%',
-                    paddingVertical: 18,
-                    paddingHorizontal: 12,
-                    borderRadius: radius.md,
-                    borderWidth: 1,
-                    backgroundColor: colors.warningSubtle,
-                    borderColor: colors.warning,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: spacing.sm,
-                  }}
-                  onPress={() => handleAction('fasting')}
-                  activeOpacity={0.7}
-                >
-                  <Timer size={24} color={colors.warning} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.warning }}>Puasa</Text>
+                  <Text style={{ ...typography.caption, color: colors.textSecondary }}>Tutup</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Close Button */}
-              <TouchableOpacity
+              <View
                 style={{
-                  marginTop: spacing.md,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: colors.surfaceElevated,
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: colors.divider,
+                  borderRadius: radius.md,
                 }}
-                onPress={onClose}
-                activeOpacity={0.7}
               >
-                <X size={20} color={colors.textTertiary} />
-              </TouchableOpacity>
+                {ACTIONS.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.action}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.label}. ${item.detail}`}
+                    activeOpacity={0.65}
+                    onPress={() => handleAction(item.action)}
+                    style={{
+                      minHeight: 58,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      gap: spacing.md,
+                      borderTopWidth: index === 0 ? 0 : 1,
+                      borderTopColor: colors.divider,
+                      backgroundColor: colors.surface,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        ...typography.overline,
+                        color: item.action === 'food' ? colors.primaryText : colors.textTertiary,
+                        width: 24,
+                      }}
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </Text>
+                    <Text
+                      style={{
+                        ...typography.bodyMedium,
+                        color: colors.textPrimary,
+                        flex: 1,
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        color: colors.textTertiary,
+                        flexShrink: 1,
+                        textAlign: 'right',
+                      }}
+                    >
+                      {item.detail}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </TouchableWithoutFeedback>
+          </Pressable>
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
     </Modal>
   );
 };

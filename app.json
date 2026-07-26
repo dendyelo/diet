@@ -5,9 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dendyelo.diet",
+      "appleTeamId": "DUAAVP7KFC"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +24,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-status-bar"
     ]
   }
 }

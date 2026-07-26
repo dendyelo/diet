@@ -20,11 +20,10 @@ export const Surface: React.FC<SurfaceProps> = ({
       style={[
         {
           backgroundColor: variant === 'subtle' ? colors.surfaceElevated : colors.surface,
-          borderRadius: radius.lg,
+          borderRadius: radius.md,
           borderWidth: 1,
           borderColor: variant === 'subtle' ? colors.divider : colors.border,
           padding: spacing.md,
-          marginVertical: spacing.xs,
         },
         style,
       ]}

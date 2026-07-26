@@ -53,7 +53,7 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
       id: 'deficit',
       title: todayMealsCount === 0
         ? 'Defisit kalori terjaga (Belum ada makanan)'
-        : `Defisit kalori terjaga (${netDeficit >= 0 ? `Defisit ${netDeficit}` : `Surplus ${Math.abs(netDeficit)}`} kcal)`,
+        : `Keseimbangan kalori (${netDeficit >= 0 ? `Kurang ${netDeficit}` : `Lebih ${Math.abs(netDeficit)}`} kkal)`,
       isCompleted: isDeficitAchieved,
     },
     {

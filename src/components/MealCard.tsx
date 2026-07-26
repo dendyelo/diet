@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { MealLog } from '../types';
 import { TRIGGER_OPTIONS } from '../utils/habitAnalytics';
-import { Trash2, Cookie, Utensils, Edit3 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Surface } from './Surface';
 
@@ -14,126 +13,174 @@ interface MealCardProps {
 
 export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => {
   const { colors, spacing, radius, typography } = useTheme();
-
   const triggerInfo = log.trigger
-    ? TRIGGER_OPTIONS.find((t) => t.type === log.trigger)
+    ? TRIGGER_OPTIONS.find((trigger) => trigger.type === log.trigger)
     : null;
-
-  const timeStr = new Date(log.timestamp).toLocaleTimeString([], {
+  const time = new Date(log.timestamp).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
   });
+  const visibleItems = log.itemsBreakdown?.slice(0, 3) ?? [];
+  const hiddenItemCount = Math.max(0, (log.itemsBreakdown?.length ?? 0) - visibleItems.length);
 
   return (
     <Surface
+      accessibilityLabel={`${log.isSnack ? 'Snack' : 'Makan'}, ${log.name}, ${
+        log.nutrition.calories
+      } kilokalori`}
       style={{
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        padding: spacing.sm + 4,
-        marginVertical: 4,
+        padding: spacing.md,
+        marginBottom: spacing.sm,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2, flex: 1 }}>
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: 2,
-            backgroundColor: log.isSnack ? colors.warningSubtle : colors.infoSubtle,
-          }}
-        >
-          {log.isSnack ? (
-            <Cookie size={16} color={colors.warning} />
-          ) : (
-            <Utensils size={16} color={colors.info} />
-          )}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: spacing.sm,
+          marginBottom: spacing.sm,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: log.isSnack ? colors.warning : colors.primary,
+            }}
+          />
+          <Text style={{ ...typography.overline, color: colors.textTertiary }}>
+            {log.isSnack ? 'SNACK' : 'MAKAN'}
+          </Text>
         </View>
-
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 6 }}>
-            <Text style={{ ...typography.bodyMedium, color: colors.textPrimary, flex: 1 }} numberOfLines={2}>
-              {log.name}
-            </Text>
-            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
-              {timeStr}
-            </Text>
-          </View>
-
-          {/* Itemized Food Calorie Breakdown List */}
-          {log.itemsBreakdown && log.itemsBreakdown.length > 0 && (
-            <View
-              style={{
-                backgroundColor: colors.surfaceElevated,
-                borderRadius: radius.sm,
-                padding: spacing.xs + 4,
-                marginVertical: 6,
-                borderWidth: 1,
-                borderColor: colors.divider,
-              }}
-            >
-              {log.itemsBreakdown.map((item, index) => (
-                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginVertical: 2 }}>
-                  <Text style={{ color: colors.info, fontSize: 12, fontWeight: 'bold' }}>•</Text>
-                  <Text style={{ ...typography.caption, color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
-                    {item.name}:
-                  </Text>
-                  <Text style={{ ...typography.caption, fontWeight: 'bold', color: colors.info }} numberOfLines={1}>
-                    {item.calories} kcal
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }} numberOfLines={1}>
-              Total: {log.nutrition.calories} kcal
-            </Text>
-            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
-              P: {log.nutrition.proteinGrams}g
-            </Text>
-            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
-              K: {log.nutrition.carbsGrams}g
-            </Text>
-            <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>
-              L: {log.nutrition.fatGrams}g
-            </Text>
-          </View>
-
-          {triggerInfo && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                alignSelf: 'flex-start',
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: radius.sm,
-                marginTop: 4,
-                backgroundColor: triggerInfo.color + '20',
-              }}
-            >
-              <Text style={{ fontSize: 11 }}>{triggerInfo.emoji}</Text>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: triggerInfo.color }} numberOfLines={1}>
-                {triggerInfo.label}
-              </Text>
-            </View>
-          )}
-        </View>
+        <Text style={{ ...typography.caption, color: colors.textTertiary }}>{time}</Text>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 6 }}>
-        <TouchableOpacity onPress={() => onEdit(log)} style={{ padding: 6 }}>
-          <Edit3 size={16} color={colors.info} />
-        </TouchableOpacity>
+      <Text
+        style={{
+          ...typography.h3,
+          color: colors.textPrimary,
+          marginBottom: spacing.sm,
+        }}
+        numberOfLines={2}
+      >
+        {log.name}
+      </Text>
 
-        <TouchableOpacity onPress={() => onDelete(log.id)} style={{ padding: 6 }}>
-          <Trash2 size={16} color={colors.textTertiary} />
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
+        <Text
+          style={{
+            fontSize: 25,
+            lineHeight: 31,
+            fontWeight: '600',
+            letterSpacing: -0.5,
+            color: colors.textPrimary,
+          }}
+        >
+          {log.nutrition.calories}
+        </Text>
+        <Text style={{ ...typography.caption, color: colors.textTertiary }}>kcal</Text>
+      </View>
+
+      <Text
+        style={{
+          ...typography.caption,
+          color: colors.textSecondary,
+          marginTop: 3,
+        }}
+      >
+        P {log.nutrition.proteinGrams} g · K {log.nutrition.carbsGrams} g · L{' '}
+        {log.nutrition.fatGrams} g
+      </Text>
+
+      {visibleItems.length > 0 ? (
+        <View
+          style={{
+            marginTop: spacing.md,
+            paddingTop: spacing.sm,
+            borderTopWidth: 1,
+            borderTopColor: colors.divider,
+            gap: 5,
+          }}
+        >
+          {visibleItems.map((item, index) => (
+            <View
+              key={`${item.name}-${index}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
+            >
+              <Text
+                style={{ ...typography.caption, color: colors.textSecondary, flex: 1 }}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                {item.calories} kcal
+              </Text>
+            </View>
+          ))}
+          {hiddenItemCount > 0 ? (
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+              +{hiddenItemCount} item lain
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: spacing.md,
+          paddingTop: spacing.sm,
+          borderTopWidth: 1,
+          borderTopColor: colors.divider,
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          {triggerInfo ? (
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: 9,
+                paddingVertical: 4,
+                borderRadius: radius.full,
+                backgroundColor: colors.surfaceElevated,
+              }}
+            >
+              <Text style={{ ...typography.caption, color: colors.textSecondary }}>
+                Pemicu · {triggerInfo.label}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${log.name}`}
+          onPress={() => onEdit(log)}
+          style={{
+            minWidth: 52,
+            minHeight: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ ...typography.caption, color: colors.textSecondary }}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={`Hapus ${log.name}`}
+          onPress={() => onDelete(log.id)}
+          style={{
+            minWidth: 58,
+            minHeight: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ ...typography.caption, color: colors.danger }}>Hapus</Text>
         </TouchableOpacity>
       </View>
     </Surface>

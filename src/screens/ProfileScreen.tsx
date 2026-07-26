@@ -1,19 +1,216 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Linking,
+  Platform,
   ScrollView,
+  Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
-  Linking,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import { useProfile, useAI, useTheme } from '../context/AppContext';
-import { calculateBMR, calculateTDEE, BODY_TYPE_INFO } from '../utils/calorieCalc';
+import type { TextInputProps } from 'react-native';
 import { Surface } from '../components/Surface';
-import { BodyType } from '../types';
-import { Key, Save, CheckCircle2, Wifi, Activity, ExternalLink, RefreshCw, Trash2, Sun, Moon, Smartphone } from 'lucide-react-native';
+import { useAI, useProfile, useTheme } from '../context/AppContext';
+import type { ThemeMode } from '../context/ThemeContext';
+import type { ColorTokens } from '../theme/colors';
+import type { ActivityLevel, BodyType } from '../types';
+import { BODY_TYPE_INFO, calculateBMR, calculateTDEE } from '../utils/calorieCalc';
+
+const THEME_OPTIONS: ReadonlyArray<TextOption<ThemeMode>> = [
+  { value: 'system', label: 'Sistem' },
+  { value: 'dark', label: 'Gelap' },
+  { value: 'light', label: 'Terang' },
+];
+
+const GENDER_OPTIONS: ReadonlyArray<TextOption<'male' | 'female'>> = [
+  { value: 'male', label: 'Laki-laki' },
+  { value: 'female', label: 'Perempuan' },
+];
+
+const ACTIVITY_OPTIONS: ReadonlyArray<TextOption<ActivityLevel>> = [
+  { value: 'sedentary', label: 'Minimal' },
+  { value: 'light', label: 'Ringan' },
+  { value: 'moderate', label: 'Sedang' },
+  { value: 'active', label: 'Aktif' },
+  { value: 'very_active', label: 'Sangat aktif' },
+];
+
+const ACTIVITY_DESCRIPTIONS: Record<ActivityLevel, string> = {
+  sedentary: 'Sebagian besar hari dihabiskan dengan duduk.',
+  light: 'Bergerak ringan atau olahraga 1–3 hari per minggu.',
+  moderate: 'Olahraga rutin 3–5 hari per minggu.',
+  active: 'Aktif atau olahraga intens hampir setiap hari.',
+  very_active: 'Aktivitas fisik berat dan konsisten setiap hari.',
+};
+
+const BODY_TYPE_OPTIONS: ReadonlyArray<TextOption<BodyType>> = [
+  { value: 'easy_gain', label: 'Mudah naik' },
+  { value: 'normal', label: 'Seimbang' },
+  { value: 'hard_gain', label: 'Sulit naik' },
+];
+
+interface TextOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+interface TextSegmentedControlProps<T extends string> {
+  value: T;
+  options: ReadonlyArray<TextOption<T>>;
+  onChange: (value: T) => void;
+  colors: ColorTokens;
+  radiusValue: number;
+  accessibilityLabel: string;
+}
+
+function TextSegmentedControl<T extends string>({
+  value,
+  options,
+  onChange,
+  colors,
+  radiusValue,
+  accessibilityLabel,
+}: TextSegmentedControlProps<T>) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        padding: 3,
+        borderRadius: radiusValue,
+        backgroundColor: colors.surfaceElevated,
+      }}
+      accessibilityLabel={accessibilityLabel}
+    >
+      {options.map((option) => {
+        const isSelected = option.value === value;
+
+        return (
+          <TouchableOpacity
+            key={option.value}
+            style={{
+              flex: 1,
+              minHeight: 40,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 8,
+              borderRadius: Math.max(8, radiusValue - 3),
+              backgroundColor: isSelected ? colors.surface : 'transparent',
+              borderWidth: isSelected ? 1 : 0,
+              borderColor: colors.divider,
+            }}
+            activeOpacity={0.72}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
+          >
+            <Text
+              style={{
+                color: isSelected ? colors.textPrimary : colors.textTertiary,
+                fontSize: 12,
+                fontWeight: isSelected ? '700' : '600',
+              }}
+              numberOfLines={1}
+            >
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+interface TextChoiceGroupProps<T extends string> {
+  value: T;
+  options: ReadonlyArray<TextOption<T>>;
+  onChange: (value: T) => void;
+  colors: ColorTokens;
+  radiusValue: number;
+  accessibilityLabel: string;
+}
+
+function TextChoiceGroup<T extends string>({
+  value,
+  options,
+  onChange,
+  colors,
+  radiusValue,
+  accessibilityLabel,
+}: TextChoiceGroupProps<T>) {
+  return (
+    <View
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}
+      accessibilityLabel={accessibilityLabel}
+    >
+      {options.map((option) => {
+        const isSelected = option.value === value;
+
+        return (
+          <TouchableOpacity
+            key={option.value}
+            style={{
+              minHeight: 40,
+              justifyContent: 'center',
+              paddingHorizontal: 14,
+              borderRadius: radiusValue,
+              backgroundColor: isSelected ? colors.primarySubtle : colors.surfaceElevated,
+              borderWidth: 1,
+              borderColor: isSelected ? colors.primary : colors.divider,
+            }}
+            activeOpacity={0.72}
+            onPress={() => onChange(option.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
+          >
+            <Text
+              style={{
+                color: isSelected ? colors.primaryText : colors.textSecondary,
+                fontSize: 12,
+                fontWeight: '600',
+              }}
+            >
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+interface ProfileFieldProps extends Omit<TextInputProps, 'style'> {
+  label: string;
+  colors: ColorTokens;
+  radiusValue: number;
+}
+
+const ProfileField: React.FC<ProfileFieldProps> = ({
+  label,
+  colors,
+  radiusValue,
+  ...inputProps
+}) => (
+  <View style={{ gap: 7 }}>
+    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+    <TextInput
+      {...inputProps}
+      style={{
+        minHeight: 46,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: radiusValue,
+        borderWidth: 1,
+        borderColor: colors.divider,
+        backgroundColor: colors.surfaceElevated,
+        color: colors.textPrimary,
+        fontSize: 14,
+      }}
+      placeholderTextColor={colors.textTertiary}
+      selectionColor={colors.primary}
+    />
+  </View>
+);
 
 export const ProfileScreen: React.FC = () => {
   const { profile, updateProfile } = useProfile();
@@ -26,12 +223,17 @@ export const ProfileScreen: React.FC = () => {
   const [height, setHeight] = useState<string>(profile.heightCm.toString());
   const [weight, setWeight] = useState<string>(profile.weightKg.toString());
   const [targetWeight, setTargetWeight] = useState<string>(profile.targetWeightKg.toString());
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile.activityLevel || 'light');
   const [bodyType, setBodyType] = useState<BodyType>(profile.bodyType || 'normal');
   const [targetDeficit, setTargetDeficit] = useState<string>(profile.targetDeficitKcal.toString());
-  const [fastingTarget, setFastingTarget] = useState<string>((profile.fastingTargetHours || 16).toString());
+  const [fastingTarget, setFastingTarget] = useState<string>(
+    (profile.fastingTargetHours || 16).toString()
+  );
   const [apiKeyInput, setApiKeyInput] = useState<string>(userApiKey);
   const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
   const [savedMsg, setSavedMsg] = useState<string>('');
+  const [isDataExpanded, setIsDataExpanded] = useState<boolean>(false);
+  const [isAIExpanded, setIsAIExpanded] = useState<boolean>(false);
 
   useEffect(() => {
     setApiKeyInput(userApiKey);
@@ -41,8 +243,14 @@ export const ProfileScreen: React.FC = () => {
   const parsedHeight = Math.max(100, Math.min(230, parseFloat(height) || 170));
   const parsedWeight = Math.max(30, Math.min(250, parseFloat(weight) || 70));
   const parsedTargetWeight = Math.max(30, Math.min(250, parseFloat(targetWeight) || 65));
-  const parsedTargetDeficit = Math.max(100, Math.min(1500, parseInt(targetDeficit, 10) || 500));
-  const parsedFastingTarget = Math.max(8, Math.min(24, parseInt(fastingTarget, 10) || 16));
+  const parsedTargetDeficit = Math.max(
+    100,
+    Math.min(1500, parseInt(targetDeficit, 10) || 500)
+  );
+  const parsedFastingTarget = Math.max(
+    8,
+    Math.min(24, parseInt(fastingTarget, 10) || 16)
+  );
 
   const updatedProfileObj = {
     ...profile,
@@ -52,6 +260,7 @@ export const ProfileScreen: React.FC = () => {
     heightCm: parsedHeight,
     weightKg: parsedWeight,
     targetWeightKg: parsedTargetWeight,
+    activityLevel,
     bodyType,
     targetDeficitKcal: parsedTargetDeficit,
     fastingTargetHours: parsedFastingTarget,
@@ -59,6 +268,12 @@ export const ProfileScreen: React.FC = () => {
 
   const bmr = calculateBMR(updatedProfileObj);
   const tdee = calculateTDEE(updatedProfileObj);
+  const initial = name.trim().charAt(0).toUpperCase() || 'S';
+
+  const showMessage = (message: string, duration = 3000) => {
+    setSavedMsg(message);
+    setTimeout(() => setSavedMsg(''), duration);
+  };
 
   const handleOpenGoogleAIStudio = () => {
     Linking.openURL('https://aistudio.google.com/app/apikey');
@@ -68,358 +283,620 @@ export const ProfileScreen: React.FC = () => {
     setIsTestingKey(true);
     const connectionResult = await testConnection();
     setIsTestingKey(false);
+
     if (connectionResult === 'connected') {
-      setSavedMsg('✓ Koneksi Gemini Cloud Berhasil!');
+      showMessage('Koneksi Gemini berhasil.', 4000);
     } else {
-      setSavedMsg('✕ Gagal terhubung ke Gemini AI Cloud.');
+      showMessage('Gemini belum dapat terhubung.', 4000);
     }
-    setTimeout(() => setSavedMsg(''), 4000);
   };
 
   const handleSaveApiKey = async () => {
     if (apiKeyInput.trim()) {
       await updateApiKey(apiKeyInput.trim());
-      setSavedMsg('API Key berhasil disimpan.');
-      setTimeout(() => setSavedMsg(''), 3000);
+      showMessage('API key disimpan.');
     }
   };
 
   const handleDeleteApiKey = async () => {
     await deleteApiKey();
     setApiKeyInput('');
-    setSavedMsg('API Key berhasil dihapus.');
-    setTimeout(() => setSavedMsg(''), 3000);
+    showMessage('API key dihapus.');
   };
 
-  const handleSaveProfile = () => {
-    updateProfile(updatedProfileObj);
-    setSavedMsg('Profil & Target Kesehatan Berhasil Disimpan!');
-    setTimeout(() => setSavedMsg(''), 3000);
+  const handleSaveProfile = async () => {
+    await updateProfile(updatedProfileObj);
+    showMessage('Data dan target diperbarui.');
+  };
+
+  const sectionLabelStyle = {
+    ...typography.bodyMedium,
+    color: colors.textPrimary,
+    fontWeight: '700' as const,
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, paddingBottom: 100, gap: spacing.md }}>
-        <Text style={{ ...typography.h1, color: colors.textPrimary, marginTop: 10 }}>Pengaturan & Profil</Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.md,
+          paddingBottom: 112,
+          gap: spacing.md,
+        }}
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ paddingVertical: spacing.sm, gap: 3 }}>
+          <Text
+            style={{
+              ...typography.h1,
+              color: colors.textPrimary,
+              fontSize: 30,
+              lineHeight: 36,
+              letterSpacing: -0.7,
+            }}
+          >
+            Saya
+          </Text>
+          <Text style={{ ...typography.body, color: colors.textTertiary }}>
+            Profil, target, dan preferensi.
+          </Text>
+        </View>
 
         {savedMsg ? (
-          <View style={{ backgroundColor: colors.primarySubtle, padding: spacing.sm + 4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary }}>
-            <Text style={{ ...typography.bodyMedium, color: colors.primaryText, textAlign: 'center' }}>{savedMsg}</Text>
+          <View
+            style={{
+              minHeight: 42,
+              justifyContent: 'center',
+              paddingHorizontal: spacing.md,
+              borderRadius: radius.md,
+              backgroundColor: colors.primarySubtle,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            }}
+            accessibilityLiveRegion="polite"
+          >
+            <Text
+              style={{
+                ...typography.bodyMedium,
+                color: colors.primaryText,
+                textAlign: 'center',
+              }}
+            >
+              {savedMsg}
+            </Text>
           </View>
         ) : null}
 
-        {/* Theme Mode Preference Card */}
-        <Surface style={{ padding: spacing.md, borderRadius: radius.lg }}>
-          <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs }}>Tema Tampilan</Text>
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: spacing.md }}>Pilih mode tema yang nyaman di mata</Text>
-
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <TouchableOpacity
+        <Surface style={{ padding: spacing.lg, marginVertical: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+            <View
               style={{
-                flex: 1,
-                flexDirection: 'row',
+                width: 48,
+                height: 48,
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
-                paddingVertical: 10,
-                borderRadius: radius.md,
-                backgroundColor: themeMode === 'system' ? colors.primary : colors.surfaceElevated,
-                borderWidth: 1,
-                borderColor: themeMode === 'system' ? colors.primary : colors.divider,
-                minHeight: 44,
+                borderRadius: radius.full,
+                backgroundColor: colors.primarySubtle,
               }}
-              onPress={() => setThemeMode('system')}
             >
-              <Smartphone size={16} color={themeMode === 'system' ? colors.onPrimary : colors.textSecondary} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: themeMode === 'system' ? colors.onPrimary : colors.textSecondary }}>Sistem</Text>
-            </TouchableOpacity>
+              <Text style={{ color: colors.primaryText, fontSize: 18, fontWeight: '700' }}>
+                {initial}
+              </Text>
+            </View>
 
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                paddingVertical: 10,
-                borderRadius: radius.md,
-                backgroundColor: themeMode === 'dark' ? colors.primary : colors.surfaceElevated,
-                borderWidth: 1,
-                borderColor: themeMode === 'dark' ? colors.primary : colors.divider,
-                minHeight: 44,
-              }}
-              onPress={() => setThemeMode('dark')}
-            >
-              <Moon size={16} color={themeMode === 'dark' ? colors.onPrimary : colors.textSecondary} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: themeMode === 'dark' ? colors.onPrimary : colors.textSecondary }}>Gelap</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                paddingVertical: 10,
-                borderRadius: radius.md,
-                backgroundColor: themeMode === 'light' ? colors.primary : colors.surfaceElevated,
-                borderWidth: 1,
-                borderColor: themeMode === 'light' ? colors.primary : colors.divider,
-                minHeight: 44,
-              }}
-              onPress={() => setThemeMode('light')}
-            >
-              <Sun size={16} color={themeMode === 'light' ? colors.onPrimary : colors.textSecondary} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: themeMode === 'light' ? colors.onPrimary : colors.textSecondary }}>Terang</Text>
-            </TouchableOpacity>
-          </View>
-        </Surface>
-
-        {/* Gemini AI Key Card */}
-        <Surface style={{ padding: spacing.md, borderRadius: radius.lg }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.xs }}>
-            <Key size={18} color={colors.primary} />
-            <Text style={{ ...typography.h3, color: colors.textPrimary }}>Google Gemini AI Cloud</Text>
-          </View>
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: spacing.sm }}>
-            {aiStatus.description}
-          </Text>
-
-          {/* Status Indicator */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceElevated, padding: 10, borderRadius: radius.sm, marginBottom: spacing.md }}>
-            <Wifi size={16} color={aiStatus.isOnline ? colors.success : colors.warning} />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: aiStatus.isOnline ? colors.success : colors.warning, flex: 1 }}>
-              {aiStatus.modeLabel}
-            </Text>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{
+                  ...typography.h2,
+                  color: colors.textPrimary,
+                  letterSpacing: -0.2,
+                }}
+                numberOfLines={1}
+              >
+                {name.trim() || 'Tanpa nama'}
+              </Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                {parsedWeight} kg menuju {parsedTargetWeight} kg
+              </Text>
+            </View>
           </View>
 
-          <TextInput
+          <View
             style={{
-              backgroundColor: colors.surfaceElevated,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: colors.divider,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              color: colors.textPrimary,
-              fontSize: 13,
-              marginBottom: spacing.md,
+              height: 1,
+              backgroundColor: colors.divider,
+              marginVertical: spacing.md,
             }}
-            placeholder="Tempel Gemini API Key (AIzaSy...)"
-            placeholderTextColor={colors.textTertiary}
-            value={apiKeyInput}
-            onChangeText={setApiKeyInput}
-            secureTextEntry={true}
           />
 
-          <View style={{ gap: spacing.sm }}>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <TouchableOpacity
-                style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-                onPress={handleSaveApiKey}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.onPrimary }}>Simpan Key</Text>
-              </TouchableOpacity>
-
-              {userApiKey ? (
-                <>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: colors.infoSubtle, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}
-                    onPress={handleTestConnection}
-                    disabled={isTestingKey}
-                  >
-                    {isTestingKey ? <ActivityIndicator size="small" color={colors.info} /> : <RefreshCw size={14} color={colors.info} />}
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.info }}>Tes Koneksi</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={{ backgroundColor: colors.dangerSubtle, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', minHeight: 44 }}
-                    onPress={handleDeleteApiKey}
-                  >
-                    <Trash2 size={16} color={colors.danger} />
-                  </TouchableOpacity>
-                </>
-              ) : null}
-            </View>
-
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', paddingTop: 4 }}
-              onPress={handleOpenGoogleAIStudio}
-            >
-              <ExternalLink size={14} color={colors.primary} />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primaryText }}>
-                Buat API Key Gratis di Google AI Studio
+          <View style={{ flexDirection: 'row' }}>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Saat istirahat
               </Text>
-            </TouchableOpacity>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 20,
+                  lineHeight: 25,
+                  fontWeight: '700',
+                  letterSpacing: -0.35,
+                }}
+              >
+                {bmr}
+                <Text style={{ ...typography.caption, color: colors.textTertiary }}> kcal</Text>
+              </Text>
+            </View>
+
+            <View style={{ width: 1, backgroundColor: colors.divider, marginHorizontal: spacing.md }} />
+
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Total harian
+              </Text>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 20,
+                  lineHeight: 25,
+                  fontWeight: '700',
+                  letterSpacing: -0.35,
+                }}
+              >
+                {tdee}
+                <Text style={{ ...typography.caption, color: colors.textTertiary }}> kcal</Text>
+              </Text>
+            </View>
           </View>
         </Surface>
 
-        {/* Calculated Metabolism BMR / TDEE Card */}
-        <Surface style={{ padding: spacing.md, borderRadius: radius.lg }}>
-          <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs }}>Estimasi Metabolisme (BMR & TDEE)</Text>
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: spacing.md }}>
-            Dihitung berdasarkan usia, tinggi, berat, gender, dan tipe tubuhmu.
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <View style={{ flex: 1, backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.md, alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: colors.textTertiary, textTransform: 'uppercase' }}>BMR (Istirahat)</Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.primary, marginTop: 2 }}>{bmr} kcal</Text>
-            </View>
-
-            <View style={{ flex: 1, backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.md, alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, color: colors.textTertiary, textTransform: 'uppercase' }}>TDEE (Total Harian)</Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.info, marginTop: 2 }}>{tdee} kcal</Text>
-            </View>
-          </View>
+        <Surface style={{ padding: spacing.md, marginVertical: 0 }}>
+          <Text style={{ ...sectionLabelStyle, marginBottom: spacing.sm }}>Tampilan</Text>
+          <TextSegmentedControl
+            value={themeMode}
+            options={THEME_OPTIONS}
+            onChange={(mode) => {
+              void setThemeMode(mode);
+            }}
+            colors={colors}
+            radiusValue={radius.md}
+            accessibilityLabel="Pilih tema tampilan"
+          />
         </Surface>
 
-        {/* Profile & Health Goals Form */}
-        <Surface style={{ padding: spacing.md, borderRadius: radius.lg }}>
-          <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: spacing.md }}>Data Fisik & Target Kesehatan</Text>
-
-          <View style={{ gap: spacing.md }}>
-            {/* Name */}
-            <View style={{ gap: spacing.xs }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Nama Pengguna</Text>
-              <TextInput
-                style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 14, paddingVertical: 10, color: colors.textPrimary, fontSize: 13, minHeight: 44 }}
-                value={name}
-                onChangeText={setName}
-              />
+        <Surface
+          style={{
+            padding: 0,
+            marginVertical: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              minHeight: 72,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+            activeOpacity={0.7}
+            onPress={() => setIsDataExpanded((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel="Data dan target"
+            accessibilityState={{ expanded: isDataExpanded }}
+          >
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={sectionLabelStyle}>Data & target</Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Tubuh, aktivitas, dan sasaran harian
+              </Text>
             </View>
+            <Text
+              style={{
+                color: colors.textTertiary,
+                fontSize: 22,
+                lineHeight: 24,
+                fontWeight: '300',
+              }}
+            >
+              {isDataExpanded ? '⌄' : '›'}
+            </Text>
+          </TouchableOpacity>
 
-            {/* Gender Selection */}
-            <View style={{ gap: spacing.xs }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Jenis Kelamin</Text>
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {isDataExpanded ? (
+            <>
+              <View style={{ height: 1, backgroundColor: colors.divider }} />
+              <View style={{ padding: spacing.md, gap: spacing.lg }}>
+                <ProfileField
+                  label="Nama"
+                  value={name}
+                  onChangeText={setName}
+                  colors={colors}
+                  radiusValue={radius.md}
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                />
+
+                <View style={{ gap: 8 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                    Jenis kelamin
+                  </Text>
+                  <TextSegmentedControl
+                    value={gender}
+                    options={GENDER_OPTIONS}
+                    onChange={setGender}
+                    colors={colors}
+                    radiusValue={radius.md}
+                    accessibilityLabel="Pilih jenis kelamin"
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <ProfileField
+                      label="Usia"
+                      value={age}
+                      onChangeText={setAge}
+                      colors={colors}
+                      radiusValue={radius.md}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ProfileField
+                      label="Tinggi (cm)"
+                      value={height}
+                      onChangeText={setHeight}
+                      colors={colors}
+                      radiusValue={radius.md}
+                      keyboardType="decimal-pad"
+                      returnKeyType="done"
+                    />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <ProfileField
+                      label="Berat kini (kg)"
+                      value={weight}
+                      onChangeText={setWeight}
+                      colors={colors}
+                      radiusValue={radius.md}
+                      keyboardType="decimal-pad"
+                      returnKeyType="done"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ProfileField
+                      label="Berat yang ingin dicapai (kg)"
+                      value={targetWeight}
+                      onChangeText={setTargetWeight}
+                      colors={colors}
+                      radiusValue={radius.md}
+                      keyboardType="decimal-pad"
+                      returnKeyType="done"
+                    />
+                  </View>
+                </View>
+
+                <View style={{ gap: 9 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                    Aktivitas harian
+                  </Text>
+                  <TextChoiceGroup
+                    value={activityLevel}
+                    options={ACTIVITY_OPTIONS}
+                    onChange={setActivityLevel}
+                    colors={colors}
+                    radiusValue={radius.full}
+                    accessibilityLabel="Pilih aktivitas harian"
+                  />
+                  <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
+                    {ACTIVITY_DESCRIPTIONS[activityLevel]}
+                  </Text>
+                </View>
+
+                <View style={{ gap: 9 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                    Respons tubuh
+                  </Text>
+                  <TextChoiceGroup
+                    value={bodyType}
+                    options={BODY_TYPE_OPTIONS}
+                    onChange={setBodyType}
+                    colors={colors}
+                    radiusValue={radius.full}
+                    accessibilityLabel="Pilih respons tubuh"
+                  />
+                  <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
+                    {BODY_TYPE_INFO[bodyType].desc}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <ProfileField
+                      label="Defisit (kcal)"
+                      value={targetDeficit}
+                      onChangeText={setTargetDeficit}
+                      colors={colors}
+                      radiusValue={radius.md}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ProfileField
+                      label="Puasa (jam)"
+                      value={fastingTarget}
+                      onChangeText={setFastingTarget}
+                      colors={colors}
+                      radiusValue={radius.md}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                    />
+                  </View>
+                </View>
+
                 <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', backgroundColor: gender === 'male' ? colors.primary : colors.surfaceElevated, borderWidth: 1, borderColor: gender === 'male' ? colors.primary : colors.divider, minHeight: 44 }}
-                  onPress={() => setGender('male')}
+                  style={{
+                    minHeight: 48,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: radius.md,
+                    backgroundColor: colors.primary,
+                  }}
+                  activeOpacity={0.78}
+                  onPress={handleSaveProfile}
+                  accessibilityRole="button"
+                  accessibilityLabel="Simpan data dan target"
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: gender === 'male' ? colors.onPrimary : colors.textSecondary }}>Laki-laki 👨</Text>
+                  <Text style={{ color: colors.onPrimary, fontSize: 14, fontWeight: '700' }}>
+                    Simpan perubahan
+                  </Text>
                 </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+        </Surface>
 
-                <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', backgroundColor: gender === 'female' ? colors.primary : colors.surfaceElevated, borderWidth: 1, borderColor: gender === 'female' ? colors.primary : colors.divider, minHeight: 44 }}
-                  onPress={() => setGender('female')}
+        <Surface
+          style={{
+            padding: 0,
+            marginVertical: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              minHeight: 72,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+            activeOpacity={0.7}
+            onPress={() => setIsAIExpanded((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel="AI dan privasi"
+            accessibilityState={{ expanded: isAIExpanded }}
+          >
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={sectionLabelStyle}>AI & privasi</Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                {aiStatus.modeLabel}
+              </Text>
+            </View>
+            <Text
+              style={{
+                color: colors.textTertiary,
+                fontSize: 22,
+                lineHeight: 24,
+                fontWeight: '300',
+              }}
+            >
+              {isAIExpanded ? '⌄' : '›'}
+            </Text>
+          </TouchableOpacity>
+
+          {isAIExpanded ? (
+            <>
+              <View style={{ height: 1, backgroundColor: colors.divider }} />
+              <View style={{ padding: spacing.md, gap: spacing.md }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: 12,
+                    borderRadius: radius.md,
+                    backgroundColor: colors.surfaceElevated,
+                  }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: gender === 'female' ? colors.onPrimary : colors.textSecondary }}>Perempuan 👩</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Physical Stats Row */}
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Umur (10-100)</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 13, minHeight: 44 }}
-                  keyboardType="number-pad"
-                  value={age}
-                  onChangeText={setAge}
-                />
-              </View>
-
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Tinggi (100-230 cm)</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 13, minHeight: 44 }}
-                  keyboardType="decimal-pad"
-                  value={height}
-                  onChangeText={setHeight}
-                />
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Berat Saat Ini (kg)</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 13, minHeight: 44 }}
-                  keyboardType="decimal-pad"
-                  value={weight}
-                  onChangeText={setWeight}
-                />
-              </View>
-
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Target Berat (kg)</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 13, minHeight: 44 }}
-                  keyboardType="decimal-pad"
-                  value={targetWeight}
-                  onChangeText={setTargetWeight}
-                />
-              </View>
-            </View>
-
-            {/* Body Type Selection */}
-            <View style={{ gap: spacing.xs }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Tipe Tubuh / Aktivitas</Text>
-              <View style={{ gap: spacing.xs }}>
-                {(['easy_gain', 'normal', 'hard_gain'] as BodyType[]).map((bt) => {
-                  const info = BODY_TYPE_INFO[bt];
-                  return (
-                    <TouchableOpacity
-                      key={bt}
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: radius.full,
+                      backgroundColor: aiStatus.isOnline ? colors.success : colors.warning,
+                    }}
+                  />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text
                       style={{
+                        ...typography.bodyMedium,
+                        color: colors.textPrimary,
+                      }}
+                    >
+                      {aiStatus.modeLabel}
+                    </Text>
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        color: colors.textTertiary,
+                        lineHeight: 17,
+                      }}
+                    >
+                      {aiStatus.description}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ gap: 7 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                    Gemini API key
+                  </Text>
+                  <TextInput
+                    style={{
+                      minHeight: 46,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: colors.divider,
+                      backgroundColor: colors.surfaceElevated,
+                      color: colors.textPrimary,
+                      fontSize: 14,
+                    }}
+                    placeholder="Tempel API key"
+                    placeholderTextColor={colors.textTertiary}
+                    selectionColor={colors.primary}
+                    value={apiKeyInput}
+                    onChangeText={setApiKeyInput}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                  />
+                  <Text
+                    style={{
+                      ...typography.caption,
+                      color: colors.textTertiary,
+                      lineHeight: 17,
+                    }}
+                  >
+                    {Platform.OS === 'web'
+                      ? 'Prototipe web menyimpan key hanya selama sesi tab. Untuk produksi, gunakan proxy backend agar key tidak berada di browser. Data fitur dikirim ke Gemini saat AI dipakai.'
+                      : 'Di iOS dan Android, key disimpan dengan penyimpanan aman OS (Keychain/Keystore). Ringkasan, pertanyaan Coach, dan deskripsi makanan dikirim ke Gemini saat AI dipakai.'}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      minHeight: 46,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: radius.md,
+                      backgroundColor: colors.primary,
+                      opacity: apiKeyInput.trim() ? 1 : 0.45,
+                    }}
+                    activeOpacity={0.78}
+                    onPress={handleSaveApiKey}
+                    disabled={!apiKeyInput.trim()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Simpan Gemini API key"
+                  >
+                    <Text style={{ color: colors.onPrimary, fontSize: 13, fontWeight: '700' }}>
+                      Simpan key
+                    </Text>
+                  </TouchableOpacity>
+
+                  {userApiKey ? (
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        minHeight: 46,
                         flexDirection: 'row',
                         alignItems: 'center',
-                        gap: 10,
-                        padding: 10,
+                        justifyContent: 'center',
+                        gap: 7,
                         borderRadius: radius.md,
-                        backgroundColor: bodyType === bt ? colors.surfaceElevated : 'transparent',
                         borderWidth: 1,
-                        borderColor: bodyType === bt ? colors.primary : colors.divider,
-                        minHeight: 44,
+                        borderColor: colors.divider,
+                        backgroundColor: colors.surfaceElevated,
+                        opacity: isTestingKey ? 0.65 : 1,
                       }}
-                      onPress={() => setBodyType(bt)}
+                      activeOpacity={0.72}
+                      onPress={handleTestConnection}
+                      disabled={isTestingKey}
+                      accessibilityRole="button"
+                      accessibilityLabel="Tes koneksi Gemini"
                     >
-                      <Text style={{ fontSize: 16 }}>{info.emoji}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textPrimary }}>{info.label}</Text>
-                        <Text style={{ fontSize: 10, color: colors.textTertiary }}>{info.desc}</Text>
-                      </View>
+                      {isTestingKey ? (
+                        <ActivityIndicator size="small" color={colors.primaryText} />
+                      ) : null}
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: '700',
+                        }}
+                      >
+                        {isTestingKey ? 'Menguji' : 'Tes koneksi'}
+                      </Text>
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+                  ) : null}
+                </View>
 
-            {/* Target Deficit & Fasting Target */}
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Target Defisit (kcal)</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 12, paddingVertical: 10, color: colors.primaryText, fontSize: 13, fontWeight: 'bold', minHeight: 44 }}
-                  keyboardType="number-pad"
-                  value={targetDeficit}
-                  onChangeText={setTargetDeficit}
-                />
-              </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: spacing.md,
+                  }}
+                >
+                  <TouchableOpacity
+                    style={{ minHeight: 40, justifyContent: 'center' }}
+                    activeOpacity={0.7}
+                    onPress={handleOpenGoogleAIStudio}
+                    accessibilityRole="link"
+                    accessibilityLabel="Buka Google AI Studio"
+                  >
+                    <Text style={{ color: colors.primaryText, fontSize: 12, fontWeight: '600' }}>
+                      Buka Google AI Studio ↗
+                    </Text>
+                  </TouchableOpacity>
 
-              <View style={{ flex: 1, gap: spacing.xs }}>
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Target Puasa (Jam)</Text>
-                <TextInput
-                  style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 12, paddingVertical: 10, color: colors.textPrimary, fontSize: 13, minHeight: 44 }}
-                  keyboardType="number-pad"
-                  value={fastingTarget}
-                  onChangeText={setFastingTarget}
-                />
+                  {userApiKey ? (
+                    <TouchableOpacity
+                      style={{ minHeight: 40, justifyContent: 'center' }}
+                      activeOpacity={0.7}
+                      onPress={handleDeleteApiKey}
+                      accessibilityRole="button"
+                      accessibilityLabel="Hapus Gemini API key"
+                    >
+                      <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>
+                        Hapus key
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
-            </View>
-
-            <TouchableOpacity
-              style={{ backgroundColor: colors.primary, paddingVertical: 14, borderRadius: radius.md, alignItems: 'center', marginTop: spacing.sm, minHeight: 44, justifyContent: 'center' }}
-              onPress={handleSaveProfile}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onPrimary }}>Simpan Perubahan Profil & Target</Text>
-            </TouchableOpacity>
-          </View>
+            </>
+          ) : null}
         </Surface>
+
+        <Text
+          style={{
+            ...typography.caption,
+            color: colors.textTertiary,
+            textAlign: 'center',
+            lineHeight: 17,
+          }}
+        >
+          Perubahan aktivitas dan respons tubuh langsung memperbarui estimasi energi.
+        </Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };

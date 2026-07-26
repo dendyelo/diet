@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserProfile, MealLog, WeightLog } from '../types';
+import { ActivityLog, UserProfile, MealLog, WeightLog } from '../types';
 
 const SCHEMA_VERSION = 6;
 
@@ -11,6 +11,7 @@ const KEYS = {
   STEP_RECORD: '@habitdiet_step_record',
   LEGACY_STEP_COUNT: '@habitdiet_step_count',
   WEIGHT_LOGS: '@habitdiet_weight_logs',
+  ACTIVITY_LOGS: '@habitdiet_activity_logs',
 };
 
 export interface StepRecord {
@@ -303,6 +304,54 @@ export async function saveStepRecord(dateStr: string, record: StepRecord): Promi
   });
 }
 
+export async function loadActivityLogs(dateStr: string): Promise<ActivityLog[]> {
+  try {
+    const data = await AsyncStorage.getItem(`${KEYS.ACTIVITY_LOGS}_${dateStr}`);
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((item): item is ActivityLog => {
+        if (!item || typeof item !== 'object') return false;
+        if (typeof item.id !== 'string' || typeof item.name !== 'string') return false;
+        if (!item.timestamp || Number.isNaN(new Date(item.timestamp).getTime())) return false;
+        return (
+          Number(item.durationMinutes) > 0 &&
+          Number(item.met) >= 1 &&
+          Number(item.estimatedCalories) >= 0 &&
+          Number(item.creditedCalories) >= 0
+        );
+      })
+      .map((item) => ({
+        ...item,
+        durationMinutes: Math.min(720, Math.max(1, Number(item.durationMinutes))),
+        met: Math.min(20, Math.max(1, Number(item.met))),
+        estimatedCalories: Math.round(Math.max(0, Number(item.estimatedCalories))),
+        creditedCalories: Math.round(Math.max(0, Number(item.creditedCalories))),
+        stepOverlap: ['high', 'medium', 'low'].includes(item.stepOverlap)
+          ? item.stepOverlap
+          : 'medium',
+        source: item.source === 'ai' ? 'ai' : 'local',
+      }));
+  } catch (error) {
+    console.error('Error loading activity logs:', error);
+    return [];
+  }
+}
+
+export async function saveActivityLogs(
+  dateStr: string,
+  logs: ActivityLog[]
+): Promise<void> {
+  return storageQueue.enqueue(async () => {
+    await AsyncStorage.setItem(
+      `${KEYS.ACTIVITY_LOGS}_${dateStr}`,
+      JSON.stringify(logs)
+    );
+  });
+}
+
 /**
  * Load Weight Logs with Strict Schema Validation
  */
@@ -336,4 +385,3 @@ export async function saveWeightLogs(logs: WeightLog[]): Promise<void> {
     }
   });
 }
-

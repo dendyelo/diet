@@ -1,4 +1,5 @@
 import { FastingStage, TriggerOption, MealLog } from '../types';
+import { getLocalDateString } from './date';
 
 export const FASTING_STAGES: FastingStage[] = [
   {
@@ -160,12 +161,23 @@ export interface WeeklyHabitSummary {
 export function generateWeeklyHabitSummary(
   mealLogs: MealLog[],
   todayWaterGlasses: number = 0,
-  targetProteinGrams: number = 80
+  targetProteinGrams: number = 80,
+  now: Date = new Date()
 ): WeeklyHabitSummary {
-  if (!mealLogs || mealLogs.length === 0) {
+  const endTime = now.getTime();
+  const startOfWindow = new Date(now);
+  startOfWindow.setHours(0, 0, 0, 0);
+  startOfWindow.setDate(startOfWindow.getDate() - 6);
+  const startTime = startOfWindow.getTime();
+  const weeklyLogs = (mealLogs || []).filter((meal) => {
+    const timestamp = new Date(meal.timestamp).getTime();
+    return Number.isFinite(timestamp) && timestamp >= startTime && timestamp <= endTime;
+  });
+
+  if (weeklyLogs.length === 0) {
     const waterPct = Math.min(100, Math.round((todayWaterGlasses / 8) * 100));
     return {
-      habitScore: waterPct > 0 ? Math.round(waterPct * 0.3) : 0,
+      habitScore: 0,
       avgDailyCalories: 0,
       waterCompliancePct: waterPct,
       proteinCompliancePct: 0,
@@ -173,29 +185,36 @@ export function generateWeeklyHabitSummary(
     };
   }
 
-  const totalCal = mealLogs.reduce((acc, m) => acc + (m.nutrition.calories || 0), 0);
-  const daysWithData = Math.max(1, Math.min(7, new Set(mealLogs.map((m) => m.timestamp.slice(0, 10))).size));
+  const totalCal = weeklyLogs.reduce((acc, m) => acc + (m.nutrition.calories || 0), 0);
+  const daysWithData = Math.max(
+    1,
+    new Set(weeklyLogs.map((meal) => getLocalDateString(new Date(meal.timestamp)))).size
+  );
   const avgDailyCalories = Math.round(totalCal / daysWithData);
 
   const waterCompliancePct = Math.min(100, Math.round((todayWaterGlasses / 8) * 100));
 
-  const totalProtein = mealLogs.reduce((acc, m) => acc + (m.nutrition.proteinGrams || 0), 0);
+  const totalProtein = weeklyLogs.reduce(
+    (acc, m) => acc + (m.nutrition.proteinGrams || 0),
+    0
+  );
   const avgProtein = totalProtein / daysWithData;
   const proteinCompliancePct = Math.min(100, Math.round((avgProtein / Math.max(1, targetProteinGrams)) * 100));
 
-  // Habit Score Calculation (Weighted blend of water, protein, and logging consistency)
+  // Weekly score uses only seven-day meal data. Water storage is today-only,
+  // so it is reported separately and never presented as a weekly trend.
   const consistencyScore = Math.min(100, Math.round((daysWithData / 7) * 100));
   const habitScore = Math.round(
-    consistencyScore * 0.4 + waterCompliancePct * 0.3 + proteinCompliancePct * 0.3
+    consistencyScore * 0.55 + proteinCompliancePct * 0.45
   );
 
-  let insightSentence = 'Konsistensi pola makanmu sangat baik minggu ini. Pertahankan hidrasi harian!';
+  let insightSentence = 'Pencatatan dan asupan proteinmu mulai membentuk pola.';
   if (habitScore >= 85) {
-    insightSentence = 'Luar biasa! Konsistensi gizi dan hidrasimu berada di tingkat optimal minggu ini 🎉.';
+    insightSentence = 'Pencatatan dan asupan proteinmu konsisten minggu ini.';
   } else if (habitScore >= 60) {
-    insightSentence = 'Pola kebiasaanmu stabil. Coba tambahkan 1 gelas air lagi untuk hidrasi maksimal.';
+    insightSentence = 'Pola pencatatanmu mulai stabil. Pertahankan ritme yang terasa realistis.';
   } else {
-    insightSentence = 'Awal yang baik! Catat makanan dan air secara rutin untuk membangun momentum kebiasaan.';
+    insightSentence = 'Awal yang baik. Tambah hari tercatat agar pola minggu ini makin jelas.';
   }
 
   return {

@@ -53,6 +53,21 @@ export interface MealLog {
   notes?: string;
 }
 
+export type ActivityStepOverlap = 'high' | 'medium' | 'low';
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  name: string;
+  durationMinutes: number;
+  met: number;
+  estimatedCalories: number;
+  creditedCalories: number;
+  stepOverlap: ActivityStepOverlap;
+  source: 'ai' | 'local';
+  notes?: string;
+}
+
 export interface FastingStage {
   id: string;
   name: string;

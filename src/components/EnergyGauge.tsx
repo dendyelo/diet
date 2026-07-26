@@ -35,7 +35,7 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
     ? 'CHEAT DAY MODE'
     : isDeficit
     ? `DEFISIT ${absBalance} KCAL`
-    : `SURPLUS ${absBalance} KCAL`;
+    : `LEBIH ${absBalance} KKAL`;
 
   // SVG Gauge Calculations
   const radius = 80;
@@ -92,7 +92,7 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
             {netBalance >= 0 ? `-${netBalance}` : `+${Math.abs(netBalance)}`}
           </Text>
           <Text style={{ fontSize: 10, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            {netBalance >= 0 ? 'Nett Defisit' : 'Nett Surplus'}
+            {netBalance >= 0 ? 'Kalori belum terpenuhi' : 'Kalori berlebih'}
           </Text>
         </View>
       </View>

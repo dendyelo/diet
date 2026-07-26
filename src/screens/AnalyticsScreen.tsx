@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useProfile, useMeals, useHealth, useTheme } from '../context/AppContext';
 import { calculateTriggerStats } from '../utils/habitAnalytics';
 import { Surface } from '../components/Surface';
-import { Flame, AlertTriangle, ShieldCheck } from 'lucide-react-native';
 
 export const AnalyticsScreen: React.FC = () => {
   const { profile } = useProfile();
@@ -14,93 +13,169 @@ export const AnalyticsScreen: React.FC = () => {
   const triggerStats = calculateTriggerStats(mealLogs || []);
   const fastingTargetHours = profile?.fastingTargetHours || 16;
   const isTargetFastingReached = (fastingState?.fastingHours || 0) >= fastingTargetHours;
+  const fastingHours = fastingState?.fastingHours || 0;
+  const fastingProgress = Math.min(
+    100,
+    Math.max(0, Math.round((fastingHours / Math.max(1, fastingTargetHours)) * 100))
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.sm, paddingBottom: 100 }}>
-        {/* Screen Header */}
-        <View style={{ marginBottom: spacing.xs }}>
-          <Text style={{ ...typography.h1, color: colors.textPrimary }} numberOfLines={1}>Analisis Habit & Pemicu Ngemil</Text>
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginTop: 2 }}>
-            Ketahui pemicu emosional dan stabilitas habit puasa Anda.
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          paddingBottom: 120,
+          gap: spacing.lg,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ ...typography.h1, color: colors.textPrimary }}>Pola</Text>
+          <Text style={{ ...typography.body, color: colors.textTertiary }}>
+            Lihat hubungan antara puasa, hidrasi, dan keinginan ngemil.
           </Text>
         </View>
 
-        {/* Fasting & Consistency Overview */}
-        <Surface style={{ padding: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md }}>
-            <Flame size={16} color={colors.warning} />
-            <Text style={{ ...typography.caption, fontWeight: '700', color: colors.warning, textTransform: 'uppercase' }} numberOfLines={1}>
-              TARGET HARIAN & KONSISTENSI
+        <Surface style={{ marginVertical: 0, padding: spacing.lg, gap: spacing.lg }}>
+          <View style={{ gap: spacing.xs }}>
+            <Text style={{ ...typography.body, color: colors.textTertiary }}>Puasa saat ini</Text>
+            <Text
+              style={{
+                fontSize: 54,
+                lineHeight: 60,
+                fontWeight: '300',
+                letterSpacing: -2,
+                color: colors.textPrimary,
+              }}
+            >
+              {fastingHours}
+              <Text style={{ fontSize: 20, color: colors.textTertiary }}> jam</Text>
+            </Text>
+            <Text style={{ ...typography.caption, color: isTargetFastingReached ? colors.primaryText : colors.textTertiary }}>
+              {isTargetFastingReached
+                ? 'Target hari ini tercapai'
+                : `${Math.max(0, fastingTargetHours - fastingHours)} jam menuju target`}
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }}>
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>PUASA SAAT INI</Text>
-              <Text style={{ ...typography.h2, color: colors.info, marginTop: 4 }} numberOfLines={1}>
-                {fastingState?.fastingHours || 0} / {fastingTargetHours} Jam
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Target {fastingTargetHours} jam
               </Text>
-              <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>
-                {isTargetFastingReached ? '✓ Target Tercapai' : 'Sedang Berjalan'}
+              <Text style={{ ...typography.caption, color: colors.textSecondary }}>
+                {fastingProgress}%
               </Text>
             </View>
-
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>TOTAL SNACKING</Text>
-              <Text style={{ ...typography.h2, color: snackCount > 2 ? colors.danger : colors.primary, marginTop: 4 }} numberOfLines={1}>
-                {snackCount} Kali
-              </Text>
-              <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>Hari Ini</Text>
+            <View
+              style={{
+                height: 3,
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: radius.full,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                style={{
+                  height: '100%',
+                  width: `${fastingProgress}%`,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.primary,
+                }}
+              />
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>LANGKAH KAKI</Text>
-              <Text style={{ ...typography.h2, color: colors.primaryText, marginTop: 4 }} numberOfLines={1}>{steps || 0}</Text>
-              <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>Langkah</Text>
-            </View>
-
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }} numberOfLines={1}>AIR MINUM</Text>
-              <Text style={{ ...typography.h2, color: colors.info, marginTop: 4 }} numberOfLines={1}>{waterGlasses || 0} / 8</Text>
-              <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>Gelas Hari Ini</Text>
-            </View>
+          <View style={{ borderTopWidth: 1, borderTopColor: colors.divider }}>
+            {[
+              {
+                label: 'Ngemil hari ini',
+                value: `${snackCount} kali`,
+                color: snackCount > 2 ? colors.danger : colors.textPrimary,
+              },
+              {
+                label: 'Langkah',
+                value: `${steps || 0}`,
+                color: colors.textPrimary,
+              },
+              {
+                label: 'Air minum',
+                value: `${waterGlasses || 0} dari 8 gelas`,
+                color: colors.textPrimary,
+              },
+            ].map((item, index) => (
+              <View
+                key={item.label}
+                style={{
+                  minHeight: 58,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderBottomWidth: index < 2 ? 1 : 0,
+                  borderBottomColor: colors.divider,
+                }}
+              >
+                <Text style={{ ...typography.body, color: colors.textSecondary }}>{item.label}</Text>
+                <Text style={{ ...typography.bodyMedium, color: item.color }}>{item.value}</Text>
+              </View>
+            ))}
           </View>
         </Surface>
 
-        {/* Trigger Breakdown */}
-        <Surface style={{ padding: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md }}>
-            <AlertTriangle size={16} color={colors.warning} />
-            <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textPrimary, textTransform: 'uppercase' }}>
-              Pemicu Emotional Eating
+        <Surface style={{ marginVertical: 0, padding: spacing.lg, gap: spacing.lg }}>
+          <View style={{ gap: spacing.xs }}>
+            <Text style={{ ...typography.h3, color: colors.textPrimary }}>Pemicu ngemil</Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+              Berdasarkan catatan ngemil yang memiliki pemicu.
             </Text>
           </View>
 
           {triggerStats.totalSnacks === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: spacing.md, gap: 6 }}>
-              <ShieldCheck size={28} color={colors.primary} />
-              <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>Belum Ada Snacking Dicatat</Text>
-              <Text style={{ ...typography.caption, color: colors.textTertiary, textAlign: 'center' }}>
-                Bagus sekali! Tetap pertahankan kesadaran makan Anda.
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: colors.divider,
+                paddingTop: spacing.lg,
+                gap: spacing.xs,
+              }}
+            >
+              <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>
+                Belum ada pola yang terbentuk
+              </Text>
+              <Text style={{ ...typography.body, color: colors.textTertiary }}>
+                Catat pemicu saat ngemil agar pola emosional dan fisik bisa dibedakan.
               </Text>
             </View>
           ) : (
-            <View style={{ gap: spacing.sm }}>
+            <View style={{ gap: spacing.lg }}>
               {triggerStats.breakdown.map((item) => (
-                <View key={item.type} style={{ gap: 4 }}>
+                <View key={item.type} style={{ gap: spacing.sm }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>
-                      {item.emoji} {item.label}
+                    <Text style={{ ...typography.body, color: colors.textSecondary }}>
+                      {item.label}
                     </Text>
-                    <Text style={{ ...typography.caption, color: colors.textSecondary, fontWeight: '700' }}>
-                      {item.count}x ({item.percentage}%)
+                    <Text style={{ ...typography.caption, color: colors.textPrimary }}>
+                      {item.count} · {item.percentage}%
                     </Text>
                   </View>
-                  <View style={{ height: 6, backgroundColor: colors.surfaceElevated, borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: '100%', backgroundColor: item.color, width: `${item.percentage}%` }} />
+                  <View
+                    style={{
+                      height: 3,
+                      backgroundColor: colors.surfaceElevated,
+                      borderRadius: radius.full,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: '100%',
+                        backgroundColor: item.color,
+                        borderRadius: radius.full,
+                        width: `${item.percentage}%`,
+                      }}
+                    />
                   </View>
                 </View>
               ))}
@@ -108,6 +183,6 @@ export const AnalyticsScreen: React.FC = () => {
           )}
         </Surface>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };

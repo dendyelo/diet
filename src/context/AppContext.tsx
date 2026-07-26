@@ -67,12 +67,17 @@ export const useApp = () => {
     steps: healthCtx.steps,
     sensorSteps: healthCtx.sensorSteps,
     manualSteps: healthCtx.manualSteps,
+    stepTrackingStatus: healthCtx.stepTrackingStatus,
+    stepTrackingMessage: healthCtx.stepTrackingMessage,
     elapsedSeconds: healthCtx.elapsedSeconds,
     fastingState: healthCtx.fastingState,
     energy: healthCtx.energy,
+    activityLogs: healthCtx.activityLogs,
     showWelcomeBackModal: healthCtx.showWelcomeBackModal,
     addWaterGlass: healthCtx.addWaterGlass,
     addStepsManual: healthCtx.addStepsManual,
+    addActivityLog: healthCtx.addActivityLog,
+    deleteActivityLog: healthCtx.deleteActivityLog,
     resetFastingTimer: healthCtx.resetFastingTimer,
     freshStartToday: healthCtx.freshStartToday,
     dismissWelcomeBackModal: healthCtx.dismissWelcomeBackModal,
@@ -80,6 +85,10 @@ export const useApp = () => {
     // AIContext
     aiStatus: aiCtx.aiStatus,
     parseFoodNutrition: aiCtx.parseFoodNutrition,
+    parseActivity: aiCtx.parseActivity,
+    generateDailyInsight: aiCtx.generateDailyInsight,
+    generateWeeklyInsight: aiCtx.generateWeeklyInsight,
+    sendCoachQuery: aiCtx.sendCoachQuery,
     generateAICoachMessage: aiCtx.generateAICoachMessage,
 
     // Combined Loading

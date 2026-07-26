@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
-  View,
+  Platform,
+  Pressable,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
-  Keyboard,
-  Alert,
+  View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WeightLog } from '../types';
 import { useTheme } from '../context/ThemeContext';
 
@@ -31,124 +34,272 @@ export const EditWeightModal: React.FC<EditWeightModalProps> = ({
   isOnlyLog = false,
 }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const insets = useSafeAreaInsets();
   const [weight, setWeight] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (visible && weightLog) {
-      setWeight(weightLog.weightKg.toString());
+      setWeight(String(weightLog.weightKg));
       setNote(weightLog.note || '');
       setError('');
+      setDeleting(false);
     }
   }, [visible, weightLog]);
 
   const handleSave = () => {
     if (!weightLog) return;
 
-    const parsedWeight = parseFloat(weight.replace(',', '.'));
-    if (isNaN(parsedWeight) || parsedWeight < 20 || parsedWeight > 300) {
-      setError('Berat badan harus antara 20 dan 300 kg');
+    const parsedWeight = Number.parseFloat(weight.replace(',', '.'));
+    if (!Number.isFinite(parsedWeight) || parsedWeight < 20 || parsedWeight > 300) {
+      setError('Masukkan berat antara 20–300 kg.');
       return;
     }
 
     onSave(weightLog.id, {
       weightKg: parsedWeight,
-      note: note.trim() !== '' ? note.trim() : undefined,
+      note: note.trim() || undefined,
     });
     onClose();
   };
 
   const handleDelete = () => {
-    if (!weightLog || isOnlyLog) return;
+    if (!weightLog || isOnlyLog || deleting) return;
 
-    Alert.alert(
-      'Hapus Data',
-      'Apakah Anda yakin ingin menghapus catatan berat badan ini?',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            const deleted = await onDelete(weightLog.id);
-            if (deleted) {
-              onClose();
-            } else {
-              setError('Tidak bisa menghapus satu-satunya catatan berat badan');
-            }
-          },
+    Alert.alert('Hapus catatan?', 'Data berat ini akan dihapus dari progresmu.', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          const deleted = await onDelete(weightLog.id);
+          setDeleting(false);
+          if (deleted) {
+            onClose();
+          } else {
+            setError('Catatan ini belum bisa dihapus.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
+
+  if (!weightLog) return null;
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      statusBarTranslucent
+      animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: spacing.md }}>
-          <View style={{ width: '100%', backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.divider }}>
-            <Text style={{ ...typography.h2, color: colors.textPrimary, marginBottom: spacing.lg, textAlign: 'center' }}>
-              ✏️ Edit Berat Badan
-            </Text>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
-              <TextInput
-                style={{ fontSize: 32, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center', minWidth: 100 }}
-                value={weight}
-                onChangeText={(text) => {
-                  setWeight(text);
-                  setError('');
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <Pressable style={{ flex: 1 }} onPress={onClose}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'flex-end',
+              backgroundColor: colors.overlay,
+            }}
+          >
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                Keyboard.dismiss();
+              }}
+            >
+              <View
+                style={{
+                  width: '100%',
+                  maxWidth: 560,
+                  alignSelf: 'center',
+                  paddingHorizontal: spacing.md,
+                  paddingTop: spacing.sm,
+                  paddingBottom: Math.max(spacing.md, insets.bottom),
+                  borderTopLeftRadius: radius.xl,
+                  borderTopRightRadius: radius.xl,
+                  borderWidth: 1,
+                  borderBottomWidth: 0,
+                  borderColor: colors.divider,
+                  backgroundColor: colors.surface,
                 }}
-                keyboardType="decimal-pad"
-                placeholder="0.0"
-                placeholderTextColor={colors.textTertiary}
-              />
-              <Text style={{ fontSize: 24, color: colors.textTertiary, marginLeft: 8, marginTop: 4 }}>kg</Text>
-            </View>
-
-            {error ? <Text style={{ color: colors.danger, textAlign: 'center', marginBottom: spacing.md }}>{error}</Text> : null}
-
-            <TextInput
-              style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, padding: spacing.md, color: colors.textPrimary, fontSize: 16, minHeight: 80, textAlignVertical: 'top', marginBottom: spacing.lg }}
-              value={note}
-              onChangeText={setNote}
-              placeholder="Catatan opsional..."
-              placeholderTextColor={colors.textTertiary}
-              multiline
-            />
-
-            <View style={{ flexDirection: 'row', gap: spacing.xs + 4 }}>
-              <TouchableOpacity
-                style={{ flex: 1, height: 48, borderRadius: radius.md, backgroundColor: colors.danger + '20', borderWidth: 1, borderColor: colors.danger + '50', justifyContent: 'center', alignItems: 'center', opacity: isOnlyLog ? 0.3 : 1 }}
-                onPress={handleDelete}
-                disabled={isOnlyLog}
               >
-                <Text style={{ color: colors.danger, fontSize: 14, fontWeight: '600' }}>Hapus</Text>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    width: 38,
+                    height: 4,
+                    borderRadius: 2,
+                    alignSelf: 'center',
+                    backgroundColor: colors.divider,
+                    marginBottom: spacing.lg,
+                  }}
+                />
 
-              <TouchableOpacity
-                style={{ flex: 1, height: 48, borderRadius: radius.md, backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }}
-                onPress={onClose}
-              >
-                <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '600' }}>Batal</Text>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ ...typography.overline, color: colors.textTertiary }}>
+                    EDIT BERAT
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Tutup edit berat badan"
+                    onPress={onClose}
+                    style={{
+                      minWidth: 44,
+                      minHeight: 44,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ ...typography.caption, color: colors.textSecondary }}>Tutup</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <TouchableOpacity
-                style={{ flex: 1, height: 48, borderRadius: radius.md, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}
-                onPress={handleSave}
-              >
-                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>Simpan</Text>
-              </TouchableOpacity>
-            </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'center',
+                    paddingVertical: spacing.lg,
+                  }}
+                >
+                  <TextInput
+                    accessibilityLabel="Berat badan dalam kilogram"
+                    selectTextOnFocus
+                    keyboardType="decimal-pad"
+                    value={weight}
+                    onChangeText={(text) => {
+                      setWeight(text);
+                      setError('');
+                    }}
+                    placeholder="0,0"
+                    placeholderTextColor={colors.textDisabled}
+                    style={{
+                      minWidth: 130,
+                      color: colors.textPrimary,
+                      fontSize: 44,
+                      lineHeight: 52,
+                      fontWeight: '500',
+                      letterSpacing: -1.5,
+                      textAlign: 'right',
+                      paddingVertical: 0,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      ...typography.h3,
+                      color: colors.textTertiary,
+                      marginLeft: spacing.sm,
+                    }}
+                  >
+                    kg
+                  </Text>
+                </View>
+
+                {error ? (
+                  <Text
+                    accessibilityRole="alert"
+                    style={{
+                      ...typography.caption,
+                      color: colors.danger,
+                      textAlign: 'center',
+                      marginBottom: spacing.md,
+                    }}
+                  >
+                    {error}
+                  </Text>
+                ) : null}
+
+                <TextInput
+                  accessibilityLabel="Catatan berat badan"
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder="Catatan, opsional"
+                  placeholderTextColor={colors.textTertiary}
+                  multiline
+                  maxLength={160}
+                  style={{
+                    minHeight: 72,
+                    maxHeight: 112,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderWidth: 1,
+                    borderColor: colors.divider,
+                    borderRadius: radius.md,
+                    backgroundColor: colors.surfaceElevated,
+                    color: colors.textPrimary,
+                    ...typography.body,
+                    textAlignVertical: 'top',
+                  }}
+                />
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: spacing.sm,
+                    marginTop: spacing.md,
+                  }}
+                >
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isOnlyLog ? 'Catatan awal tidak dapat dihapus' : 'Hapus catatan berat'
+                    }
+                    accessibilityState={{ disabled: isOnlyLog || deleting }}
+                    disabled={isOnlyLog || deleting}
+                    onPress={handleDelete}
+                    style={{
+                      minWidth: 80,
+                      minHeight: 50,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: radius.md,
+                      opacity: isOnlyLog || deleting ? 0.35 : 1,
+                    }}
+                  >
+                    <Text style={{ ...typography.bodyMedium, color: colors.danger }}>Hapus</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    activeOpacity={0.8}
+                    onPress={handleSave}
+                    style={{
+                      flex: 1,
+                      minHeight: 50,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: radius.md,
+                      backgroundColor: colors.primary,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        ...typography.bodyMedium,
+                        color: colors.onPrimary,
+                        fontWeight: '600',
+                      }}
+                    >
+                      Simpan perubahan
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
           </View>
-        </View>
-      </TouchableWithoutFeedback>
+        </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

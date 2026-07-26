@@ -4,6 +4,7 @@ import {
   calculateTDEE,
   calculateTargetCalories,
   calculateStepCalories,
+  calculateActivitySummary,
   calculateEnergyBalance,
   BODY_TYPE_MULTIPLIERS,
 } from '../calorieCalc';
@@ -57,6 +58,37 @@ describe('Calorie Calculation Utility Suite', () => {
     expect(burn).toBeLessThanOrEqual(295);
   });
 
+  test('activity summary avoids double-counting steps already included in TDEE', () => {
+    const baseline = calculateActivitySummary(MOCK_MALE_PROFILE, 5000);
+    const aboveBaseline = calculateActivitySummary(MOCK_MALE_PROFILE, 10000);
+
+    expect(baseline.baselineSteps).toBe(5000);
+    expect(baseline.activityBonusCalories).toBe(0);
+    expect(baseline.adjustedMaintenance).toBe(baseline.baseMaintenance);
+
+    expect(aboveBaseline.bonusSteps).toBe(5000);
+    expect(aboveBaseline.stepCalories).toBe(calculateStepCalories(10000, 70));
+    expect(aboveBaseline.activityBonusCalories).toBe(
+      calculateStepCalories(5000, 70)
+    );
+    expect(aboveBaseline.adjustedMaintenance).toBe(
+      aboveBaseline.baseMaintenance + aboveBaseline.activityBonusCalories
+    );
+  });
+
+  test('activity summary derives a clear step goal from profile activity', () => {
+    const light = calculateActivitySummary(MOCK_MALE_PROFILE, 3750);
+    const active = calculateActivitySummary(
+      { ...MOCK_MALE_PROFILE, activityLevel: 'active' },
+      11000
+    );
+
+    expect(light.stepGoal).toBe(7500);
+    expect(light.stepProgressPct).toBe(50);
+    expect(active.stepGoal).toBe(11000);
+    expect(active.stepProgressPct).toBe(100);
+  });
+
   test('calculateEnergyBalance identifies Deficit vs Surplus accurately', () => {
     const noon = new Date();
     noon.setHours(12, 0, 0, 0);
@@ -68,6 +100,56 @@ describe('Calorie Calculation Utility Suite', () => {
     const surplusResult = calculateEnergyBalance(MOCK_MALE_PROFILE, 2500, 0, noon);
     expect(surplusResult.isDeficit).toBe(false);
     expect(surplusResult.netBalance).toBeLessThan(0);
+  });
+
+  test('energy expenditure accrues with time instead of exposing full TDEE as burned', () => {
+    const morning = new Date();
+    morning.setHours(6, 0, 0, 0);
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+
+    const morningEnergy = calculateEnergyBalance(
+      MOCK_MALE_PROFILE,
+      0,
+      0,
+      morning
+    );
+    const noonEnergy = calculateEnergyBalance(
+      MOCK_MALE_PROFILE,
+      0,
+      0,
+      noon
+    );
+
+    expect(morningEnergy.totalCaloriesOut).toBeLessThan(
+      noonEnergy.totalCaloriesOut
+    );
+    expect(noonEnergy.totalCaloriesOut).toBeLessThan(
+      noonEnergy.adjustedMaintenance
+    );
+    expect(noonEnergy.elapsedMaintenanceProgressPct).toBe(50);
+  });
+
+  test('confirmed narrated activity increases today’s energy need', () => {
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    const withoutActivity = calculateEnergyBalance(
+      MOCK_MALE_PROFILE,
+      0,
+      0,
+      noon
+    );
+    const withActivity = calculateEnergyBalance(
+      MOCK_MALE_PROFILE,
+      0,
+      0,
+      noon,
+      240
+    );
+
+    expect(withActivity.loggedActivityCalories).toBe(240);
+    expect(withActivity.adjustedMaintenance - withoutActivity.adjustedMaintenance).toBe(240);
+    expect(withActivity.totalCaloriesOut - withoutActivity.totalCaloriesOut).toBe(240);
   });
 
   test('calculateTargetCalories applies deficit and cheat day correctly', () => {

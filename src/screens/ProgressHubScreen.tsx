@@ -1,13 +1,27 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { useProfile, useMeals, useHealth, useTheme } from '../context/AppContext';
+import {
+  useAI,
+  useHealth,
+  useMeals,
+  useProfile,
+  useTheme,
+} from '../context/AppContext';
 import { WeightScreen } from './WeightScreen';
 import { AnalyticsScreen } from './AnalyticsScreen';
 import { Surface } from '../components/Surface';
-import { generateWeeklyHabitSummary } from '../utils/habitAnalytics';
-import { calculateTargetProtein } from '../utils/calorieCalc';
-import { Scale, BarChart2, Award, Droplets, Utensils, CheckCircle2, Sparkles } from 'lucide-react-native';
+import {
+  generateWeeklyHabitSummary,
+  getTopTrigger,
+} from '../utils/habitAnalytics';
+import {
+  calculateTargetCalories,
+  calculateTargetProtein,
+} from '../utils/calorieCalc';
 import { triggerHaptic } from '../utils/haptics';
+import { ContextInsight } from '../components/ContextInsight';
+import { WeeklyAIInsight } from '../services/aiService';
+import { getLocalDateString } from '../utils/date';
 
 type ProgressTabMode = 'weight' | 'analytics' | 'weekly';
 
@@ -17,179 +31,322 @@ export const ProgressHubScreen: React.FC = () => {
   const { profile } = useProfile();
   const { mealLogs } = useMeals();
   const { waterGlasses } = useHealth();
+  const {
+    connectionStatus,
+    generateWeeklyInsight,
+    userApiKey,
+  } = useAI();
   const { colors, spacing, radius, typography } = useTheme();
+  const [weeklyAIInsight, setWeeklyAIInsight] = useState<WeeklyAIInsight | null>(
+    null
+  );
+  const [weeklyAILoading, setWeeklyAILoading] = useState(false);
+  const [weeklyAIRefreshToken, setWeeklyAIRefreshToken] = useState(0);
+  const lastWeeklyAIKey = useRef<string | null>(null);
 
   const targetProtein = useMemo(() => calculateTargetProtein(profile), [profile]);
+  const targetCalories = useMemo(
+    () => calculateTargetCalories(profile),
+    [profile]
+  );
+  const weeklyMealLogs = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 6);
+    const startTime = start.getTime();
+    const endTime = now.getTime();
+
+    return mealLogs.filter((meal) => {
+      const timestamp = new Date(meal.timestamp).getTime();
+      return (
+        Number.isFinite(timestamp) &&
+        timestamp >= startTime &&
+        timestamp <= endTime
+      );
+    });
+  }, [mealLogs]);
 
   const weeklySummary = useMemo(() => {
     return generateWeeklyHabitSummary(mealLogs, waterGlasses, targetProtein);
   }, [mealLogs, waterGlasses, targetProtein]);
+  const daysWithMealData = useMemo(
+    () =>
+      new Set(
+        weeklyMealLogs.map((meal) =>
+          getLocalDateString(new Date(meal.timestamp))
+        )
+      ).size,
+    [weeklyMealLogs]
+  );
+  const weeklySnackCount = useMemo(
+    () => weeklyMealLogs.filter((meal) => meal.isSnack).length,
+    [weeklyMealLogs]
+  );
+  const topTrigger = useMemo(
+    () => getTopTrigger(weeklyMealLogs),
+    [weeklyMealLogs]
+  );
+  const weeklyAIInput = useMemo(
+    () => ({
+      habitScore: weeklySummary.habitScore,
+      avgDailyCalories: weeklySummary.avgDailyCalories,
+      targetCalories,
+      proteinCompliancePct: weeklySummary.proteinCompliancePct,
+      todayWaterCompliancePct: weeklySummary.waterCompliancePct,
+      daysWithMealData,
+      snackCount: weeklySnackCount,
+      topSnackTrigger: topTrigger?.label || null,
+    }),
+    [
+      daysWithMealData,
+      targetCalories,
+      topTrigger?.label,
+      weeklySnackCount,
+      weeklySummary,
+    ]
+  );
+  const weeklyAIKey = useMemo(
+    () => JSON.stringify([weeklyAIInput, weeklyAIRefreshToken]),
+    [weeklyAIInput, weeklyAIRefreshToken]
+  );
+
+  useEffect(() => {
+    if (!userApiKey || connectionStatus !== 'connected') {
+      lastWeeklyAIKey.current = null;
+      setWeeklyAIInsight(null);
+      setWeeklyAILoading(false);
+      return;
+    }
+    if (
+      activeTab !== 'weekly' ||
+      daysWithMealData === 0
+    ) {
+      setWeeklyAILoading(false);
+      return;
+    }
+    if (lastWeeklyAIKey.current === weeklyAIKey) return;
+
+    let cancelled = false;
+    let settled = false;
+    const timer = setTimeout(() => {
+      lastWeeklyAIKey.current = weeklyAIKey;
+      setWeeklyAILoading(true);
+      void generateWeeklyInsight(weeklyAIInput)
+        .then((insight) => {
+          if (!cancelled) setWeeklyAIInsight(insight);
+        })
+        .catch(() => {
+          if (!cancelled) setWeeklyAIInsight(null);
+        })
+        .finally(() => {
+          settled = true;
+          if (!cancelled) setWeeklyAILoading(false);
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      if (!settled && lastWeeklyAIKey.current === weeklyAIKey) {
+        lastWeeklyAIKey.current = null;
+      }
+    };
+  }, [
+    activeTab,
+    connectionStatus,
+    daysWithMealData,
+    generateWeeklyInsight,
+    userApiKey,
+    weeklyAIInput,
+    weeklyAIKey,
+  ]);
 
   const handleTabChange = (tab: ProgressTabMode) => {
     triggerHaptic('light');
     setActiveTab(tab);
   };
 
+  const weeklyInsight = weeklySummary.insightSentence.replace(' 🎉', '');
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: 50 }}>
-      {/* Top Selector Bar */}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View
         style={{
           flexDirection: 'row',
-          backgroundColor: colors.surfaceElevated,
-          marginHorizontal: spacing.md,
-          marginBottom: spacing.sm,
-          borderRadius: radius.md,
-          padding: 4,
+          marginHorizontal: spacing.lg,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.divider,
         }}
       >
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: radius.sm,
-            backgroundColor: activeTab === 'weight' ? colors.primary : 'transparent',
-            minHeight: 44,
-          }}
-          onPress={() => handleTabChange('weight')}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityLabel="Tab Progres Berat Badan"
-        >
-          <Scale size={14} color={activeTab === 'weight' ? '#FFFFFF' : colors.textTertiary} />
-          <Text style={{ fontSize: 12, fontWeight: activeTab === 'weight' ? '700' : '600', color: activeTab === 'weight' ? '#FFFFFF' : colors.textTertiary }}>
-            Berat
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: radius.sm,
-            backgroundColor: activeTab === 'analytics' ? colors.primary : 'transparent',
-            minHeight: 44,
-          }}
-          onPress={() => handleTabChange('analytics')}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityLabel="Tab Analisis Habit"
-        >
-          <BarChart2 size={14} color={activeTab === 'analytics' ? '#FFFFFF' : colors.textTertiary} />
-          <Text style={{ fontSize: 12, fontWeight: activeTab === 'analytics' ? '700' : '600', color: activeTab === 'analytics' ? '#FFFFFF' : colors.textTertiary }}>
-            Analisis
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingVertical: 10,
-            borderRadius: radius.sm,
-            backgroundColor: activeTab === 'weekly' ? colors.primary : 'transparent',
-            minHeight: 44,
-          }}
-          onPress={() => handleTabChange('weekly')}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityLabel="Tab Ringkasan Mingguan"
-        >
-          <Award size={14} color={activeTab === 'weekly' ? '#FFFFFF' : colors.textTertiary} />
-          <Text style={{ fontSize: 12, fontWeight: activeTab === 'weekly' ? '700' : '600', color: activeTab === 'weekly' ? '#FFFFFF' : colors.textTertiary }}>
-            Mingguan
-          </Text>
-        </TouchableOpacity>
+        {([
+          ['weight', 'Berat'],
+          ['analytics', 'Pola'],
+          ['weekly', '7 hari'],
+        ] as const).map(([tab, label]) => {
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={{
+                flex: 1,
+                minHeight: 52,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderBottomWidth: 2,
+                borderBottomColor: isActive ? colors.primary : 'transparent',
+                marginBottom: -1,
+              }}
+              onPress={() => handleTabChange(tab)}
+              activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityLabel={`Buka progres ${label}`}
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text
+                style={{
+                  ...typography.bodyMedium,
+                  color: isActive ? colors.textPrimary : colors.textTertiary,
+                  fontWeight: isActive ? '700' : '500',
+                }}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Render Selected View */}
       {activeTab === 'weight' && <WeightScreen />}
       {activeTab === 'analytics' && <AnalyticsScreen />}
       {activeTab === 'weekly' && (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md, paddingBottom: 100 }}>
-          <View>
-            <Text style={{ ...typography.h2, color: colors.textPrimary }}>Ringkasan Habit 7 Hari</Text>
-            <Text style={{ ...typography.caption, color: colors.textTertiary }}>Konsistensi dan pencapaian kebiasaan sehatmu minggu ini.</Text>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.lg,
+            paddingBottom: 120,
+            gap: spacing.lg,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ gap: spacing.xs }}>
+            <Text style={{ ...typography.h1, color: colors.textPrimary }}>Tujuh hari terakhir</Text>
+            <Text style={{ ...typography.body, color: colors.textTertiary }}>
+              Satu pandangan tenang untuk melihat ritmemu.
+            </Text>
           </View>
 
-          {mealLogs.length === 0 ? (
-            <Surface style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.sm, marginVertical: spacing.md }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primarySubtle, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs }}>
-                <Sparkles size={32} color={colors.primary} />
-              </View>
-              <Text style={{ ...typography.h3, color: colors.textPrimary, textAlign: 'center' }}>
-                Belum Ada Data Mingguan
+          {weeklyMealLogs.length === 0 ? (
+            <Surface
+              style={{
+                marginVertical: 0,
+                padding: spacing.lg,
+                minHeight: 180,
+                justifyContent: 'flex-end',
+                gap: spacing.sm,
+              }}
+            >
+              <View
+                style={{
+                  width: 28,
+                  height: 3,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.primary,
+                  marginBottom: spacing.lg,
+                }}
+              />
+              <Text style={{ ...typography.h2, color: colors.textPrimary }}>
+                Belum ada ritme yang bisa dibaca
               </Text>
-              <Text style={{ ...typography.body, color: colors.textSecondary, textAlign: 'center', lineHeight: 20 }}>
-                Mulailah mencatat makanan dan air minum harianmu. Ringkasan habit dan konsistensi 7 hari akan otomatis terbentuk di sini.
+              <Text style={{ ...typography.body, color: colors.textSecondary }}>
+                Catat makan dan minum seperti biasa. Ringkasan ini akan terbentuk sendiri setelah ada data.
               </Text>
             </Surface>
           ) : (
             <>
-              {/* Score Banner */}
-              <Surface style={{ padding: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View>
-                  <Text style={{ ...typography.caption, color: colors.textTertiary, textTransform: 'uppercase' }}>Skor Habit Minggu Ini</Text>
-                  <Text style={{ fontSize: 32, fontWeight: '900', color: colors.primary }}>
-                    {weeklySummary.habitScore}%
+              <Surface style={{ marginVertical: 0, padding: spacing.lg, gap: spacing.lg }}>
+                <View style={{ gap: spacing.xs }}>
+                  <Text style={{ ...typography.body, color: colors.textTertiary }}>Konsistensi minggu ini</Text>
+                  <Text
+                    style={{
+                      fontSize: 54,
+                      lineHeight: 60,
+                      fontWeight: '300',
+                      letterSpacing: -2,
+                      color: colors.textPrimary,
+                    }}
+                  >
+                    {weeklySummary.habitScore}
+                    <Text style={{ fontSize: 20, color: colors.textTertiary }}> %</Text>
                   </Text>
                 </View>
-                <View style={{ backgroundColor: colors.primarySubtle, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primaryText }}>
-                    Pencapaian Konsisten
-                  </Text>
+
+                <View
+                  style={{
+                    height: 3,
+                    borderRadius: radius.full,
+                    backgroundColor: colors.surfaceElevated,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View
+                    style={{
+                      height: '100%',
+                      width: `${Math.min(100, Math.max(0, weeklySummary.habitScore))}%`,
+                      borderRadius: radius.full,
+                      backgroundColor: colors.primary,
+                    }}
+                  />
                 </View>
+
+                <Text style={{ ...typography.body, color: colors.textSecondary }}>
+                  {weeklyInsight}
+                </Text>
               </Surface>
 
-              {/* Habit Metrics Card */}
-              <Surface style={{ padding: spacing.md, gap: spacing.sm }}>
-                <Text style={{ ...typography.h3, color: colors.textPrimary }}>Pencapaian Habit</Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Utensils size={18} color={colors.primary} />
-                    <Text style={{ ...typography.body, color: colors.textSecondary }}>Rata-rata Kalori Harian</Text>
+              <Surface style={{ marginVertical: 0, paddingHorizontal: spacing.lg, paddingVertical: 0 }}>
+                {[
+                  ['Rata-rata hari tercatat', `${weeklySummary.avgDailyCalories} kcal`],
+                  ['Hidrasi hari ini', `${weeklySummary.waterCompliancePct}%`],
+                  ['Target protein', `${weeklySummary.proteinCompliancePct}%`],
+                ].map(([label, value], index) => (
+                  <View
+                    key={label}
+                    style={{
+                      minHeight: 64,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottomWidth: index < 2 ? 1 : 0,
+                      borderBottomColor: colors.divider,
+                    }}
+                  >
+                    <Text style={{ ...typography.body, color: colors.textSecondary }}>{label}</Text>
+                    <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>{value}</Text>
                   </View>
-                  <Text style={{ ...typography.bodyMedium, fontWeight: '700', color: colors.textPrimary }}>
-                    {weeklySummary.avgDailyCalories} kcal
-                  </Text>
-                </View>
-
-                <View style={{ height: 1, backgroundColor: colors.divider }} />
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Droplets size={18} color={colors.info} />
-                    <Text style={{ ...typography.body, color: colors.textSecondary }}>Tingkat Hidrasi Air</Text>
-                  </View>
-                  <Text style={{ ...typography.bodyMedium, fontWeight: '700', color: colors.textPrimary }}>
-                    {weeklySummary.waterCompliancePct}%
-                  </Text>
-                </View>
-
-                <View style={{ height: 1, backgroundColor: colors.divider }} />
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <CheckCircle2 size={18} color={colors.success} />
-                    <Text style={{ ...typography.body, color: colors.textSecondary }}>Tingkat Capaian Protein</Text>
-                  </View>
-                  <Text style={{ ...typography.bodyMedium, fontWeight: '700', color: colors.textPrimary }}>
-                    {weeklySummary.proteinCompliancePct}%
-                  </Text>
-                </View>
+                ))}
               </Surface>
+
+              {connectionStatus === 'connected' ? (
+                <Surface style={{ marginVertical: 0, padding: spacing.lg }}>
+                  <ContextInsight
+                    label="AI · POLA 7 HARI"
+                    headline={weeklyAIInsight?.headline}
+                    body={
+                      weeklyAIInsight
+                        ? `${weeklyAIInsight.body}\nEksperimen: ${weeklyAIInsight.nextExperiment}`
+                        : undefined
+                    }
+                    loading={weeklyAILoading}
+                    error={!weeklyAILoading && !weeklyAIInsight}
+                    onRefresh={() => {
+                      lastWeeklyAIKey.current = null;
+                      setWeeklyAIRefreshToken((value) => value + 1);
+                    }}
+                  />
+                </Surface>
+              ) : null}
             </>
           )}
         </ScrollView>

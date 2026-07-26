@@ -82,10 +82,58 @@ describe('Habit Analytics Utility Suite', () => {
       },
     ];
 
-    const summary = generateWeeklyHabitSummary(mockLogs, 8, 80);
-    expect(summary.habitScore).toBe(65);
+    const summary = generateWeeklyHabitSummary(
+      mockLogs,
+      8,
+      80,
+      new Date('2026-07-26T20:00:00.000Z')
+    );
+    expect(summary.habitScore).toBe(52);
     expect(summary.waterCompliancePct).toBe(100);
     expect(summary.avgDailyCalories).toBe(900);
-    expect(summary.insightSentence).toContain('Pola kebiasaanmu');
+    expect(summary.insightSentence).toContain('Awal yang baik');
+  });
+
+  test('today water is reported separately and does not inflate a weekly score', () => {
+    const summary = generateWeeklyHabitSummary(
+      [],
+      8,
+      80,
+      new Date('2026-07-26T20:00:00.000Z')
+    );
+
+    expect(summary.waterCompliancePct).toBe(100);
+    expect(summary.habitScore).toBe(0);
+  });
+
+  test('generateWeeklyHabitSummary excludes logs outside the last seven local days', () => {
+    const mockLogs: MealLog[] = [
+      {
+        id: 'recent',
+        timestamp: '2026-07-26T08:00:00.000Z',
+        name: 'Makan baru',
+        isSnack: false,
+        nutrition: { calories: 500, proteinGrams: 40, carbsGrams: 30, fatGrams: 15 },
+        source: 'manual',
+      },
+      {
+        id: 'old',
+        timestamp: '2026-07-10T08:00:00.000Z',
+        name: 'Makan lama',
+        isSnack: false,
+        nutrition: { calories: 1200, proteinGrams: 10, carbsGrams: 100, fatGrams: 40 },
+        source: 'manual',
+      },
+    ];
+
+    const summary = generateWeeklyHabitSummary(
+      mockLogs,
+      0,
+      80,
+      new Date('2026-07-26T20:00:00.000Z')
+    );
+
+    expect(summary.avgDailyCalories).toBe(500);
+    expect(summary.proteinCompliancePct).toBe(50);
   });
 });

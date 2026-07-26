@@ -1,417 +1,811 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
+  Pressable,
   ScrollView,
-  TouchableOpacity,
-  LayoutAnimation,
-  Platform,
-  UIManager,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import {
-  useProfile,
-  useMeals,
-  useWeight,
   useHealth,
-  useAI,
+  useMeals,
+  useProfile,
   useTheme,
 } from '../context/AppContext';
 import { Surface } from '../components/Surface';
-import { DailyMissionCard } from '../components/DailyMissionCard';
-import { InlineCoachCard } from '../components/InlineCoachCard';
-import { EnergyGauge } from '../components/EnergyGauge';
-import { HabitRings } from '../components/HabitRings';
 import { MealCard } from '../components/MealCard';
-import { SnackModal } from '../components/SnackModal';
 import { EditMealModal } from '../components/EditMealModal';
-import { calculateTargetCalories, calculateTargetProtein } from '../utils/calorieCalc';
-import { getFastingStage, formatElapsedTime } from '../utils/habitAnalytics';
-import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
-import { Utensils, Plus, Droplets, Footprints, Dumbbell, Cookie, Clock, ChevronDown, ChevronUp, RefreshCw, Flame } from 'lucide-react-native';
+import {
+  calculateTargetCalories,
+  calculateTargetProtein,
+} from '../utils/calorieCalc';
+import { formatElapsedTime, getFastingStage } from '../utils/habitAnalytics';
+import { MealLog } from '../types';
+import { HungerCheckResult } from '../components/HungerCheckScreen';
 import { triggerHaptic } from '../utils/haptics';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { decideHunger } from '../utils/hungerDecision';
+import { ContextInsight } from '../components/ContextInsight';
+import { DailyAIInsight } from '../services/aiService';
 
 interface LivingTimelineHomeProps {
+  lastCheckIn: HungerCheckResult | null;
+  aiInsight: DailyAIInsight | null;
+  aiInsightEnabled: boolean;
+  aiInsightLoading: boolean;
+  onRefreshAIInsight: () => void;
+  onOpenHungerCheck: () => void;
   onOpenAddMeal: () => void;
   onOpenAddWeight: () => void;
-  onOpenAICoachChat: () => void;
+  onOpenAddActivity: () => void;
+  onOpenAICoachChat: (starterPrompt?: string) => void;
 }
 
+const formatToday = () => {
+  const value = new Date().toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+const Metric: React.FC<{
+  value: string;
+  label: string;
+  progress: number;
+}> = ({
+  value,
+  label,
+  progress,
+}) => {
+  const { colors, typography } = useTheme();
+
+  return (
+    <View style={styles.metric}>
+      <Text style={[typography.h2, { color: colors.textPrimary }]} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={[typography.caption, { color: colors.textTertiary }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <View style={[styles.metricTrack, { backgroundColor: colors.surfaceElevated }]}>
+        <View
+          style={[
+            styles.metricFill,
+            {
+              backgroundColor: colors.primary,
+              width: `${Math.min(100, Math.max(0, progress))}%`,
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
+};
+
+const DetailRow: React.FC<{ label: string; value: string }> = ({
+  label,
+  value,
+}) => {
+  const { colors, typography } = useTheme();
+
+  return (
+    <View style={styles.detailRow}>
+      <Text style={[typography.caption, { color: colors.textTertiary }]}>
+        {label}
+      </Text>
+      <Text style={[typography.bodyMedium, { color: colors.textPrimary }]}>
+        {value}
+      </Text>
+    </View>
+  );
+};
+
 export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
+  lastCheckIn,
+  aiInsight,
+  aiInsightEnabled,
+  aiInsightLoading,
+  onRefreshAIInsight,
+  onOpenHungerCheck,
   onOpenAddMeal,
   onOpenAddWeight,
+  onOpenAddActivity,
   onOpenAICoachChat,
 }) => {
   const { profile } = useProfile();
-  const { todayLogs, totalCaloriesIn, snackCount, addMealLog, updateMealLog, deleteMealLog } = useMeals();
-  const { fastingState, steps, waterGlasses, energy, addWaterGlass, resetFastingTimer } = useHealth();
-  const { userApiKey } = useAI();
+  const {
+    todayLogs,
+    totalCaloriesIn,
+    snackCount,
+    updateMealLog,
+    deleteMealLog,
+  } = useMeals();
+  const {
+    fastingState,
+    steps,
+    stepTrackingStatus,
+    stepTrackingMessage,
+    waterGlasses,
+    energy,
+    addWaterGlass,
+    activityLogs,
+    deleteActivityLog,
+  } = useHealth();
   const { colors, spacing, radius, typography } = useTheme();
-
-  const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
   const [editingLog, setEditingLog] = useState<MealLog | null>(null);
-  const [showAdvancedStats, setShowAdvancedStats] = useState<boolean>(false);
+  const [showDetails, setShowDetails] = useState(false);
 
-  const currentHour = new Date().getHours();
-  const elapsedSeconds = fastingState?.elapsedSeconds || 0;
-  const hasMealRecorded = fastingState?.hasMealRecorded ?? true;
-  const elapsedHours = elapsedSeconds / 3600;
-  const fastingStage = getFastingStage(elapsedHours);
+  const targetCalories = useMemo(
+    () => calculateTargetCalories(profile),
+    [profile]
+  );
+  const targetProtein = useMemo(
+    () => calculateTargetProtein(profile),
+    [profile]
+  );
+  const maintenanceCalories = energy.adjustedMaintenance;
+  const caloriesIn = totalCaloriesIn || 0;
+  const remainingCalories = targetCalories - caloriesIn;
+  const overTargetCalories = Math.max(0, -remainingCalories);
+  const overMaintenanceCalories = Math.max(
+    0,
+    caloriesIn - maintenanceCalories
+  );
+  const calorieZone =
+    caloriesIn > maintenanceCalories
+      ? 'above_maintenance'
+      : caloriesIn > targetCalories
+        ? 'above_plan'
+        : 'within_plan';
+  const calorieChartMax = Math.max(
+    1,
+    maintenanceCalories,
+    caloriesIn > maintenanceCalories ? Math.round(caloriesIn * 1.08) : 0
+  );
+  const plannedProgress = Math.min(
+    100,
+    (Math.min(caloriesIn, targetCalories) / calorieChartMax) * 100
+  );
+  const abovePlanStart = (targetCalories / calorieChartMax) * 100;
+  const abovePlanProgress =
+    (Math.max(0, Math.min(caloriesIn, maintenanceCalories) - targetCalories) /
+      calorieChartMax) *
+    100;
+  const aboveNeedStart = (maintenanceCalories / calorieChartMax) * 100;
+  const aboveNeedProgress =
+    (Math.max(0, caloriesIn - maintenanceCalories) / calorieChartMax) * 100;
+  const targetMarkerPosition = Math.min(
+    100,
+    Math.max(0, (targetCalories / calorieChartMax) * 100)
+  );
+  const needMarkerPosition = Math.min(
+    100,
+    Math.max(0, (maintenanceCalories / calorieChartMax) * 100)
+  );
+  const proteinGrams = useMemo(
+    () =>
+      todayLogs.reduce(
+        (total, meal) => total + (meal.nutrition.proteinGrams || 0),
+        0
+      ),
+    [todayLogs]
+  );
+
+  const elapsedSeconds = fastingState.elapsedSeconds || 0;
+  const fastingStage = getFastingStage(elapsedSeconds);
   const fastingFormatted = formatElapsedTime(elapsedSeconds);
 
-  // Dynamic Target Calculations
-  const targetCalories = useMemo(() => calculateTargetCalories(profile), [profile]);
-  const targetProtein = useMemo(() => calculateTargetProtein(profile), [profile]);
+  const liveCheckInDecision = useMemo(() => {
+    if (!lastCheckIn) return null;
 
-  const caloriesIn = totalCaloriesIn || 0;
-  const netDeficit = targetCalories - caloriesIn;
+    return decideHunger({
+      answer: lastCheckIn.answer,
+      signal: lastCheckIn.signal,
+      intent: lastCheckIn.intent,
+      caloriesIn,
+      targetCalories,
+      maintenanceCalories,
+      snackCount,
+      fastingHours: fastingState.fastingHours || 0,
+    });
+  }, [
+    caloriesIn,
+    fastingState.fastingHours,
+    lastCheckIn,
+    maintenanceCalories,
+    snackCount,
+    targetCalories,
+  ]);
 
-  // Total protein consumed today
-  const proteinGrams = useMemo(() => {
-    return todayLogs.reduce((acc: number, m: MealLog) => acc + (m.nutrition.proteinGrams || 0), 0);
-  }, [todayLogs]);
-
-  // Smart Activity Advice Rule
-  const activityAdvice = useMemo(() => {
-    if (steps < 4000 && caloriesIn > 1500) {
-      return `Langkahmu baru ${steps.toLocaleString()}. Luangkan 15 menit jalan santai untuk membantu pencernaan & pembakaran.`;
-    }
-    return null;
-  }, [steps, caloriesIn]);
-
-  // Contextual Coach Advice
-  const timeState = useMemo(() => {
-    if (activityAdvice) {
+  const currentRecommendation = useMemo(() => {
+    if (liveCheckInDecision) {
       return {
-        greeting: `Selamat ${currentHour < 12 ? 'Pagi' : currentHour < 18 ? 'Siang' : 'Malam'}, ${profile.name || 'Teman'} ✨`,
-        subtitle: 'Saran aktivitas untuk pencernaanmu.',
-        advice: activityAdvice,
-        actionLabel: '+ Jalan 15 Mnt',
-        onAction: () => triggerHaptic('medium'),
+        eyebrow: liveCheckInDecision.status,
+        title: liveCheckInDecision.headline,
+        detail: liveCheckInDecision.body,
+        action:
+          liveCheckInDecision.kind === 'water'
+            ? ('water' as const)
+            : liveCheckInDecision.kind === 'none'
+              ? ('check' as const)
+              : ('food' as const),
       };
     }
 
-    if (currentHour >= 5 && currentHour < 12) {
-      if (todayLogs.length > 0) {
-        return {
-          greeting: `Selamat Pagi, ${profile.name || 'Teman'} 🌅`,
-          subtitle: 'Sarapanmu sudah tercatat. Siap melangkah hari ini!',
-          advice: `Bagus! Proteinmu sudah ${Math.round(proteinGrams)}g pagi ini. Pertahankan hidrasi harian.`,
-          actionLabel: '+ Minum Air',
-          onAction: () => {
-            triggerHaptic('light');
-            addWaterGlass();
-          },
-        };
-      }
+    if (calorieZone === 'above_maintenance') {
       return {
-        greeting: `Selamat Pagi, ${profile.name || 'Teman'} 🌅`,
-        subtitle: 'Awali hari dengan energi positif dan pola makan terjaga.',
-        advice: 'Sarapan tinggi protein akan membuatmu kenyang lebih lama.',
-        actionLabel: '+ Catat Sarapan',
-        onAction: onOpenAddMeal,
-      };
-    } else if (currentHour >= 12 && currentHour < 18) {
-      if (proteinGrams < targetProtein) {
-        const remaining = Math.round(targetProtein - proteinGrams);
-        return {
-          greeting: `Selamat Siang, ${profile.name || 'Teman'} ☀️`,
-          subtitle: 'Berikut ringkasan energimu sejauh ini.',
-          advice: `Proteinmu kurang ${remaining}g lagi. Tambahkan telur atau ayam saat makan siang.`,
-          actionLabel: '+ Tambah Makanan',
-          onAction: onOpenAddMeal,
-        };
-      }
-      return {
-        greeting: `Selamat Siang, ${profile.name || 'Teman'} ☀️`,
-        subtitle: 'Berikut ringkasan energimu sejauh ini.',
-        advice: `Mantap! Target protein tercapai (${Math.round(proteinGrams)}g). Ingat minum air putih di sela aktivitas.`,
-        actionLabel: '+ Minum Air',
-        onAction: () => {
-          triggerHaptic('light');
-          addWaterGlass();
-        },
-      };
-    } else {
-      return {
-        greeting: `Selamat Malam, ${profile.name || 'Teman'} 🌙`,
-        subtitle: 'Hari ini hampir usai. Kerja bagus menjaga pola makanmu.',
-        advice: netDeficit >= 0
-          ? 'Defisit kalori harianmu sangat terjaga. Besok kita lanjut lagi!'
-          : 'Ada sedikit surplus kalori, tetapi tidak perlu panik. Besok kita seimbangkan kembali.',
-        actionLabel: '+ Catat Makanan',
-        onAction: onOpenAddMeal,
+        eyebrow: 'SARAN SEKARANG',
+        title: 'Asupan melebihi kebutuhan hari ini.',
+        detail: 'Periksa rasa lapar sebelum memilih makanan berikutnya. Angka adalah konteks, bukan larangan untuk makan.',
+        action: 'check' as const,
       };
     }
-  }, [currentHour, profile.name, todayLogs.length, proteinGrams, targetProtein, netDeficit, activityAdvice, onOpenAddMeal, addWaterGlass]);
 
-  const toggleAdvancedStats = () => {
-    triggerHaptic('light');
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowAdvancedStats(!showAdvancedStats);
+    if (calorieZone === 'above_plan') {
+      return {
+        eyebrow: 'KONTEKS HARI INI',
+        title: 'Rencana makan hari ini terlewati.',
+        detail: 'Kebutuhan tubuh belum tentu terlewati. Jika benar-benar lapar, periksa rasa lapar untuk menentukan porsi.',
+        action: 'check' as const,
+      };
+    }
+
+    return {
+      eyebrow: 'SARAN SEKARANG',
+      title: 'Cek rasa lapar, bukan hanya angka.',
+      detail: 'Masih ada ruang dalam rencana makan, tetapi bukan kewajiban untuk menghabiskannya.',
+      action: 'check' as const,
+    };
+  }, [
+    calorieZone,
+    liveCheckInDecision,
+  ]);
+
+  const handleRecommendationAction = () => {
+    if (currentRecommendation.action === 'water') {
+      triggerHaptic('success');
+      addWaterGlass();
+      return;
+    }
+    if (currentRecommendation.action === 'food') {
+      onOpenAddMeal();
+      return;
+    }
+    onOpenHungerCheck();
   };
 
-  const handleAddSnackSubmit = async (
-    name: string,
-    nutrition: NutritionData,
-    trigger: TriggerType,
-    itemsBreakdown?: FoodItemBreakdown[]
-  ) => {
-    triggerHaptic('success');
-    await addMealLog(name, true, nutrition, trigger, undefined, 'ai', itemsBreakdown);
-  };
+  const calorieSummary = useMemo(() => {
+    if (calorieZone === 'above_maintenance') {
+      return {
+        label: 'KEBUTUHAN HARIAN TERLEWATI',
+        description: `${overMaintenanceCalories.toLocaleString('id-ID')} kkal melebihi perkiraan kebutuhan tubuh.`,
+      };
+    }
+
+    if (calorieZone === 'above_plan') {
+      return {
+        label: 'RENCANA MAKAN TERLEWATI',
+        description: `${overTargetCalories.toLocaleString('id-ID')} kkal di atas rencana, tetapi masih di bawah perkiraan kebutuhan tubuh.`,
+      };
+    }
+
+    return {
+      label: 'KALORI HARI INI',
+      description: `${Math.max(0, remainingCalories).toLocaleString('id-ID')} kkal tersisa dari rencana makan.`,
+    };
+  }, [
+    calorieZone,
+    overMaintenanceCalories,
+    overTargetCalories,
+    remainingCalories,
+  ]);
+
+  const activityCopy = useMemo(() => {
+    if (energy.stepProgressPct >= 100) {
+      return {
+        headline: 'Target langkah tercapai.',
+        detail:
+          energy.activityBonusCalories > 0
+            ? `${energy.bonusSteps.toLocaleString('id-ID')} langkah tambahan meningkatkan kebutuhan energi sekitar ${energy.activityBonusCalories.toLocaleString('id-ID')} kkal.`
+            : `Kamu sudah mencapai sasaran ${energy.stepGoal.toLocaleString('id-ID')} langkah hari ini.`,
+      };
+    }
+
+    if (steps <= energy.baselineSteps) {
+      return {
+        headline: 'Aktivitas sedang terkumpul.',
+        detail: 'Langkah akan tercatat otomatis dan ikut menyesuaikan kebutuhan energi hari ini.',
+      };
+    }
+
+    return {
+      headline: 'Langkah dasar sudah terlewati.',
+      detail: `${energy.bonusSteps.toLocaleString('id-ID')} langkah tambahan meningkatkan kebutuhan energi sekitar ${energy.activityBonusCalories.toLocaleString('id-ID')} kkal.`,
+    };
+  }, [
+    energy.activityBonusCalories,
+    energy.baselineSteps,
+    energy.bonusSteps,
+    energy.stepProgressPct,
+    steps,
+  ]);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: spacing.md, paddingTop: 50, paddingBottom: 100 }}>
-      {/* 1. Header Greeting & Cheat Day Indicator */}
-      <View style={{ marginBottom: spacing.sm }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-          <Text style={{ ...typography.h1, color: colors.textPrimary, flex: 1 }}>
-            {timeState.greeting}
-          </Text>
-
-          {profile?.isCheatDay && (
-            <View style={{ backgroundColor: colors.warningSubtle, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.warning }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.warning }}>🍕 CHEAT DAY</Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-          {timeState.subtitle}
-        </Text>
-      </View>
-
-      {/* 2. Dominant Primary Calorie Metric Card */}
-      <Surface style={{ padding: spacing.md, marginVertical: spacing.xs }}>
-        <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-          Target Kalori Harian
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 10 }}>
-          <Text style={{ fontSize: 32, fontWeight: '900', color: colors.textPrimary }}>
-            {caloriesIn.toLocaleString()}
-          </Text>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textTertiary }}>
-            {' '}/ {targetCalories.toLocaleString()} kcal
-          </Text>
-        </View>
-        <View style={{ height: 8, backgroundColor: colors.surfaceElevated, borderRadius: 4, overflow: 'hidden' }}>
-          <View
-            style={{
-              height: '100%',
-              backgroundColor: colors.primary,
-              borderRadius: 4,
-              width: `${Math.min(100, Math.round((caloriesIn / targetCalories) * 100))}%`,
-            }}
-          />
-        </View>
-      </Surface>
-
-      {/* 3. Secondary Compact Metrics Bar */}
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.xs }}>
-        <Surface style={{ flex: 1, padding: 12, alignItems: 'center', gap: 4 }}>
-          <Dumbbell size={14} color={colors.weight} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary }}>
-            {Math.round(proteinGrams)}/{targetProtein}g
-          </Text>
-          <Text style={{ fontSize: 10, color: colors.textTertiary }}>Protein</Text>
-        </Surface>
-
-        <Surface style={{ flex: 1, padding: 12, alignItems: 'center', gap: 4 }}>
-          <Droplets size={14} color={colors.info} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary }}>
-            {waterGlasses}/8
-          </Text>
-          <Text style={{ fontSize: 10, color: colors.textTertiary }}>Air (Gelas)</Text>
-        </Surface>
-
-        <Surface style={{ flex: 1, padding: 12, alignItems: 'center', gap: 4 }}>
-          <Footprints size={14} color={colors.primary} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary }}>
-            {steps.toLocaleString()}
-          </Text>
-          <Text style={{ fontSize: 10, color: colors.textTertiary }}>Langkah</Text>
-        </Surface>
-      </View>
-
-      {/* 4. Modern Sleek Fasting Bar */}
-      <Surface style={{ padding: 12, marginVertical: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: fastingStage.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={16} color={fastingStage.color} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: colors.textPrimary }}>{fastingFormatted.formatted}</Text>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: fastingStage.color }}>• {fastingStage.name}</Text>
-            </View>
-            <Text style={{ fontSize: 10, color: colors.textTertiary }} numberOfLines={1}>
-              {hasMealRecorded ? 'Puasa berjalan sejak makan terakhir' : 'Belum ada sesi makan hari ini'}
+    <>
+      <ScrollView
+        style={[styles.screen, { backgroundColor: colors.background }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {formatToday()}
+            </Text>
+            <Text style={[typography.h1, { color: colors.textPrimary }]}>
+              Hari ini
             </Text>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mulai check-in lapar"
+            onPress={onOpenHungerCheck}
+            style={({ pressed }) => [
+              styles.checkButton,
+              {
+                borderColor: colors.divider,
+                backgroundColor: pressed ? colors.surfacePressed : colors.surface,
+              },
+            ]}
+          >
+            <View style={[styles.liveDot, { backgroundColor: colors.primary }]} />
+            <Text style={[typography.caption, { color: colors.textSecondary }]}>
+              Check-in
+            </Text>
+          </Pressable>
         </View>
 
-        <TouchableOpacity
-          style={{ backgroundColor: colors.surfaceElevated, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.divider }}
-          onPress={async () => {
-            triggerHaptic('medium');
-            await resetFastingTimer(new Date().toISOString());
-          }}
+        <Surface style={styles.energyHero}>
+          <View style={styles.heroTopline}>
+            <Text style={[typography.overline, { color: colors.textTertiary }]}>
+              {calorieSummary.label}
+            </Text>
+          </View>
+          <View style={styles.energyNumberRow}>
+            <Text style={[typography.display, styles.energyNumber, { color: colors.textPrimary }]}>
+              {caloriesIn.toLocaleString('id-ID')}
+            </Text>
+            <Text style={[typography.body, { color: colors.textTertiary }]}>kkal dimakan</Text>
+          </View>
+          <Text style={[typography.body, styles.heroDescription, { color: colors.textSecondary }]}>
+            {calorieSummary.description}
+          </Text>
+          <View
+            accessibilityLabel={`Progress kalori. ${caloriesIn.toLocaleString('id-ID')} dimakan, rencana ${targetCalories.toLocaleString('id-ID')}, kebutuhan sekitar ${maintenanceCalories.toLocaleString('id-ID')} kilokalori.`}
+            style={[
+              styles.progressTrack,
+              { backgroundColor: colors.surfaceElevated },
+            ]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  backgroundColor: colors.primary,
+                  width: `${plannedProgress}%`,
+                },
+              ]}
+            />
+            {abovePlanProgress > 0 ? (
+              <View
+                style={[
+                  styles.progressZone,
+                  {
+                    left: `${abovePlanStart}%`,
+                    width: `${abovePlanProgress}%`,
+                    backgroundColor: colors.warning,
+                  },
+                ]}
+              />
+            ) : null}
+            {aboveNeedProgress > 0 ? (
+              <View
+                style={[
+                  styles.progressZone,
+                  {
+                    left: `${aboveNeedStart}%`,
+                    width: `${aboveNeedProgress}%`,
+                    backgroundColor: colors.danger,
+                  },
+                ]}
+              />
+            ) : null}
+            <View
+              style={[
+                styles.targetMarker,
+                {
+                  backgroundColor: colors.textSecondary,
+                  left: `${targetMarkerPosition}%`,
+                },
+              ]}
+            />
+            {caloriesIn > maintenanceCalories ? (
+              <View
+                style={[
+                  styles.needMarker,
+                  {
+                    backgroundColor: colors.danger,
+                    left: `${needMarkerPosition}%`,
+                  },
+                ]}
+              />
+            ) : null}
+          </View>
+          <View style={styles.calorieLegend}>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              Rencana {targetCalories.toLocaleString('id-ID')}
+            </Text>
+            <Text style={[typography.caption, styles.legendRight, { color: colors.textTertiary }]}>
+              Kebutuhan ±{maintenanceCalories.toLocaleString('id-ID')}
+            </Text>
+          </View>
+          {caloriesIn > targetCalories ? (
+            <View style={styles.zoneLegend}>
+              <View style={[styles.zoneDot, { backgroundColor: colors.primary }]} />
+              <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                Dalam rencana
+              </Text>
+              <View
+                style={[
+                  styles.zoneDot,
+                  {
+                    backgroundColor:
+                      caloriesIn > maintenanceCalories
+                        ? colors.danger
+                        : colors.warning,
+                  },
+                ]}
+              />
+              <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                {caloriesIn > maintenanceCalories
+                  ? 'Melebihi kebutuhan'
+                  : 'Di atas rencana'}
+              </Text>
+            </View>
+          ) : null}
+        </Surface>
+
+        <Surface style={styles.metricStrip}>
+          <Metric
+            value={`${Math.round(proteinGrams)} / ${targetProtein}g`}
+            label="Protein"
+            progress={(proteinGrams / Math.max(1, targetProtein)) * 100}
+          />
+          <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+          <Metric
+            value={`${waterGlasses} / 8`}
+            label="Gelas air"
+            progress={(waterGlasses / 8) * 100}
+          />
+        </Surface>
+
+        <Surface
+          style={[
+            styles.recommendation,
+            {
+              backgroundColor:
+                currentRecommendation.action === 'water'
+                  ? colors.infoSubtle
+                  : colors.primarySubtle,
+              borderColor:
+                currentRecommendation.action === 'water'
+                  ? colors.infoSubtle
+                  : colors.primarySubtle,
+            },
+          ]}
         >
-          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>Reset Puasa</Text>
-        </TouchableOpacity>
-      </Surface>
+          <Text
+            style={[
+              typography.overline,
+              {
+                color:
+                  currentRecommendation.action === 'water'
+                    ? colors.info
+                    : colors.primaryText,
+              },
+            ]}
+          >
+            {currentRecommendation.eyebrow}
+          </Text>
+          <Text
+            style={[
+              typography.h2,
+              styles.recommendationTitle,
+              { color: colors.textPrimary },
+            ]}
+          >
+            {currentRecommendation.title}
+          </Text>
+          <Text style={[typography.body, { color: colors.textSecondary }]}>
+            {currentRecommendation.detail}
+          </Text>
+          <View style={styles.recommendationActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleRecommendationAction}
+              style={({ pressed }) => [
+                styles.primaryAction,
+                {
+                  backgroundColor:
+                    currentRecommendation.action === 'water'
+                      ? colors.info
+                      : colors.primary,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  typography.bodyMedium,
+                  {
+                    color:
+                      currentRecommendation.action === 'water'
+                        ? colors.onInfo
+                        : colors.onPrimary,
+                    fontWeight: '600',
+                  },
+                ]}
+              >
+                {currentRecommendation.action === 'water'
+                  ? '+ 1 gelas air'
+                  : currentRecommendation.action === 'food'
+                    ? 'Catat makan'
+                    : 'Check-in lagi'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Buka AI coach"
+              onPress={() => onOpenAICoachChat()}
+              hitSlop={8}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+            >
+              <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                Tanya coach
+              </Text>
+            </Pressable>
+          </View>
+          {aiInsightEnabled ? (
+            <ContextInsight
+              label="AI · FOKUS NUTRISI"
+              headline={aiInsight?.headline}
+              body={aiInsight?.body}
+              loading={aiInsightLoading}
+              error={!aiInsightLoading && !aiInsight}
+              onOpen={() => onOpenAICoachChat(aiInsight?.suggestedPrompt)}
+              onRefresh={onRefreshAIInsight}
+            />
+          ) : null}
+        </Surface>
 
-      {/* 5. Health Coach Companion Card */}
-      <InlineCoachCard
-        adviceText={timeState.advice}
-        actionLabel={timeState.actionLabel}
-        onActionPress={timeState.onAction}
-        onOpenChatPress={onOpenAICoachChat}
-      />
+        <Surface style={styles.activityCard}>
+          <View style={styles.activityTopline}>
+            <Text style={[typography.overline, { color: colors.textTertiary }]}>
+              AKTIVITAS
+            </Text>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {stepTrackingStatus === 'connected'
+                ? 'Sensor aktif'
+                : stepTrackingStatus === 'checking'
+                  ? 'Menghubungkan sensor'
+                  : 'Sensor belum aktif'}
+            </Text>
+          </View>
+          <View style={styles.activityNumberRow}>
+            <Text style={[typography.display, styles.activityNumber, { color: colors.textPrimary }]}>
+              {steps.toLocaleString('id-ID')}
+            </Text>
+            <Text style={[typography.caption, styles.activityGoal, { color: colors.textTertiary }]}>
+              dari {energy.stepGoal.toLocaleString('id-ID')} langkah
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.activityProgressTrack,
+              { backgroundColor: colors.surfaceElevated },
+            ]}
+          >
+            <View
+              style={[
+                styles.activityProgressFill,
+                {
+                  width: `${energy.stepProgressPct}%`,
+                  backgroundColor: colors.primary,
+                },
+              ]}
+            />
+          </View>
+          <Text style={[typography.bodyMedium, { color: colors.textPrimary }]}>
+            {activityCopy.detail}
+          </Text>
+          <Text style={[typography.caption, { color: colors.textTertiary }]}>
+            Sekitar {energy.stepCalories.toLocaleString('id-ID')} kkal dari langkah hari ini.
+          </Text>
+          {stepTrackingStatus !== 'connected' ? (
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {stepTrackingMessage}
+            </Text>
+          ) : null}
+          {activityLogs.length > 0 ? (
+            <View style={[styles.loggedActivities, { borderTopColor: colors.divider }]}>
+              <View style={styles.loggedActivityHeader}>
+                <Text style={[typography.overline, { color: colors.textTertiary }]}>
+                  AKTIVITAS DICERITAKAN
+                </Text>
+                <Text style={[typography.caption, { color: colors.primaryText }]}>
+                  +{energy.loggedActivityCalories.toLocaleString('id-ID')} kkal
+                </Text>
+              </View>
+              {activityLogs.slice(0, 3).map((activity) => (
+                <View key={activity.id} style={styles.loggedActivityRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typography.bodyMedium, { color: colors.textPrimary }]}>
+                      {activity.name}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                      {activity.durationMinutes} menit · +{activity.creditedCalories} kkal
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Hapus aktivitas ${activity.name}`}
+                    hitSlop={8}
+                    onPress={() => deleteActivityLog(activity.id)}
+                  >
+                    <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                      Hapus
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ceritakan aktivitas kepada AI"
+            onPress={onOpenAddActivity}
+            style={({ pressed }) => [
+              styles.activityAction,
+              {
+                borderColor: colors.divider,
+                opacity: pressed ? 0.55 : 1,
+              },
+            ]}
+          >
+            <Text style={[typography.bodyMedium, { color: colors.primaryText }]}>
+              Ceritakan aktivitas
+            </Text>
+          </Pressable>
+        </Surface>
 
-      {/* 6. Quick Health Logging Actions Bar */}
-      <Surface style={{ padding: spacing.md, marginVertical: spacing.xs }}>
-        <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
-          PENCATATAN HARIAN CEPAT
-        </Text>
-        <View style={{ flexDirection: 'row', gap: spacing.xs + 4 }}>
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.infoSubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' }}
+        <Surface style={styles.detailCard}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showDetails }}
             onPress={() => {
               triggerHaptic('light');
-              addWaterGlass();
+              setShowDetails((value) => !value);
             }}
+            style={styles.detailToggle}
           >
-            <Droplets size={16} color={colors.info} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.info }}>+1 Air</Text>
-          </TouchableOpacity>
+            <View style={styles.fastingCopy}>
+              <Text style={[typography.overline, { color: colors.textTertiary }]}>
+                PUASA
+              </Text>
+              <Text style={[typography.h3, { color: colors.textPrimary }]}>
+                {fastingState.hasMealRecorded
+                  ? `${fastingFormatted.hours} jam ${fastingFormatted.minutes} menit`
+                  : 'Belum dimulai'}
+              </Text>
+              <Text style={[typography.caption, { color: colors.textTertiary }]}>
+                {fastingState.hasMealRecorded
+                  ? fastingStage.name
+                  : 'Dimulai otomatis setelah makanan pertama dicatat.'}
+              </Text>
+            </View>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {showDetails ? 'Tutup' : 'Lihat detail'}
+            </Text>
+          </Pressable>
 
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.warningSubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' }}
-            onPress={() => setShowSnackModal(true)}
-          >
-            <Cookie size={16} color={colors.warning} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Snack</Text>
-          </TouchableOpacity>
+          {showDetails ? (
+            <View style={[styles.detailRows, { borderTopColor: colors.divider }]}>
+              <DetailRow
+                label="Energi keluar sejauh ini"
+                value={`${Math.round(energy.totalCaloriesOut).toLocaleString('id-ID')} kkal`}
+              />
+              <DetailRow
+                label="Perkiraan kebutuhan harian"
+                value={`${maintenanceCalories.toLocaleString('id-ID')} kkal`}
+              />
+              <DetailRow
+                label="Bonus aktivitas"
+                value={`+${(energy.activityBonusCalories + energy.loggedActivityCalories).toLocaleString('id-ID')} kkal`}
+              />
+              <DetailRow
+                label="Snack hari ini"
+                value={`${snackCount} kali`}
+              />
+              <DetailRow
+                label="Berat & target"
+                value={`${profile.weightKg.toFixed(1)} → ${profile.targetWeightKg.toFixed(1)} kg`}
+              />
+              <Pressable
+                onPress={onOpenAddWeight}
+                hitSlop={8}
+                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+              >
+                <Text style={[typography.caption, { color: colors.primaryText }]}>
+                  Catat berat baru
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </Surface>
 
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.primarySubtle, paddingVertical: 10, borderRadius: radius.sm, alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' }}
-            onPress={onOpenAddMeal}
-          >
-            <Utensils size={16} color={colors.primary} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>Makanan</Text>
-          </TouchableOpacity>
-        </View>
-      </Surface>
-
-      {/* 7. Daily Mission Checklist */}
-      <DailyMissionCard
-        waterGlasses={waterGlasses}
-        stepCount={steps}
-        netDeficit={netDeficit}
-        proteinGrams={proteinGrams}
-        targetProteinGrams={targetProtein}
-        todayMealsCount={todayLogs.length}
-        onAddWater={() => addWaterGlass()}
-      />
-
-      {/* 8. Collapsible Advanced Analytics Section (Energy Gauge & Triple Rings) */}
-      <Surface style={{ padding: spacing.sm + 4, marginVertical: spacing.xs }}>
-        <TouchableOpacity
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 40 }}
-          onPress={toggleAdvancedStats}
-          activeOpacity={0.7}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Flame size={16} color={colors.primary} />
-            <Text style={{ ...typography.bodyMedium, color: colors.textPrimary, fontWeight: '700' }}>
-              Statistik Energi & Ring Habit
+        <View style={styles.journalHeader}>
+          <View>
+            <Text style={[typography.h2, { color: colors.textPrimary }]}>
+              Jurnal makan
+            </Text>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {todayLogs.length} catatan hari ini
             </Text>
           </View>
-          {showAdvancedStats ? <ChevronUp size={18} color={colors.textTertiary} /> : <ChevronDown size={18} color={colors.textTertiary} />}
-        </TouchableOpacity>
-
-        {showAdvancedStats && (
-          <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
-            {energy && (
-              <EnergyGauge
-                caloriesIn={caloriesIn}
-                caloriesOut={energy.totalCaloriesOut}
-                dailyBMR={energy.dailyBMR}
-                elapsedBMR={energy.elapsedBMR}
-                stepCalories={energy.stepCalories}
-                netBalance={energy.netBalance}
-                targetDeficit={energy.targetDeficit}
-                isDeficit={energy.isDeficit}
-                isCheatDay={profile?.isCheatDay}
-              />
-            )}
-
-            <HabitRings
-              percentageDeficit={energy?.percentageToGoal || 0}
-              snackCount={snackCount || 0}
-              waterGlasses={waterGlasses || 0}
-            />
-          </View>
-        )}
-      </Surface>
-
-      {/* 9. Today's Meal Timeline (Journal) */}
-      <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
-        <Text style={{ ...typography.h3, color: colors.textPrimary, marginBottom: 4 }}>
-          Makanan Hari Ini ({todayLogs.length})
-        </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tambah makanan"
+            onPress={onOpenAddMeal}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+          >
+            <Text style={[typography.bodyMedium, { color: colors.primaryText }]}>
+              Tambah
+            </Text>
+          </Pressable>
+        </View>
 
         {todayLogs.length === 0 ? (
-          <Surface style={{ alignItems: 'center', paddingVertical: 20, gap: 10 }}>
-            <Text style={{ fontSize: 13, color: colors.textTertiary }}>
-              Belum ada makanan dicatat hari ini.
+          <View
+            style={[
+              styles.emptyJournal,
+              { borderTopColor: colors.divider, borderBottomColor: colors.divider },
+            ]}
+          >
+            <Text style={[typography.body, { color: colors.textSecondary }]}>
+              Belum ada makanan yang dicatat.
             </Text>
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                backgroundColor: colors.primarySubtle,
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: radius.sm,
-                borderWidth: 1,
-                borderColor: colors.primarySubtle,
-                minHeight: 44,
-              }}
-              onPress={onOpenAddMeal}
-            >
-              <Plus size={14} color={colors.primary} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primaryText }}>
-                Catat Makanan Pertama
-              </Text>
-            </TouchableOpacity>
-          </Surface>
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              Catat seperlunya agar saran berikutnya makin relevan.
+            </Text>
+          </View>
         ) : (
-          todayLogs.map((log: MealLog) => (
-            <MealCard
-              key={log.id}
-              log={log}
-              onEdit={(item) => setEditingLog(item)}
-              onDelete={(id) => deleteMealLog(id)}
-            />
-          ))
+          <View style={styles.mealList}>
+            {todayLogs.map((log) => (
+              <MealCard
+                key={log.id}
+                log={log}
+                onEdit={setEditingLog}
+                onDelete={deleteMealLog}
+              />
+            ))}
+          </View>
         )}
-      </View>
-
-      {/* Modals */}
-      <SnackModal
-        visible={showSnackModal}
-        onClose={() => setShowSnackModal(false)}
-        onSubmitSnack={handleAddSnackSubmit}
-        onDrinkWater={() => addWaterGlass()}
-        userApiKey={userApiKey}
-      />
+      </ScrollView>
 
       <EditMealModal
         visible={editingLog !== null}
@@ -421,6 +815,262 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
           await updateMealLog(id, updatedFields);
         }}
       />
-    </ScrollView>
+    </>
   );
+
 };
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  content: {
+    paddingTop: 20,
+    gap: 18,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  headerCopy: {
+    gap: 2,
+  },
+  checkButton: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  energyHero: {
+    padding: 20,
+  },
+  heroTopline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  energyNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 7,
+    marginTop: 12,
+  },
+  energyNumber: {
+    fontSize: 48,
+    lineHeight: 54,
+  },
+  progressTrack: {
+    position: 'relative',
+    width: '100%',
+    height: 5,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 18,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressZone: {
+    position: 'absolute',
+    top: 0,
+    height: '100%',
+  },
+  targetMarker: {
+    position: 'absolute',
+    top: -3,
+    width: 2,
+    height: 11,
+    borderRadius: 1,
+  },
+  needMarker: {
+    position: 'absolute',
+    top: -3,
+    width: 2,
+    height: 11,
+    borderRadius: 1,
+  },
+  heroDescription: {
+    marginTop: 2,
+  },
+  calorieLegend: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  legendRight: {
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  zoneLegend: {
+    marginTop: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  zoneDot: {
+    width: 7,
+    height: 7,
+    marginLeft: 4,
+    borderRadius: 4,
+  },
+  metricStrip: {
+    minHeight: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  metric: {
+    flex: 1,
+    paddingHorizontal: 14,
+    gap: 3,
+  },
+  metricDivider: {
+    width: 1,
+    height: 48,
+  },
+  metricTrack: {
+    width: '100%',
+    height: 3,
+    marginTop: 7,
+    overflow: 'hidden',
+    borderRadius: 2,
+  },
+  metricFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  recommendation: {
+    padding: 20,
+  },
+  recommendationTitle: {
+    marginTop: 8,
+    marginBottom: 7,
+  },
+  recommendationActions: {
+    marginTop: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  primaryAction: {
+    minHeight: 46,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityCard: {
+    padding: 18,
+    gap: 12,
+  },
+  activityTopline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+  },
+  activityNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  activityNumber: {
+    fontSize: 40,
+    lineHeight: 46,
+  },
+  activityGoal: {
+    flexShrink: 1,
+  },
+  activityProgressTrack: {
+    width: '100%',
+    height: 5,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  activityProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  loggedActivities: {
+    marginTop: 2,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    gap: 10,
+  },
+  loggedActivityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  loggedActivityRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  activityAction: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  detailCard: {
+    padding: 16,
+  },
+  detailToggle: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  fastingCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  detailRows: {
+    borderTopWidth: 1,
+    marginTop: 12,
+    paddingTop: 14,
+    gap: 14,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  journalHeader: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  emptyJournal: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingVertical: 22,
+    gap: 5,
+  },
+  mealList: {
+    gap: 8,
+  },
+});

@@ -57,8 +57,7 @@ export const EatingTimer: React.FC<EatingTimerProps> = ({
     );
   }
 
-  const elapsedHours = elapsedSeconds / 3600;
-  const stage = getFastingStage(elapsedHours);
+  const stage = getFastingStage(elapsedSeconds);
   const time = formatElapsedTime(elapsedSeconds);
 
   return (

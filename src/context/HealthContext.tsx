@@ -6,10 +6,13 @@ import {
   saveWaterGlasses,
   loadStepRecord,
   saveStepRecord,
+  loadActivityLogs,
+  saveActivityLogs,
 } from '../services/storageService';
 import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
 import { calculateEnergyBalance } from '../utils/calorieCalc';
 import { getLocalDateString, msUntilMidnight } from '../utils/date';
+import { ActivityLog } from '../types';
 
 interface FastingState {
   elapsedSeconds: number;
@@ -20,8 +23,19 @@ interface FastingState {
 
 interface EnergyState {
   dailyBMR: number;
+  baseMaintenance: number;
+  adjustedMaintenance: number;
+  elapsedBaseMaintenance: number;
+  elapsedMaintenanceProgressPct: number;
   elapsedBMR: number;
+  activityCalories: number;
   stepCalories: number;
+  activityBonusCalories: number;
+  loggedActivityCalories: number;
+  baselineSteps: number;
+  bonusSteps: number;
+  stepGoal: number;
+  stepProgressPct: number;
   totalCaloriesOut: number;
   totalCaloriesIn: number;
   netBalance: number;
@@ -35,12 +49,19 @@ interface HealthContextType {
   sensorSteps: number;
   manualSteps: number;
   steps: number;
+  stepTrackingStatus: 'checking' | 'connected' | 'unavailable';
+  stepTrackingMessage: string;
   elapsedSeconds: number;
   fastingState: FastingState;
   energy: EnergyState;
+  activityLogs: ActivityLog[];
   showWelcomeBackModal: boolean;
   addWaterGlass: () => Promise<void>;
   addStepsManual: (addedSteps: number) => Promise<void>;
+  addActivityLog: (
+    activity: Omit<ActivityLog, 'id' | 'timestamp'>
+  ) => Promise<void>;
+  deleteActivityLog: (id: string) => Promise<void>;
   resetFastingTimer: (timestamp?: string | null) => Promise<void>;
   freshStartToday: () => Promise<void>;
   dismissWelcomeBackModal: () => void;
@@ -56,17 +77,33 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [waterGlasses, setWaterGlasses] = useState<number>(0);
   const [sensorSteps, setSensorSteps] = useState<number>(0);
   const [manualSteps, setManualSteps] = useState<number>(0);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [stepTrackingStatus, setStepTrackingStatus] = useState<
+    'checking' | 'connected' | 'unavailable'
+  >('checking');
+  const [stepTrackingMessage, setStepTrackingMessage] = useState(
+    'Menghubungkan sensor langkah…'
+  );
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState<boolean>(false);
+  const [hydratedHealthDate, setHydratedHealthDate] = useState<string | null>(null);
 
+  const waterGlassesRef = useRef<number>(waterGlasses);
   const manualStepsRef = useRef<number>(manualSteps);
+  const sensorStepsRef = useRef<number>(sensorSteps);
+  useEffect(() => {
+    waterGlassesRef.current = waterGlasses;
+  }, [waterGlasses]);
   useEffect(() => {
     manualStepsRef.current = manualSteps;
   }, [manualSteps]);
+  useEffect(() => {
+    sensorStepsRef.current = sensorSteps;
+  }, [sensorSteps]);
 
   // Efficient Midnight Date Rollover Timeout
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     const scheduleMidnightRollover = () => {
       const delay = msUntilMidnight();
       timer = setTimeout(() => {
@@ -79,28 +116,48 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => clearTimeout(timer);
   }, []);
 
-  // Initial load for water glasses & step record
+  // Hydrate persisted daily data before the pedometer is allowed to sync.
   useEffect(() => {
-    async function initHealthData() {
-      const loadedWater = await loadWaterGlasses(todayStr);
-      const stepRecord = await loadStepRecord(todayStr);
+    let cancelled = false;
+    setHydratedHealthDate(null);
 
+    async function initHealthData() {
+      const [loadedWater, stepRecord, loadedActivities] = await Promise.all([
+        loadWaterGlasses(todayStr),
+        loadStepRecord(todayStr),
+        loadActivityLogs(todayStr),
+      ]);
+
+      if (cancelled) return;
+
+      waterGlassesRef.current = loadedWater;
       setWaterGlasses(loadedWater);
+      sensorStepsRef.current = stepRecord.sensorSteps;
+      manualStepsRef.current = stepRecord.manualSteps;
       setSensorSteps(stepRecord.sensorSteps);
       setManualSteps(stepRecord.manualSteps);
+      setActivityLogs(loadedActivities);
+      setHydratedHealthDate(todayStr);
+    }
 
-      if (profile.lastMealTimestamp) {
-        const lastMealTime = new Date(profile.lastMealTimestamp).getTime();
-        const nowTime = new Date().getTime();
-        const hoursDiff = (nowTime - lastMealTime) / (1000 * 60 * 60);
+    initHealthData();
 
-        if (hoursDiff > 36) {
-          setShowWelcomeBackModal(true);
-        }
+    return () => {
+      cancelled = true;
+    };
+  }, [todayStr]);
+
+  useEffect(() => {
+    if (profile.lastMealTimestamp) {
+      const lastMealTime = new Date(profile.lastMealTimestamp).getTime();
+      const nowTime = new Date().getTime();
+      const hoursDiff = (nowTime - lastMealTime) / (1000 * 60 * 60);
+
+      if (hoursDiff > 36) {
+        setShowWelcomeBackModal(true);
       }
     }
-    initHealthData();
-  }, [todayStr, profile.lastMealTimestamp]);
+  }, [profile.lastMealTimestamp]);
 
   // Real-time Fasting Clock Timer tick (Every 1 second)
   useEffect(() => {
@@ -121,50 +178,102 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => clearInterval(interval);
   }, [profile.lastMealTimestamp]);
 
-  // Sync Pedometer sensor steps strictly with [todayStr] dependency
+  // Start sensor sync only after the matching day's stored base has hydrated.
   useEffect(() => {
+    if (hydratedHealthDate !== todayStr) return;
+
     let sub: { remove: () => void } | null = null;
     let baseSteps = 0;
+    let cancelled = false;
 
     async function syncPedometer() {
+      setStepTrackingStatus('checking');
+      setStepTrackingMessage('Menghubungkan sensor langkah…');
       const status = await getTodayStepCount();
-      if (status.isAvailable) {
-        baseSteps = status.stepCount;
-        setSensorSteps(baseSteps);
-        await saveStepRecord(todayStr, { sensorSteps: baseSteps, manualSteps: manualStepsRef.current });
-
-        sub = subscribeStepCount(async (sessionSteps) => {
-          const totalSensor = baseSteps + sessionSteps;
-          setSensorSteps(totalSensor);
-          await saveStepRecord(todayStr, { sensorSteps: totalSensor, manualSteps: manualStepsRef.current });
-        });
+      if (cancelled) return;
+      if (!status.isAvailable) {
+        setStepTrackingStatus('unavailable');
+        setStepTrackingMessage(
+          status.error || 'Sensor langkah belum tersedia di perangkat ini.'
+        );
+        return;
       }
+
+      setStepTrackingStatus('connected');
+      setStepTrackingMessage(
+        status.historicalCountAvailable
+          ? 'Langkah hari ini tersinkron dari perangkat.'
+          : 'Langkah diperbarui selama aplikasi aktif.'
+      );
+
+      baseSteps = status.historicalCountAvailable
+        ? status.stepCount
+        : sensorStepsRef.current;
+      sensorStepsRef.current = baseSteps;
+      setSensorSteps(baseSteps);
+      await saveStepRecord(todayStr, {
+        sensorSteps: baseSteps,
+        manualSteps: manualStepsRef.current,
+      });
+
+      if (cancelled) return;
+
+      sub = subscribeStepCount((sessionSteps) => {
+        if (cancelled) return;
+
+        const totalSensor = baseSteps + sessionSteps;
+        sensorStepsRef.current = totalSensor;
+        setSensorSteps(totalSensor);
+        void saveStepRecord(todayStr, {
+          sensorSteps: totalSensor,
+          manualSteps: manualStepsRef.current,
+        });
+      });
     }
 
     syncPedometer();
 
     return () => {
+      cancelled = true;
       if (sub && sub.remove) sub.remove();
     };
-  }, [todayStr]);
+  }, [todayStr, hydratedHealthDate]);
 
   const addWaterGlass = async () => {
-    let nextWater = 0;
-    setWaterGlasses((prevWater) => {
-      nextWater = prevWater + 1;
-      return nextWater;
-    });
+    const nextWater = waterGlassesRef.current + 1;
+    waterGlassesRef.current = nextWater;
+    setWaterGlasses(nextWater);
     await saveWaterGlasses(todayStr, nextWater);
   };
 
   const addStepsManual = async (addedSteps: number) => {
     const validAdded = Math.max(0, addedSteps);
-    let nextManual = 0;
-    setManualSteps((prevManual) => {
-      nextManual = prevManual + validAdded;
-      return nextManual;
+    const nextManual = manualStepsRef.current + validAdded;
+    manualStepsRef.current = nextManual;
+    setManualSteps(nextManual);
+    await saveStepRecord(todayStr, {
+      sensorSteps: sensorStepsRef.current,
+      manualSteps: nextManual,
     });
-    await saveStepRecord(todayStr, { sensorSteps, manualSteps: nextManual });
+  };
+
+  const addActivityLog = async (
+    activity: Omit<ActivityLog, 'id' | 'timestamp'>
+  ) => {
+    const nextLog: ActivityLog = {
+      ...activity,
+      id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: new Date().toISOString(),
+    };
+    const nextLogs = [nextLog, ...activityLogs];
+    setActivityLogs(nextLogs);
+    await saveActivityLogs(todayStr, nextLogs);
+  };
+
+  const deleteActivityLog = async (id: string) => {
+    const nextLogs = activityLogs.filter((item) => item.id !== id);
+    setActivityLogs(nextLogs);
+    await saveActivityLogs(todayStr, nextLogs);
   };
 
   const resetFastingTimer = async (timestamp?: string | null) => {
@@ -191,7 +300,17 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     hasMealRecorded,
   };
 
-  const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps);
+  const loggedActivityCalories = activityLogs.reduce(
+    (total, item) => total + item.creditedCalories,
+    0
+  );
+  const energy = calculateEnergyBalance(
+    profile,
+    totalCaloriesIn,
+    steps,
+    new Date(),
+    loggedActivityCalories
+  );
 
   return (
     <HealthContext.Provider
@@ -200,12 +319,17 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         sensorSteps,
         manualSteps,
         steps,
+        stepTrackingStatus,
+        stepTrackingMessage,
         elapsedSeconds,
         fastingState,
         energy,
+        activityLogs,
         showWelcomeBackModal,
         addWaterGlass,
         addStepsManual,
+        addActivityLog,
+        deleteActivityLog,
         resetFastingTimer,
         freshStartToday,
         dismissWelcomeBackModal,

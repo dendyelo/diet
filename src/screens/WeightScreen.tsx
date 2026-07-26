@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
 import { useProfile, useWeight, useTheme } from '../context/AppContext';
 import { Surface } from '../components/Surface';
@@ -19,7 +18,7 @@ import {
   getTrendInfo,
   getChangeColor,
 } from '../utils/weightAnalytics';
-import { Scale, Plus, Activity, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 
 const MONTH_NAMES_ID = [
   'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des',
@@ -86,83 +85,146 @@ export const WeightScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md, gap: spacing.sm, paddingBottom: 100 }}>
-        {/* Header */}
-        <View style={{ marginBottom: spacing.xs }}>
-          <Text style={{ ...typography.h1, color: colors.textPrimary }}>Pelacakan Berat Badan</Text>
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginTop: 2 }}>Pantau progres dan tren berat badan Anda</Text>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          paddingBottom: 120,
+          gap: spacing.lg,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ ...typography.h1, color: colors.textPrimary }}>Berat</Text>
+          <Text style={{ ...typography.body, color: colors.textTertiary }}>
+            Perubahan kecil lebih berarti daripada satu angka.
+          </Text>
         </View>
 
-        {/* Ringkasan Berat 2x2 Grid */}
-        <Surface style={{ padding: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md }}>
-            <Scale size={16} color={colors.primary} />
-            <Text style={{ ...typography.caption, fontWeight: '700', color: colors.primaryText, textTransform: 'uppercase' }}>
-              Ringkasan Berat
+        <Surface style={{ marginVertical: 0, padding: spacing.lg, gap: spacing.lg }}>
+          <View style={{ gap: spacing.xs }}>
+            <Text style={{ ...typography.body, color: colors.textTertiary }}>Terbaru</Text>
+            <Text
+              style={{
+                fontSize: 54,
+                lineHeight: 60,
+                fontWeight: '300',
+                letterSpacing: -2,
+                color: colors.textPrimary,
+              }}
+            >
+              {latestW !== null ? latestW.toFixed(1) : '—'}
+              {latestW !== null ? (
+                <Text style={{ fontSize: 20, color: colors.textTertiary }}> kg</Text>
+              ) : null}
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
-            {/* Top-Left: Latest Weight */}
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>BERAT TERBARU</Text>
-              <Text style={{ ...typography.h1, color: colors.textPrimary, marginTop: 4 }}>
-                {latestW !== null ? `${latestW.toFixed(1)} kg` : '-'}
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Menuju {targetKg} kg
+              </Text>
+              <Text style={{ ...typography.caption, color: colors.textSecondary }}>
+                {summary.progressPercent}%
               </Text>
             </View>
-
-            {/* Top-Right: Change */}
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>PERUBAHAN</Text>
-              <Text style={{ ...typography.h1, color: changeColor, marginTop: 4 }}>
-                {summary.changeFromStart !== null ? `${summary.changeFromStart > 0 ? '+' : ''}${summary.changeFromStart.toFixed(1)} kg` : '-'}
-              </Text>
-            </View>
-
-            {/* Bottom-Left: MA-7 Hari */}
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>MA-7 HARI</Text>
-              <Text style={{ ...typography.h2, color: colors.info, marginTop: 4 }}>
-                {summary.movingAverage7 !== null ? `${summary.movingAverage7.toFixed(1)} kg` : '-'}
-              </Text>
-            </View>
-
-            {/* Bottom-Right: Trend Direction */}
-            <View style={{ flex: 1, minWidth: '45%', backgroundColor: colors.surfaceElevated, padding: spacing.sm + 2, borderRadius: radius.sm }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>TREN</Text>
-              <Text style={{ ...typography.h2, color: trendInfo.color, marginTop: 4 }}>
-                {trendInfo.emoji} {trendInfo.label}
-              </Text>
+            <View
+              style={{
+                height: 3,
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: radius.full,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                style={{
+                  height: '100%',
+                  backgroundColor: colors.primary,
+                  borderRadius: radius.full,
+                  width: `${Math.min(100, Math.max(0, summary.progressPercent))}%`,
+                }}
+              />
             </View>
           </View>
 
-          {/* Progres Target with Percentage Text */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <Text style={{ ...typography.caption, color: colors.textTertiary }}>Progres Menuju Target ({targetKg} kg)</Text>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primaryText }}>{summary.progressPercent}%</Text>
-          </View>
-          <View style={{ height: 8, backgroundColor: colors.surfaceElevated, borderRadius: 4, overflow: 'hidden' }}>
-            <View style={{ height: '100%', backgroundColor: colors.primary, width: `${Math.min(100, Math.max(0, summary.progressPercent))}%` }} />
+          <View style={{ borderTopWidth: 1, borderTopColor: colors.divider }}>
+            {[
+              {
+                label: 'Sejak mulai',
+                value:
+                  summary.changeFromStart !== null
+                    ? `${summary.changeFromStart > 0 ? '+' : ''}${summary.changeFromStart.toFixed(1)} kg`
+                    : '—',
+                color: changeColor,
+              },
+              {
+                label: 'Rata-rata 7 hari',
+                value:
+                  summary.movingAverage7 !== null
+                    ? `${summary.movingAverage7.toFixed(1)} kg`
+                    : '—',
+                color: colors.textPrimary,
+              },
+              {
+                label: 'Arah tren',
+                value: trendInfo.label,
+                color: trendInfo.color,
+              },
+            ].map((item, index) => (
+              <View
+                key={item.label}
+                style={{
+                  minHeight: 58,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderBottomWidth: index < 2 ? 1 : 0,
+                  borderBottomColor: colors.divider,
+                }}
+              >
+                <Text style={{ ...typography.body, color: colors.textSecondary }}>{item.label}</Text>
+                <Text style={{ ...typography.bodyMedium, color: item.color }}>{item.value}</Text>
+              </View>
+            ))}
           </View>
         </Surface>
 
-        {/* Chart Card */}
-        <Surface style={{ padding: spacing.md }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Activity size={16} color={colors.primary} />
-              <Text style={{ ...typography.caption, fontWeight: '700', color: colors.primaryText, textTransform: 'uppercase' }}>Grafik Tren</Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', backgroundColor: colors.surfaceElevated, borderRadius: radius.sm, padding: 2 }}>
+        <Surface style={{ marginVertical: 0, paddingHorizontal: 0, paddingVertical: spacing.lg, overflow: 'hidden' }}>
+          <View
+            style={{
+              paddingHorizontal: spacing.lg,
+              marginBottom: spacing.md,
+              gap: spacing.md,
+            }}
+          >
+            <Text style={{ ...typography.h3, color: colors.textPrimary }}>Tren</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.lg }}>
               {([7, 30, 90] as const).map((p) => (
                 <TouchableOpacity
                   key={p}
-                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm - 4, backgroundColor: chartPeriod === p ? colors.primary : 'transparent', minHeight: 44, justifyContent: 'center' }}
+                  style={{
+                    minHeight: 44,
+                    justifyContent: 'center',
+                    borderBottomWidth: 1,
+                    borderBottomColor: chartPeriod === p ? colors.primary : 'transparent',
+                  }}
                   onPress={() => setChartPeriod(p)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: chartPeriod === p }}
+                  accessibilityLabel={`Tampilkan tren ${p} hari`}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: chartPeriod === p ? colors.onPrimary : colors.textTertiary }}>{p}H</Text>
+                  <Text
+                    style={{
+                      ...typography.caption,
+                      color: chartPeriod === p ? colors.textPrimary : colors.textTertiary,
+                    }}
+                  >
+                    {p} hari
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -171,25 +233,50 @@ export const WeightScreen: React.FC = () => {
           <WeightChart dataPoints={chartData} maDataPoints={maChartData} targetKg={targetKg} />
         </Surface>
 
-        {/* Catat Berat Button */}
         <TouchableOpacity
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: radius.md, minHeight: 44 }}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: spacing.sm,
+            backgroundColor: colors.primary,
+            borderRadius: radius.full,
+            minHeight: 50,
+          }}
           onPress={() => setShowAddModal(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Catat berat baru"
         >
-          <Plus size={18} color={colors.onPrimary} />
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onPrimary }}>Catat Berat Badan</Text>
+          <Plus size={17} color={colors.onPrimary} strokeWidth={2} />
+          <Text style={{ ...typography.bodyMedium, color: colors.onPrimary }}>Catat berat</Text>
         </TouchableOpacity>
 
-        {/* Riwayat Log List */}
-        <Surface style={{ padding: spacing.md }}>
-          <Text style={{ ...typography.caption, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm }}>
-            Riwayat Pencatatan ({sortedLogs.length})
-          </Text>
+        <Surface style={{ marginVertical: 0, paddingHorizontal: spacing.lg, paddingVertical: 0 }}>
+          <View
+            style={{
+              minHeight: 64,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottomWidth: sortedLogs.length > 0 ? 1 : 0,
+              borderBottomColor: colors.divider,
+            }}
+          >
+            <Text style={{ ...typography.h3, color: colors.textPrimary }}>Riwayat</Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+              {sortedLogs.length} catatan
+            </Text>
+          </View>
 
           {sortedLogs.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: spacing.md, gap: 8 }}>
-              <Scale size={24} color={colors.textTertiary} />
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Belum ada data berat badan.</Text>
+            <View style={{ paddingVertical: spacing.lg, gap: spacing.xs }}>
+              <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>
+                Belum ada catatan
+              </Text>
+              <Text style={{ ...typography.body, color: colors.textTertiary }}>
+                Catatan pertamamu akan muncul di sini.
+              </Text>
             </View>
           ) : (
             sortedLogs.slice(0, 20).map((log, index) => {
@@ -200,18 +287,38 @@ export const WeightScreen: React.FC = () => {
               return (
                 <TouchableOpacity
                   key={log.id}
-                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider, minHeight: 44 }}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingVertical: spacing.md,
+                    borderBottomWidth: index < Math.min(sortedLogs.length, 20) - 1 ? 1 : 0,
+                    borderBottomColor: colors.divider,
+                    minHeight: 64,
+                  }}
                   onPress={() => handleOpenEdit(log)}
+                  activeOpacity={0.65}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit berat ${log.weightKg.toFixed(1)} kilogram, ${formatDateID(log.recordedAt)}`}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>{formatDateID(log.recordedAt)}</Text>
-                    {log.note ? <Text style={{ ...typography.caption, color: colors.textTertiary, fontStyle: 'italic', marginTop: 2 }}>{log.note}</Text> : null}
+                    {log.note ? (
+                      <Text
+                        style={{ ...typography.caption, color: colors.textTertiary, marginTop: spacing.xs }}
+                        numberOfLines={1}
+                      >
+                        {log.note}
+                      </Text>
+                    ) : null}
                   </View>
 
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>{log.weightKg.toFixed(1)} kg</Text>
+                    <Text style={{ ...typography.bodyMedium, color: colors.textPrimary }}>
+                      {log.weightKg.toFixed(1)} kg
+                    </Text>
                     {changeDelta !== null ? (
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: deltaColor, marginTop: 2 }}>
+                      <Text style={{ ...typography.caption, color: deltaColor, marginTop: spacing.xs }}>
                         {changeDelta > 0 ? `+${changeDelta.toFixed(1)}` : `${changeDelta.toFixed(1)}`} kg
                       </Text>
                     ) : null}
@@ -255,6 +362,6 @@ export const WeightScreen: React.FC = () => {
         weightLog={selectedLog}
         isOnlyLog={weightLogs.length <= 1}
       />
-    </SafeAreaView>
+    </View>
   );
 };

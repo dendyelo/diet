@@ -25,7 +25,7 @@ export const HomeScreen: React.FC = () => {
   const { profile } = useProfile();
   const { mealLogs = [], totalCaloriesIn, snackCount, addMealLog, updateMealLog, deleteMealLog } = useMeals();
   const { fastingState, steps = 0, waterGlasses = 0, energy, addWaterGlass, resetFastingTimer } = useHealth();
-  const { userApiKey } = useAI();
+  const { userApiKey, connectionStatus } = useAI();
   const { colors, spacing, radius, typography } = useTheme();
 
   const [showSnackModal, setShowSnackModal] = useState<boolean>(false);
@@ -189,6 +189,7 @@ export const HomeScreen: React.FC = () => {
         onClose={() => setShowChatModal(false)}
         userName={profile?.name || 'Teman Diet'}
         userApiKey={userApiKey}
+        connectionStatus={connectionStatus}
         userContext={{
           fastingHours: Math.floor(elapsedSeconds / 3600),
           caloriesIn: totalCaloriesIn || 0,

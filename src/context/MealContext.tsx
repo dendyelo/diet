@@ -34,7 +34,7 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Efficient Midnight Date Rollover Timeout
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     const scheduleMidnightRollover = () => {
       const delay = msUntilMidnight();
       timer = setTimeout(() => {

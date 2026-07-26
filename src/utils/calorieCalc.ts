@@ -8,6 +8,26 @@ export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   very_active: 1.9,
 };
 
+/**
+ * Step baselines are product heuristics used to avoid adding the same everyday
+ * movement twice: once through the activity multiplier and again as steps.
+ */
+export const ACTIVITY_STEP_BASELINES: Record<ActivityLevel, number> = {
+  sedentary: 3000,
+  light: 5000,
+  moderate: 7500,
+  active: 10000,
+  very_active: 12500,
+};
+
+export const ACTIVITY_STEP_GOALS: Record<ActivityLevel, number> = {
+  sedentary: 6000,
+  light: 7500,
+  moderate: 9000,
+  active: 11000,
+  very_active: 13000,
+};
+
 export const BODY_TYPE_MULTIPLIERS: Record<BodyType, number> = {
   easy_gain: 0.93,
   normal: 1.0,
@@ -24,7 +44,7 @@ export const BODY_TYPE_INFO: Record<BodyType, { label: string; emoji: string; de
   normal: {
     label: 'Normal / Seimbang',
     emoji: '⚖️',
-    desc: 'Metabolisme seimbang. Perhitungan BMR & TDEE standar presisi.',
+    desc: 'Metabolisme seimbang. Perkiraan kebutuhan energi menggunakan rumus standar.',
     color: '#10B981',
   },
   hard_gain: {
@@ -124,22 +144,91 @@ export function calculateStepCalories(steps: number, weightKg: number): number {
 }
 
 /**
+ * Calculate today's activity context without double-counting everyday movement.
+ *
+ * TDEE already contains a typical activity allowance. All step calories remain
+ * visible as an estimate, but only steps above the profile baseline increase
+ * today's maintenance threshold.
+ */
+export function calculateActivitySummary(
+  profile: UserProfile,
+  steps: number
+) {
+  const safeSteps = Math.max(
+    0,
+    Math.round(Number.isFinite(steps) ? steps : 0)
+  );
+  const activityLevel = profile.activityLevel || 'light';
+  const baselineSteps = ACTIVITY_STEP_BASELINES[activityLevel];
+  const stepGoal = ACTIVITY_STEP_GOALS[activityLevel];
+  const bonusSteps = Math.max(0, safeSteps - baselineSteps);
+  const stepCalories = calculateStepCalories(safeSteps, profile.weightKg);
+  const activityBonusCalories = calculateStepCalories(
+    bonusSteps,
+    profile.weightKg
+  );
+  const baseMaintenance = calculateTDEE(profile);
+  const adjustedMaintenance = baseMaintenance + activityBonusCalories;
+  const stepProgressPct = Math.min(
+    100,
+    Math.max(0, Math.round((safeSteps / Math.max(1, stepGoal)) * 100))
+  );
+
+  return {
+    steps: safeSteps,
+    baselineSteps,
+    stepGoal,
+    bonusSteps,
+    stepCalories,
+    activityBonusCalories,
+    baseMaintenance,
+    adjustedMaintenance,
+    stepProgressPct,
+  };
+}
+
+/**
  * Real-time Synchronized Energy Balance
  */
 export function calculateEnergyBalance(
   profile: UserProfile,
   totalCaloriesIn: number,
   steps: number,
-  dateObj: Date = new Date()
+  dateObj: Date = new Date(),
+  loggedActivityCalories = 0
 ) {
   const dailyBMR = calculateBMR(profile);
   const elapsedBMR = calculateElapsedBMR(dailyBMR, dateObj);
-  const dailyTDEE = calculateTDEE(profile);
-  const elapsedTDEE = calculateElapsedBMR(dailyTDEE, dateObj);
-  const activityCalories = Math.max(0, elapsedTDEE - elapsedBMR);
-  const stepCalories = calculateStepCalories(steps, profile.weightKg);
-
-  const totalCaloriesOut = elapsedBMR + activityCalories + stepCalories;
+  const activity = calculateActivitySummary(profile, steps);
+  const safeLoggedActivityCalories = Math.max(
+    0,
+    Math.round(
+      Number.isFinite(loggedActivityCalories) ? loggedActivityCalories : 0
+    )
+  );
+  const adjustedMaintenance =
+    activity.adjustedMaintenance + safeLoggedActivityCalories;
+  const elapsedBaseMaintenance = calculateElapsedBMR(
+    activity.baseMaintenance,
+    dateObj
+  );
+  const activityCalories =
+    Math.max(0, elapsedBaseMaintenance - elapsedBMR) +
+    activity.activityBonusCalories +
+    safeLoggedActivityCalories;
+  const totalCaloriesOut =
+    elapsedBaseMaintenance +
+    activity.activityBonusCalories +
+    safeLoggedActivityCalories;
+  const elapsedMaintenanceProgressPct = Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(
+        (totalCaloriesOut / Math.max(1, adjustedMaintenance)) * 100
+      )
+    )
+  );
   const netBalance = totalCaloriesOut - totalCaloriesIn;
   const targetDeficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
 
@@ -150,10 +239,20 @@ export function calculateEnergyBalance(
 
   return {
     dailyBMR,
-    dailyTDEE,
+    dailyTDEE: adjustedMaintenance,
+    baseMaintenance: activity.baseMaintenance,
+    adjustedMaintenance,
+    elapsedBaseMaintenance,
+    elapsedMaintenanceProgressPct,
     elapsedBMR,
     activityCalories,
-    stepCalories,
+    stepCalories: activity.stepCalories,
+    activityBonusCalories: activity.activityBonusCalories,
+    loggedActivityCalories: safeLoggedActivityCalories,
+    baselineSteps: activity.baselineSteps,
+    bonusSteps: activity.bonusSteps,
+    stepGoal: activity.stepGoal,
+    stepProgressPct: activity.stepProgressPct,
     totalCaloriesOut,
     totalCaloriesIn,
     netBalance,

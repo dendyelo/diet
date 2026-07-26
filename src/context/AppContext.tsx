@@ -12,6 +12,7 @@ import {
   saveStepCount,
 } from '../services/storageService';
 import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
+import { calculateEnergyBalance } from '../utils/calorieCalc';
 
 function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
@@ -23,6 +24,22 @@ interface AppContextType {
   waterGlasses: number;
   steps: number;
   elapsedSeconds: number;
+  fastingState: {
+    elapsedSeconds: number;
+    fastingHours: number;
+    isFastingTargetReached: boolean;
+  };
+  energy: {
+    dailyBMR: number;
+    elapsedBMR: number;
+    stepCalories: number;
+    totalCaloriesOut: number;
+    totalCaloriesIn: number;
+    netBalance: number;
+    targetDeficit: number;
+    isDeficit: boolean;
+    percentageToGoal: number;
+  };
   isLoading: boolean;
   showWelcomeBackModal: boolean;
   dismissWelcomeBackModal: () => void;
@@ -67,13 +84,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const loadedWater = await loadWaterGlasses(todayStr);
       const loadedSteps = await loadStepCount(todayStr);
 
-      setProfile(loadedProfile);
+      // Ensure valid lastMealTimestamp
+      let validProfile = loadedProfile;
+      if (!validProfile.lastMealTimestamp || isNaN(new Date(validProfile.lastMealTimestamp).getTime())) {
+        validProfile = { ...validProfile, lastMealTimestamp: new Date().toISOString() };
+        await saveUserProfile(validProfile);
+      }
+
+      setProfile(validProfile);
       setMealLogs(loadedLogs);
       setWaterGlasses(loadedWater);
       setSteps(loadedSteps);
 
-      // Check if user has been inactive for > 36 hours (Lupa Berhari-hari recovery trigger)
-      const lastMealTime = new Date(loadedProfile.lastMealTimestamp).getTime();
+      // Check if user has been inactive for > 36 hours
+      const lastMealTime = new Date(validProfile.lastMealTimestamp).getTime();
       const nowTime = new Date().getTime();
       const hoursDiff = (nowTime - lastMealTime) / (1000 * 60 * 60);
 
@@ -87,16 +111,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     init();
   }, []);
 
-  // Real-time Fasting Clock Timer tick
+  // Real-time Fasting Clock Timer tick (Every 1 second)
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (profile.lastMealTimestamp) {
-        const lastTime = new Date(profile.lastMealTimestamp).getTime();
-        const now = new Date().getTime();
-        const diffInSec = Math.max(0, Math.floor((now - lastTime) / 1000));
-        setElapsedSeconds(diffInSec);
-      }
-    }, 1000);
+    const updateClock = () => {
+      const lastMealTimeStr = profile.lastMealTimestamp || new Date().toISOString();
+      const lastTime = new Date(lastMealTimeStr).getTime();
+      const now = new Date().getTime();
+      const diffInSec = Math.max(0, Math.floor((now - lastTime) / 1000));
+      setElapsedSeconds(diffInSec);
+    };
+
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
 
     return () => clearInterval(interval);
   }, [profile.lastMealTimestamp]);
@@ -114,7 +140,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         saveStepCount(todayStr, baseSteps);
 
         sub = subscribeStepCount((sessionSteps) => {
-          // Expo Pedometer watchStepCount returns cumulative steps since watch started
           const totalSteps = baseSteps + sessionSteps;
           setSteps(totalSteps);
           saveStepCount(todayStr, totalSteps);
@@ -160,7 +185,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setMealLogs(updatedLogs);
     await saveMealLogs(updatedLogs);
 
-    // Update last meal timestamp for fasting timer
+    // Update last meal timestamp for fasting timer tick reset
     const updatedProfile = { ...profile, lastMealTimestamp: timestamp };
     setProfile(updatedProfile);
     await saveUserProfile(updatedProfile);
@@ -218,6 +243,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setShowWelcomeBackModal(false);
   };
 
+  // Compute Fasting State & Energy Balance Realtime
+  const fastingHours = Math.floor(elapsedSeconds / 3600);
+  const fastingState = {
+    elapsedSeconds,
+    fastingHours,
+    isFastingTargetReached: fastingHours >= (profile.fastingTargetHours || 16),
+  };
+
+  const todayLogs = mealLogs.filter((log) => log.timestamp.startsWith(todayStr));
+  const totalCaloriesIn = todayLogs.reduce((acc, log) => acc + log.nutrition.calories, 0);
+  const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps);
+
   return (
     <AppContext.Provider
       value={{
@@ -226,6 +263,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         waterGlasses,
         steps,
         elapsedSeconds,
+        fastingState,
+        energy,
         isLoading,
         showWelcomeBackModal,
         dismissWelcomeBackModal,

@@ -101,24 +101,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => clearInterval(interval);
   }, [profile.lastMealTimestamp]);
 
-  // Sync Pedometer steps if available
+  // Sync Pedometer steps accurately without cumulative exponential sum
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
+    let baseSteps = 0;
 
     async function syncPedometer() {
       const status = await getTodayStepCount();
-      if (status.isAvailable && status.stepCount > 0) {
-        setSteps(status.stepCount);
-        saveStepCount(todayStr, status.stepCount);
-      }
+      if (status.isAvailable) {
+        baseSteps = status.stepCount;
+        setSteps(baseSteps);
+        saveStepCount(todayStr, baseSteps);
 
-      sub = subscribeStepCount((newSteps) => {
-        setSteps((prev) => {
-          const total = prev + newSteps;
-          saveStepCount(todayStr, total);
-          return total;
+        sub = subscribeStepCount((sessionSteps) => {
+          // Expo Pedometer watchStepCount returns cumulative steps since watch started
+          const totalSteps = baseSteps + sessionSteps;
+          setSteps(totalSteps);
+          saveStepCount(todayStr, totalSteps);
         });
-      });
+      }
     }
 
     syncPedometer();

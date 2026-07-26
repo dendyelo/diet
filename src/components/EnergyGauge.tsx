@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Path, Circle, G, Text as SvgText } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { GlassCard } from './GlassCard';
 
 interface EnergyGaugeProps {
   caloriesIn: number;
   caloriesOut: number;
+  bmr?: number;
+  stepCalories?: number;
   netBalance: number;
   targetDeficit: number;
   isDeficit: boolean;
@@ -15,6 +17,8 @@ interface EnergyGaugeProps {
 export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
   caloriesIn,
   caloriesOut,
+  bmr = 1600,
+  stepCalories = 0,
   netBalance,
   targetDeficit,
   isDeficit,
@@ -23,7 +27,7 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
   const absBalance = Math.abs(netBalance);
   const statusColor = isCheatDay ? '#F59E0B' : isDeficit ? '#10B981' : '#EF4444';
   const statusText = isCheatDay
-    ? 'CHAT DAY MODE'
+    ? 'CHEAT DAY MODE'
     : isDeficit
     ? `DEFISIT ${absBalance} KCAL`
     : `SURPLUS ${absBalance} KCAL`;
@@ -32,7 +36,6 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
   const radius = 80;
   const strokeWidth = 14;
   const center = 100;
-  // Semi-circle arc from 180 deg to 0 deg
   const startAngle = Math.PI;
   const endAngle = 0;
 
@@ -60,7 +63,6 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
 
       <View style={styles.gaugeWrapper}>
         <Svg width={200} height={120} viewBox="0 0 200 120">
-          {/* Background Track Arc */}
           <Path
             d={getArcPath(startAngle, endAngle)}
             fill="none"
@@ -68,7 +70,6 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
             strokeWidth={strokeWidth}
             strokeLinecap="round"
           />
-          {/* Active Fill Arc */}
           <Path
             d={getArcPath(startAngle, Math.max(0, fillAngle))}
             fill="none"
@@ -76,28 +77,16 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
             strokeWidth={strokeWidth}
             strokeLinecap="round"
           />
-          {/* Center Text inside Arc */}
-          <SvgText
-            x="100"
-            y="70"
-            fontSize="26"
-            fontWeight="bold"
-            fill="#FFFFFF"
-            textAnchor="middle"
-          >
-            {isDeficit ? `-${absBalance}` : `+${absBalance}`}
-          </SvgText>
-
-          <SvgText
-            x="100"
-            y="92"
-            fontSize="12"
-            fill="rgba(255, 255, 255, 0.6)"
-            textAnchor="middle"
-          >
-            {isDeficit ? 'Target Net Deficit' : 'Surplus Warning'}
-          </SvgText>
         </Svg>
+
+        <View style={styles.centerTextOverlay}>
+          <Text style={styles.netValueText}>
+            {isDeficit ? `-${absBalance}` : `+${absBalance}`}
+          </Text>
+          <Text style={styles.netSubText}>
+            {isDeficit ? 'Target Net Deficit' : 'Surplus Warning'}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.statsRow}>
@@ -112,7 +101,9 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
         <View style={styles.statBox}>
           <Text style={styles.statLabel}>KALORI KELUAR (OUT)</Text>
           <Text style={[styles.statValue, { color: '#34D399' }]}>{caloriesOut} kcal</Text>
-          <Text style={styles.statSub}>BMR + Langkah Kaki</Text>
+          <Text style={styles.statSub}>
+            BMR ({bmr}) + Steps (+{stepCalories})
+          </Text>
         </View>
       </View>
     </GlassCard>
@@ -157,6 +148,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 4,
+    position: 'relative',
+  },
+  centerTextOverlay: {
+    position: 'absolute',
+    top: 35,
+    alignItems: 'center',
+  },
+  netValueText: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  netSubText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 2,
   },
   statsRow: {
     flexDirection: 'row',

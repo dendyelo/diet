@@ -58,7 +58,7 @@ export const HomeScreen: React.FC = () => {
   const totalCaloriesIn = todayLogs.reduce((sum, m) => sum + m.nutrition.calories, 0);
   const snackCount = todayLogs.filter((m) => m.isSnack).length;
 
-  // Calculate Energy Balance
+  // Calculate Energy Balance (Synchronized BMR + Active Step Burn)
   const energy = calculateEnergyBalance(profile, totalCaloriesIn, steps);
 
   const handleAddSnackSubmit = (name: string, calories: number, trigger: any) => {
@@ -95,10 +95,12 @@ export const HomeScreen: React.FC = () => {
           onEditTimePress={() => setShowAddMealModal(true)}
         />
 
-        {/* 2. Live Energy Balance Gauge */}
+        {/* 2. Live Synchronized Energy Balance Gauge */}
         <EnergyGauge
           caloriesIn={totalCaloriesIn}
           caloriesOut={energy.totalCaloriesOut}
+          bmr={energy.bmr}
+          stepCalories={energy.stepCalories}
           netBalance={energy.netBalance}
           targetDeficit={energy.targetDeficit}
           isDeficit={energy.isDeficit}

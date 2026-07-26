@@ -29,9 +29,8 @@ export function calculateTDEE(profile: UserProfile): number {
 }
 
 /**
- * Calculate active calories burned from walking steps
- * Refined formula matching Apple Watch & Garmin active calorie algorithms:
- * ~285 kcal for 10,000 steps (70kg adult)
+ * Calculate active calories burned directly from steps matching Apple Health / Garmin:
+ * ~287 kcal per 10,000 steps for 70kg adult
  */
 export function calculateStepCalories(steps: number, weightKg: number): number {
   if (!steps || steps <= 0) return 0;
@@ -41,16 +40,19 @@ export function calculateStepCalories(steps: number, weightKg: number): number {
 }
 
 /**
- * Calculate Net Energy Balance (Deficit or Surplus)
+ * Synchronized Net Energy Balance (Deficit or Surplus)
+ * Calorie OUT = Resting BMR + Active Step Calories (100% Synchronized with Steps!)
  */
 export function calculateEnergyBalance(
   profile: UserProfile,
   totalCaloriesIn: number,
   steps: number
 ) {
-  const tdee = calculateTDEE(profile);
+  const bmr = calculateBMR(profile);
   const stepCalories = calculateStepCalories(steps, profile.weightKg);
-  const totalCaloriesOut = tdee + stepCalories;
+  
+  // Direct synchronization: BMR (Resting) + Step Burn (Active)
+  const totalCaloriesOut = bmr + stepCalories;
   const netBalance = totalCaloriesOut - totalCaloriesIn; // Positive = Deficit, Negative = Surplus
   const targetDeficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
 
@@ -61,7 +63,7 @@ export function calculateEnergyBalance(
   );
 
   return {
-    tdee,
+    bmr,
     stepCalories,
     totalCaloriesOut,
     netBalance, // if positive, calories burned > eaten (DEFICIT)

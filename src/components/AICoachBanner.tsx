@@ -105,8 +105,10 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
     <GlassCard style={styles.bannerContainer}>
       <View style={styles.headerRow}>
         <View style={styles.aiBadge}>
-          <Sparkles size={14} color="#10B981" />
-          <Text style={styles.aiBadgeText}>GEMINI AI HEALTH COACH 🟢</Text>
+          <Sparkles size={12} color="#10B981" />
+          <Text style={styles.aiBadgeText} numberOfLines={1}>
+            GEMINI AI HEALTH COACH 🟢
+          </Text>
         </View>
 
         <View style={styles.rightIcons}>
@@ -121,8 +123,8 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
           )}
 
           <TouchableOpacity style={styles.chatHeaderBtn} onPress={onOpenChat}>
-            <MessageCircle size={16} color="#10B981" />
-            <Text style={styles.chatHeaderBtnText}>Chat Coach</Text>
+            <MessageCircle size={14} color="#10B981" />
+            <Text style={styles.chatHeaderBtnText} numberOfLines={1}>Chat Coach</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -132,24 +134,24 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
 
       {/* Interactive Quick Answer Buttons */}
       <View style={styles.actionGrid}>
-        <TouchableOpacity style={styles.btnChat} onPress={onOpenChat}>
-          <MessageCircle size={14} color="#FFFFFF" />
-          <Text style={styles.btnText}>💬 Chat Kondisi Tubuh</Text>
+        <TouchableOpacity style={[styles.actionBtn, styles.btnChat]} onPress={onOpenChat}>
+          <MessageCircle size={13} color="#FFFFFF" />
+          <Text style={styles.btnText} numberOfLines={1}>💬 Chat AI</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnMeal} onPress={onOpenAddMeal}>
-          <Utensils size={14} color="#FFFFFF" />
-          <Text style={styles.btnText}>🥗 Lapar, Makan</Text>
+        <TouchableOpacity style={[styles.actionBtn, styles.btnMeal]} onPress={onOpenAddMeal}>
+          <Utensils size={13} color="#FFFFFF" />
+          <Text style={styles.btnText} numberOfLines={1}>🥗 Makan</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnSnack} onPress={onOpenSnack}>
-          <Cookie size={14} color="#FFFFFF" />
-          <Text style={styles.btnText}>🍿 Ingin Ngemil</Text>
+        <TouchableOpacity style={[styles.actionBtn, styles.btnSnack]} onPress={onOpenSnack}>
+          <Cookie size={13} color="#FFFFFF" />
+          <Text style={styles.btnText} numberOfLines={1}>🍿 Ngemil</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnWater} onPress={onAddWater}>
-          <Droplet size={14} color="#FFFFFF" />
-          <Text style={styles.btnText}>💧 + Air</Text>
+        <TouchableOpacity style={[styles.actionBtn, styles.btnWater]} onPress={onAddWater}>
+          <Droplet size={13} color="#FFFFFF" />
+          <Text style={styles.btnText} numberOfLines={1}>💧 Air</Text>
         </TouchableOpacity>
       </View>
     </GlassCard>
@@ -161,32 +163,35 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.25)',
     backgroundColor: 'rgba(16, 185, 129, 0.06)',
     marginBottom: 12,
+    padding: 14,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 6,
   },
   rightIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 12,
+    flexShrink: 1,
   },
   aiBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'bold',
     color: '#10B981',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   refreshBtn: {
     padding: 4,
@@ -197,73 +202,59 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 10,
   },
   chatHeaderBtnText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#10B981',
   },
   coachMessage: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#FFFFFF',
-    lineHeight: 19,
+    lineHeight: 18,
     fontWeight: '600',
   },
   questionPrompt: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#34D399',
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 10,
     fontWeight: 'bold',
     fontStyle: 'italic',
   },
   actionGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 6,
+    width: '100%',
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+    borderRadius: 10,
   },
   btnChat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
     backgroundColor: '#10B981',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
   },
   btnMeal: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
     backgroundColor: '#3B82F6',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
   },
   btnSnack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
     backgroundColor: '#F59E0B',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
   },
   btnWater: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   btnText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },

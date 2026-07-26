@@ -38,8 +38,8 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
 
         <View style={styles.textContainer}>
           <View style={styles.titleRow}>
-            <Text style={styles.name}>{log.name}</Text>
-            <Text style={styles.time}>{timeStr}</Text>
+            <Text style={styles.name} numberOfLines={2}>{log.name}</Text>
+            <Text style={styles.time} numberOfLines={1}>{timeStr}</Text>
           </View>
 
           {/* Itemized Food Calorie Breakdown List */}
@@ -48,24 +48,24 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
               {log.itemsBreakdown.map((item, index) => (
                 <View key={index} style={styles.breakdownItem}>
                   <Text style={styles.breakdownDot}>•</Text>
-                  <Text style={styles.breakdownName}>{item.name}:</Text>
-                  <Text style={styles.breakdownCal}>{item.calories} kcal</Text>
+                  <Text style={styles.breakdownName} numberOfLines={1}>{item.name}:</Text>
+                  <Text style={styles.breakdownCal} numberOfLines={1}>{item.calories} kcal</Text>
                 </View>
               ))}
             </View>
           )}
 
           <View style={styles.macroRow}>
-            <Text style={styles.calBadge}>Total: {log.nutrition.calories} kcal</Text>
-            <Text style={styles.macroText}>P: {log.nutrition.proteinGrams}g</Text>
-            <Text style={styles.macroText}>K: {log.nutrition.carbsGrams}g</Text>
-            <Text style={styles.macroText}>L: {log.nutrition.fatGrams}g</Text>
+            <Text style={styles.calBadge} numberOfLines={1}>Total: {log.nutrition.calories} kcal</Text>
+            <Text style={styles.macroText} numberOfLines={1}>P: {log.nutrition.proteinGrams}g</Text>
+            <Text style={styles.macroText} numberOfLines={1}>K: {log.nutrition.carbsGrams}g</Text>
+            <Text style={styles.macroText} numberOfLines={1}>L: {log.nutrition.fatGrams}g</Text>
           </View>
 
           {triggerInfo && (
             <View style={[styles.triggerPill, { backgroundColor: triggerInfo.color + '20' }]}>
               <Text style={styles.triggerEmoji}>{triggerInfo.emoji}</Text>
-              <Text style={[styles.triggerText, { color: triggerInfo.color }]}>
+              <Text style={[styles.triggerText, { color: triggerInfo.color }]} numberOfLines={1}>
                 {triggerInfo.label}
               </Text>
             </View>
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: 16,
-    padding: 14,
+    padding: 12,
     marginVertical: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -101,13 +101,13 @@ const styles = StyleSheet.create({
   leftRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 10,
     flex: 1,
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -118,32 +118,32 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 4,
+    gap: 6,
   },
   name: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#FFFFFF',
     flex: 1,
-    marginRight: 8,
   },
   time: {
-    fontSize: 11,
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.4)',
   },
   breakdownContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: 10,
     padding: 8,
-    marginBottom: 8,
+    marginVertical: 6,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   breakdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     marginVertical: 2,
   },
   breakdownDot: {
@@ -152,28 +152,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   breakdownName: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.85)',
     flex: 1,
   },
   breakdownCal: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#60A5FA',
   },
   macroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 6,
     marginBottom: 4,
   },
   calBadge: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#34D399',
   },
   macroText: {
-    fontSize: 11,
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.5)',
   },
   triggerPill: {
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
     marginLeft: 6,
   },
   actionBtn: {

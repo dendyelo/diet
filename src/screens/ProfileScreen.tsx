@@ -12,7 +12,7 @@ import { useApp } from '../context/AppContext';
 import { calculateBMR, calculateTDEE } from '../utils/calorieCalc';
 import { getAIStatus } from '../services/aiService';
 import { GlassCard } from '../components/GlassCard';
-import { Key, Save, CheckCircle2, Wifi, WifiOff } from 'lucide-react-native';
+import { Key, Save, CheckCircle2, Wifi, Sparkles } from 'lucide-react-native';
 
 export const ProfileScreen: React.FC = () => {
   const { profile, updateProfile } = useApp();
@@ -58,7 +58,7 @@ export const ProfileScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.screenTitle}>PROFIL & PENGATURAN ENERGI</Text>
+        <Text style={styles.screenTitle} numberOfLines={1}>PROFIL & PENGATURAN ENERGI</Text>
         <Text style={styles.screenSub}>
           Konfigurasi data fisik untuk kalkulasi presisi BMR, TDEE, dan API Key Gemini AI.
         </Text>
@@ -66,7 +66,7 @@ export const ProfileScreen: React.FC = () => {
         {savedMsg !== '' && (
           <View style={styles.savedBanner}>
             <CheckCircle2 size={18} color="#10B981" />
-            <Text style={styles.savedText}>{savedMsg}</Text>
+            <Text style={styles.savedText} numberOfLines={1}>{savedMsg}</Text>
           </View>
         )}
 
@@ -74,37 +74,37 @@ export const ProfileScreen: React.FC = () => {
         <GlassCard style={styles.metricsCard}>
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabel}>BMR (ISTIRAHAT)</Text>
-              <Text style={[styles.metricValue, { color: '#60A5FA' }]}>{bmr} kcal</Text>
+              <Text style={styles.metricLabel} numberOfLines={1}>BMR (ISTIRAHAT)</Text>
+              <Text style={[styles.metricValue, { color: '#60A5FA' }]} numberOfLines={1}>{bmr} kcal</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={styles.metricLabel}>TDEE (AKTIVITAS)</Text>
-              <Text style={[styles.metricValue, { color: '#34D399' }]}>{tdee} kcal</Text>
+              <Text style={styles.metricLabel} numberOfLines={1}>TDEE (AKTIVITAS)</Text>
+              <Text style={[styles.metricValue, { color: '#34D399' }]} numberOfLines={1}>{tdee} kcal</Text>
             </View>
           </View>
         </GlassCard>
 
         {/* Profile Inputs */}
         <GlassCard>
-          <Text style={styles.sectionHeader}>PROFIL FISIK</Text>
+          <Text style={styles.sectionHeader} numberOfLines={1}>PROFIL FISIK</Text>
 
-          <Text style={styles.label}>NAMA PANGGILAN</Text>
+          <Text style={styles.label} numberOfLines={1}>NAMA PANGGILAN</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} />
 
           <View style={styles.grid2}>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>USIA (TAHUN)</Text>
+              <Text style={styles.label} numberOfLines={1}>USIA (TAHUN)</Text>
               <TextInput style={styles.input} keyboardType="numeric" value={age} onChangeText={setAge} maxLength={3} />
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>JENIS KELAMIN</Text>
+              <Text style={styles.label} numberOfLines={1}>GENDER</Text>
               <View style={styles.genderRow}>
                 <TouchableOpacity
                   style={[styles.genderBtn, gender === 'male' && styles.genderBtnActive]}
                   onPress={() => setGender('male')}
                 >
-                  <Text style={[styles.genderText, gender === 'male' && styles.genderTextActive]}>
+                  <Text style={[styles.genderText, gender === 'male' && styles.genderTextActive]} numberOfLines={1}>
                     Pria
                   </Text>
                 </TouchableOpacity>
@@ -112,7 +112,7 @@ export const ProfileScreen: React.FC = () => {
                   style={[styles.genderBtn, gender === 'female' && styles.genderBtnActive]}
                   onPress={() => setGender('female')}
                 >
-                  <Text style={[styles.genderText, gender === 'female' && styles.genderTextActive]}>
+                  <Text style={[styles.genderText, gender === 'female' && styles.genderTextActive]} numberOfLines={1}>
                     Wanita
                   </Text>
                 </TouchableOpacity>
@@ -122,18 +122,18 @@ export const ProfileScreen: React.FC = () => {
 
           <View style={styles.grid2}>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>TINGGI (CM)</Text>
+              <Text style={styles.label} numberOfLines={1}>TINGGI (CM)</Text>
               <TextInput style={styles.input} keyboardType="numeric" value={height} onChangeText={setHeight} maxLength={3} />
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>BERAT SAAT INI (KG)</Text>
+              <Text style={styles.label} numberOfLines={1}>BERAT (KG)</Text>
               <TextInput style={styles.input} keyboardType="numeric" value={weight} onChangeText={setWeight} maxLength={4} />
             </View>
           </View>
 
           <View style={styles.grid2}>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>TARGET BERAT (KG)</Text>
+              <Text style={styles.label} numberOfLines={1}>TARGET BERAT (KG)</Text>
               <TextInput
                 style={styles.input}
                 keyboardType="numeric"
@@ -143,7 +143,7 @@ export const ProfileScreen: React.FC = () => {
               />
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>TARGET DEFISIT (KCAL)</Text>
+              <Text style={styles.label} numberOfLines={1}>TARGET DEFISIT (KCAL)</Text>
               <TextInput
                 style={styles.input}
                 keyboardType="numeric"
@@ -159,19 +159,15 @@ export const ProfileScreen: React.FC = () => {
         <GlassCard>
           <View style={styles.headerRow}>
             <Key size={16} color="#F59E0B" />
-            <Text style={styles.sectionHeader}>GEMINI AI API KEY</Text>
+            <Text style={styles.sectionHeader} numberOfLines={1}>GEMINI AI API KEY</Text>
           </View>
 
-          {/* AI Status Badge Container */}
+          {/* AI Status Banner Container */}
           <View style={[styles.statusBanner, { backgroundColor: aiStatus.color + '15', borderColor: aiStatus.color + '30' }]}>
-            {aiStatus.isOnline ? (
-              <Wifi size={16} color="#10B981" />
-            ) : (
-              <WifiOff size={16} color="#F59E0B" />
-            )}
+            <Wifi size={16} color={aiStatus.color} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.statusTitle, { color: aiStatus.color }]}>
-                Status: {aiStatus.modeLabel}
+              <Text style={[styles.statusTitle, { color: aiStatus.color }]} numberOfLines={1}>
+                {aiStatus.modeLabel}
               </Text>
               <Text style={styles.statusDesc}>{aiStatus.description}</Text>
             </View>
@@ -209,7 +205,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#09090B',
   },
   scrollContent: {
-    padding: 16,
+    padding: 14,
     paddingBottom: 40,
   },
   screenTitle: {
@@ -219,10 +215,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   screenSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 16,
-    lineHeight: 18,
+    marginBottom: 12,
+    lineHeight: 16,
   },
   savedBanner: {
     flexDirection: 'row',
@@ -231,17 +227,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     borderColor: 'rgba(16, 185, 129, 0.3)',
     borderWidth: 1,
-    padding: 12,
-    borderRadius: 14,
-    marginBottom: 16,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 12,
   },
   savedText: {
     fontSize: 12,
     fontWeight: 'bold',
     color: '#10B981',
+    flex: 1,
   },
   metricsCard: {
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -252,19 +249,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.5)',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 4,
+    marginTop: 2,
   },
   metricDivider: {
     width: 1,
-    height: 32,
+    height: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerRow: {
@@ -276,8 +273,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
     color: 'rgba(255, 255, 255, 0.7)',
-    letterSpacing: 1,
-    marginBottom: 12,
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
   statusBanner: {
     flexDirection: 'row',
@@ -286,59 +283,60 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   statusTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
   statusDesc: {
     fontSize: 10,
     color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 1,
+    lineHeight: 14,
   },
   label: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 6,
-    marginTop: 8,
+    marginBottom: 4,
+    marginTop: 6,
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
   },
   hint: {
-    fontSize: 11,
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 10,
-    lineHeight: 16,
+    marginBottom: 8,
+    lineHeight: 15,
   },
   grid2: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   gridItem: {
     flex: 1,
   },
   genderRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
   },
   genderBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -347,7 +345,7 @@ const styles = StyleSheet.create({
     borderColor: '#3B82F6',
   },
   genderText: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
   },
   genderTextActive: {
@@ -362,7 +360,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
     paddingVertical: 14,
     borderRadius: 14,
-    marginTop: 12,
+    marginTop: 10,
   },
   saveBtnText: {
     fontSize: 15,

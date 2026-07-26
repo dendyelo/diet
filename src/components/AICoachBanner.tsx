@@ -27,6 +27,7 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
 }) => {
   const fastingHours = Math.floor(elapsedSeconds / 3600);
   const currentHour = new Date().getHours();
+  const currentMinute = new Date().getMinutes();
 
   const [aiMessage, setAiMessage] = useState<string>('');
   const [aiQuestion, setAiQuestion] = useState<string>('');
@@ -74,23 +75,23 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
   let displayQuestion = aiQuestion;
 
   if (!isCloudAI || !displayMessage) {
+    // Dynamic Rotation index to prevent repeating the same topic (water, steps, fasting, deficit)
+    const rotateIndex = (currentHour + Math.floor(currentMinute / 5)) % 4;
+
     if (caloriesIn === 0 && currentHour >= 12) {
       displayMessage = `Halo ${userName}! Sudah jam ${currentHour}:00 dan kamu belum mencatat makanan hari ini.`;
       displayQuestion = 'Apakah kamu sudah lapar dan mau makan siang sekarang?';
-    } else if (netDeficit > 700 && caloriesIn < 800 && currentHour >= 13) {
-      displayMessage = `Defisit kalorimu saat ini cukup besar (${netDeficit} kcal). Jagalah tenaga tubuhmu agar tidak terlalu lemas!`;
-      displayQuestion = 'Apakah perutmu mulai menyuarakan lapar asli?';
-    } else if (fastingHours >= 14 && fastingHours < 18) {
-      displayMessage = `Luar biasa! Kamu sudah berpuasa selama ${fastingHours} jam. Tubuhmu sedang aktif dalam fase Pembakaran Lemak (Fat Adaptation)! 🔥`;
-      displayQuestion = 'Bagaimana rasanya? Masih merasa segar atau ingin membatalkan puasa?';
-    } else if (waterGlasses < 4 && currentHour >= 14) {
-      displayMessage = `Asupan air minummu baru ${waterGlasses} gelas hari ini. Seringkali rasa 'ngemil' sebenarnya adalah sinyal haus dari otak.`;
+    } else if (rotateIndex === 0 && fastingHours >= 6) {
+      displayMessage = `Hebat ${userName}! Kamu sudah berpuasa selama ${fastingHours} jam. Tubuhmu sedang aktif membakar cadangan lemak! 🔥`;
+      displayQuestion = 'Bagaimana perasaannya saat ini? Masih merasa bertenaga?';
+    } else if (rotateIndex === 1 && steps < 3000 && currentHour >= 15) {
+      displayMessage = `Langkah kakimu baru ${steps} steps hari ini. Jalan santai 15 menit dapat memperlancar metabolisme.`;
+      displayQuestion = 'Mau luangkan 15 menit berjalan kaki sore ini?';
+    } else if (rotateIndex === 2 && waterGlasses < 6 && currentHour >= 13) {
+      displayMessage = `Asupan air minummu saat ini ${waterGlasses} / 8 gelas. Hidrasi yang terjaga mencegah pusing saat puasa.`;
       displayQuestion = 'Yuk, minum 1 gelas air putih dingin sekarang?';
-    } else if (steps < 2000 && currentHour >= 16) {
-      displayMessage = `Langkah kakimu baru ${steps} steps hari ini.`;
-      displayQuestion = 'Mau luangkan 10-15 menit jalan santai sore ini untuk membakar lemak lebih lancar?';
     } else {
-      displayMessage = `Hebat ${userName}! Pola habit dan defisit kalorimu berjalan sangat rapi hari ini.`;
+      displayMessage = `Hebat ${userName}! Defisit kalorimu saat ini ${netDeficit} kcal. Pola habitmu berjalan sangat seimbang hari ini.`;
       displayQuestion = 'Bagaimana kondisi tubuh dan energi perasaanmu saat ini?';
     }
   }
@@ -100,7 +101,9 @@ export const AICoachBanner: React.FC<AICoachBannerProps> = ({
       <View style={styles.headerRow}>
         <View style={styles.aiBadge}>
           <Sparkles size={13} color="#10B981" />
-          <Text style={styles.aiBadgeText} numberOfLines={1}>AI HEALTH COACH</Text>
+          <Text style={styles.aiBadgeText} numberOfLines={1}>
+            {isCloudAI ? 'GEMINI AI CLOUD 🟢' : 'AI HEALTH COACH'}
+          </Text>
         </View>
 
         <View style={styles.rightGroup}>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { CheckCircle2, Circle } from 'lucide-react-native';
+import { CheckCircle2, Circle, Plus } from 'lucide-react-native';
 import { GlassCard } from './GlassCard';
 
 export interface DailyMissionItem {
@@ -14,8 +14,9 @@ interface DailyMissionCardProps {
   stepCount: number;
   netDeficit: number;
   proteinGrams: number;
-  targetProteinGrams?: number;
-  onToggleWater?: () => void;
+  targetProteinGrams: number;
+  todayMealsCount: number;
+  onAddWater: () => void;
 }
 
 export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
@@ -23,9 +24,13 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
   stepCount,
   netDeficit,
   proteinGrams,
-  targetProteinGrams = 80,
-  onToggleWater,
+  targetProteinGrams,
+  todayMealsCount,
+  onAddWater,
 }) => {
+  // Point 2: Deficit mission is completed ONLY if at least 1 meal has been logged AND user is in deficit!
+  const isDeficitAchieved = todayMealsCount > 0 && netDeficit >= 0;
+
   const missions: DailyMissionItem[] = [
     {
       id: 'water',
@@ -39,8 +44,10 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
     },
     {
       id: 'deficit',
-      title: `Defisit kalori terjaga (${netDeficit >= 0 ? `Defisit ${netDeficit}` : `Surplus ${Math.abs(netDeficit)}`} kcal)`,
-      isCompleted: netDeficit >= 0,
+      title: todayMealsCount === 0
+        ? 'Defisit kalori terjaga (Belum ada makanan)'
+        : `Defisit kalori terjaga (${netDeficit >= 0 ? `Defisit ${netDeficit}` : `Surplus ${Math.abs(netDeficit)}`} kcal)`,
+      isCompleted: isDeficitAchieved,
     },
     {
       id: 'protein',
@@ -62,26 +69,35 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
 
       <View style={styles.missionList}>
         {missions.map((mission) => (
-          <TouchableOpacity
-            key={mission.id}
-            style={styles.missionItem}
-            activeOpacity={mission.id === 'water' && onToggleWater ? 0.7 : 1}
-            onPress={mission.id === 'water' && onToggleWater ? onToggleWater : undefined}
-          >
-            {mission.isCompleted ? (
-              <CheckCircle2 size={18} color="#10B981" />
-            ) : (
-              <Circle size={18} color="rgba(255, 255, 255, 0.3)" />
+          <View key={mission.id} style={styles.missionItem}>
+            <View style={styles.missionLeft}>
+              {mission.isCompleted ? (
+                <CheckCircle2 size={18} color="#10B981" />
+              ) : (
+                <Circle size={18} color="rgba(255, 255, 255, 0.3)" />
+              )}
+              <Text
+                style={[
+                  styles.missionText,
+                  mission.isCompleted && styles.completedText,
+                ]}
+              >
+                {mission.title}
+              </Text>
+            </View>
+
+            {/* Point 3: Explicit +1 button for Water row */}
+            {mission.id === 'water' && waterGlasses < 8 && (
+              <TouchableOpacity
+                style={styles.waterPlusBtn}
+                onPress={onAddWater}
+                activeOpacity={0.7}
+              >
+                <Plus size={12} color="#10B981" />
+                <Text style={styles.waterPlusText}>+1</Text>
+              </TouchableOpacity>
             )}
-            <Text
-              style={[
-                styles.missionText,
-                mission.isCompleted && styles.completedText,
-              ]}
-            >
-              {mission.title}
-            </Text>
-          </TouchableOpacity>
+          </View>
         ))}
       </View>
     </GlassCard>
@@ -124,8 +140,14 @@ const styles = StyleSheet.create({
   missionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
     paddingVertical: 4,
+  },
+  missionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
   },
   missionText: {
     fontSize: 13,
@@ -135,5 +157,21 @@ const styles = StyleSheet.create({
   completedText: {
     color: 'rgba(255, 255, 255, 0.5)',
     textDecorationLine: 'line-through',
+  },
+  waterPlusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  waterPlusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#34D399',
   },
 });

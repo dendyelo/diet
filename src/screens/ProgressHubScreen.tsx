@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useMeals, useHealth, useWeight } from '../context/AppContext';
+import { useProfile, useMeals, useHealth } from '../context/AppContext';
 import { WeightScreen } from './WeightScreen';
 import { AnalyticsScreen } from './AnalyticsScreen';
 import { GlassCard } from '../components/GlassCard';
 import { generateWeeklyHabitSummary } from '../utils/habitAnalytics';
+import { calculateTargetProtein } from '../utils/calorieCalc';
 import { Scale, BarChart2, Award, Droplets, Utensils, CheckCircle2 } from 'lucide-react-native';
 
 type ProgressTabMode = 'weight' | 'analytics' | 'weekly';
@@ -12,12 +13,16 @@ type ProgressTabMode = 'weight' | 'analytics' | 'weekly';
 export const ProgressHubScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ProgressTabMode>('weight');
 
+  const { profile } = useProfile();
   const { mealLogs } = useMeals();
   const { waterGlasses } = useHealth();
 
+  const targetProtein = useMemo(() => calculateTargetProtein(profile), [profile]);
+
+  // Point 8: Authentic data calculation strictly from real user logs
   const weeklySummary = useMemo(() => {
-    return generateWeeklyHabitSummary(mealLogs, [waterGlasses, 7, 8, 6, 8, 8, 7]);
-  }, [mealLogs, waterGlasses]);
+    return generateWeeklyHabitSummary(mealLogs, waterGlasses, targetProtein);
+  }, [mealLogs, waterGlasses, targetProtein]);
 
   return (
     <View style={styles.container}>
@@ -105,7 +110,7 @@ export const ProgressHubScreen: React.FC = () => {
                 </View>
                 <View style={styles.metricTextGroup}>
                   <Text style={styles.metricTitle}>Kepatuhan Target Protein</Text>
-                  <Text style={styles.metricSub}>Target di atas 75g per hari</Text>
+                  <Text style={styles.metricSub}>Target {targetProtein}g per hari</Text>
                 </View>
                 <Text style={styles.metricVal}>{weeklySummary.proteinCompliancePct}%</Text>
               </View>

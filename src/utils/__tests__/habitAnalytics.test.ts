@@ -82,8 +82,8 @@ describe('Habit Analytics Utility Suite', () => {
       },
     ];
 
-    const summary = generateWeeklyHabitSummary(mockLogs, [8, 8, 8, 8, 8, 8, 8]);
-    expect(summary.habitScore).toBe(66);
+    const summary = generateWeeklyHabitSummary(mockLogs, 8, 80);
+    expect(summary.habitScore).toBe(65);
     expect(summary.waterCompliancePct).toBe(100);
     expect(summary.avgDailyCalories).toBe(900);
     expect(summary.insightSentence).toContain('Pola kebiasaanmu');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Modal, Alert } from 'react-native';
 import {
   AppProvider,
   useProfile,
@@ -15,7 +15,7 @@ import { LoggerScreen } from './src/screens/LoggerScreen';
 import { QuickAddMealModal } from './src/components/QuickAddMealModal';
 import { AddWeightModal } from './src/components/AddWeightModal';
 import { AICoachChatModal } from './src/components/AICoachChatModal';
-import { RadialMenuModal } from './src/components/RadialMenuModal';
+import { QuickActionMenu } from './src/components/QuickActionMenu';
 import { Home, TrendingUp, Plus, User } from 'lucide-react-native';
 import { calculateTargetCalories } from './src/utils/calorieCalc';
 
@@ -23,7 +23,7 @@ type TabName = 'home' | 'progress' | 'profile';
 
 const MainNavigator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabName>('home');
-  const [showRadialMenu, setShowRadialMenu] = useState<boolean>(false);
+  const [showQuickActionMenu, setShowQuickActionMenu] = useState<boolean>(false);
   const [showQuickFoodLogger, setShowQuickFoodLogger] = useState<boolean>(false);
   const [showAddWeight, setShowAddWeight] = useState<boolean>(false);
   const [showAICoachChat, setShowAICoachChat] = useState<boolean>(false);
@@ -34,7 +34,8 @@ const MainNavigator: React.FC = () => {
   const { weightLogs, addWeightLog } = useWeight();
   const { userApiKey, parseFoodNutrition } = useAI();
 
-  const handleSelectRadialAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
+  // Point 4 & Point 5: Safe Fasting action with explicit confirmation alert
+  const handleSelectQuickAction = (action: 'food' | 'water' | 'weight' | 'fasting') => {
     switch (action) {
       case 'food':
         setShowQuickFoodLogger(true);
@@ -46,7 +47,19 @@ const MainNavigator: React.FC = () => {
         setShowAddWeight(true);
         break;
       case 'fasting':
-        resetFastingTimer();
+        if (fastingState && fastingState.elapsedSeconds > 0) {
+          const hours = (fastingState.elapsedSeconds / 3600).toFixed(1);
+          Alert.alert(
+            'Akhiri Puasa?',
+            `Sesi puasa saat ini sudah berjalan ${hours} jam. Apakah Anda yakin ingin mengakhiri puasa?`,
+            [
+              { text: 'Batal', style: 'cancel' },
+              { text: 'Akhiri Puasa', style: 'destructive', onPress: () => resetFastingTimer(null) },
+            ]
+          );
+        } else {
+          resetFastingTimer(new Date().toISOString());
+        }
         break;
     }
   };
@@ -99,7 +112,7 @@ const MainNavigator: React.FC = () => {
         </TouchableOpacity>
 
         {/* Center Prominent (+) Action Button */}
-        <TouchableOpacity style={styles.plusCenterBtn} onPress={() => setShowRadialMenu(true)} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.plusCenterBtn} onPress={() => setShowQuickActionMenu(true)} activeOpacity={0.85}>
           <Plus size={26} color="#FFFFFF" />
         </TouchableOpacity>
 
@@ -109,11 +122,11 @@ const MainNavigator: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Radial Menu Modal */}
-      <RadialMenuModal
-        visible={showRadialMenu}
-        onClose={() => setShowRadialMenu(false)}
-        onSelectAction={handleSelectRadialAction}
+      {/* Quick Action Menu Modal */}
+      <QuickActionMenu
+        visible={showQuickActionMenu}
+        onClose={() => setShowQuickActionMenu(false)}
+        onSelectAction={handleSelectQuickAction}
       />
 
       {/* Quick Add Food Logger Modal (3-second logging) */}

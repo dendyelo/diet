@@ -1,4 +1,4 @@
-import { FastingStage, TriggerOption, MealLog, DailySummary } from '../types';
+import { FastingStage, TriggerOption, MealLog } from '../types';
 
 export const FASTING_STAGES: FastingStage[] = [
   {
@@ -154,25 +154,36 @@ export interface WeeklyHabitSummary {
 }
 
 /**
- * Generate 7-day Weekly Habit Summary & Compliance Score
+ * Generate 7-day Weekly Habit Summary & Compliance Score strictly using authentic user logs.
+ * No synthetic fake data.
  */
 export function generateWeeklyHabitSummary(
   mealLogs: MealLog[],
-  waterGlassesHistory: number[] = [8, 7, 8, 6, 8, 8, 7]
+  todayWaterGlasses: number = 0,
+  targetProteinGrams: number = 80
 ): WeeklyHabitSummary {
+  if (!mealLogs || mealLogs.length === 0) {
+    const waterPct = Math.min(100, Math.round((todayWaterGlasses / 8) * 100));
+    return {
+      habitScore: waterPct > 0 ? Math.round(waterPct * 0.3) : 0,
+      avgDailyCalories: 0,
+      waterCompliancePct: waterPct,
+      proteinCompliancePct: 0,
+      insightSentence: 'Belum ada data pencatatan makanan minggu ini. Catat makanan pertamamu!',
+    };
+  }
+
   const totalCal = mealLogs.reduce((acc, m) => acc + (m.nutrition.calories || 0), 0);
   const daysWithData = Math.max(1, Math.min(7, new Set(mealLogs.map((m) => m.timestamp.slice(0, 10))).size));
   const avgDailyCalories = Math.round(totalCal / daysWithData);
 
-  const totalWater = waterGlassesHistory.reduce((acc, w) => acc + w, 0);
-  const avgWater = totalWater / Math.max(1, waterGlassesHistory.length);
-  const waterCompliancePct = Math.min(100, Math.round((avgWater / 8) * 100));
+  const waterCompliancePct = Math.min(100, Math.round((todayWaterGlasses / 8) * 100));
 
   const totalProtein = mealLogs.reduce((acc, m) => acc + (m.nutrition.proteinGrams || 0), 0);
   const avgProtein = totalProtein / daysWithData;
-  const proteinCompliancePct = Math.min(100, Math.round((avgProtein / 75) * 100));
+  const proteinCompliancePct = Math.min(100, Math.round((avgProtein / Math.max(1, targetProteinGrams)) * 100));
 
-  // Habit Score Calculation (Weighted blend of water, protein, and consistency)
+  // Habit Score Calculation (Weighted blend of water, protein, and logging consistency)
   const consistencyScore = Math.min(100, Math.round((daysWithData / 7) * 100));
   const habitScore = Math.round(
     consistencyScore * 0.4 + waterCompliancePct * 0.3 + proteinCompliancePct * 0.3

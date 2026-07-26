@@ -99,6 +99,18 @@ export function calculateTargetCalories(profile: UserProfile): number {
 }
 
 /**
+ * Calculate target daily protein intake based on body weight (1.5g per kg)
+ * Single Source of Truth across the entire app
+ */
+export function calculateTargetProtein(profile: UserProfile): number {
+  let weightKg = Number(profile.weightKg);
+  if (isNaN(weightKg) || weightKg < 30 || weightKg > 250) {
+    weightKg = 70;
+  }
+  return Math.round(weightKg * 1.5);
+}
+
+/**
  * Calculate active calories burned directly from steps matching Apple Health / Garmin
  */
 export function calculateStepCalories(steps: number, weightKg: number): number {

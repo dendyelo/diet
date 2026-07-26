@@ -9,13 +9,13 @@ import {
 } from 'react-native';
 import { Utensils, Droplets, Scale, Timer, X } from 'lucide-react-native';
 
-interface RadialMenuModalProps {
+interface QuickActionMenuProps {
   visible: boolean;
   onClose: () => void;
   onSelectAction: (action: 'food' | 'water' | 'weight' | 'fasting') => void;
 }
 
-export const RadialMenuModal: React.FC<RadialMenuModalProps> = ({
+export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   visible,
   onClose,
   onSelectAction,
@@ -37,7 +37,7 @@ export const RadialMenuModal: React.FC<RadialMenuModalProps> = ({
             <View style={styles.menuContainer}>
               <Text style={styles.menuTitle}>Catat Sesuatu</Text>
 
-              {/* Radial Grid Buttons */}
+              {/* Quick Action Grid Buttons */}
               <View style={styles.gridContainer}>
                 {/* Food */}
                 <TouchableOpacity

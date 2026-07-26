@@ -15,9 +15,9 @@ import {
 import { GlassCard } from '../components/GlassCard';
 import { DailyMissionCard } from '../components/DailyMissionCard';
 import { InlineCoachCard } from '../components/InlineCoachCard';
-import { calculateTargetCalories } from '../utils/calorieCalc';
+import { calculateTargetCalories, calculateTargetProtein } from '../utils/calorieCalc';
 import { MealLog } from '../types';
-import { Utensils, Plus } from 'lucide-react-native';
+import { Utensils, Plus, Droplets, Footprints, Dumbbell } from 'lucide-react-native';
 
 interface LivingTimelineHomeProps {
   onOpenAddMeal: () => void;
@@ -37,10 +37,9 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
 
   const currentHour = new Date().getHours();
 
-  // Target Calories calculation
-  const targetCalories = useMemo(() => {
-    return calculateTargetCalories(profile);
-  }, [profile]);
+  // Dynamic Target Calculations
+  const targetCalories = useMemo(() => calculateTargetCalories(profile), [profile]);
+  const targetProtein = useMemo(() => calculateTargetProtein(profile), [profile]);
 
   const caloriesIn = totalCaloriesIn || 0;
   const netDeficit = targetCalories - caloriesIn;
@@ -61,11 +60,12 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onAction: onOpenAddMeal,
       };
     } else if (currentHour >= 12 && currentHour < 18) {
-      if (proteinGrams < 50) {
+      if (proteinGrams < targetProtein) {
+        const remaining = Math.round(targetProtein - proteinGrams);
         return {
           greeting: `Selamat Siang, ${profile.name || 'Teman'} ☀️`,
           subtitle: 'Berikut ringkasan energimu sejauh ini.',
-          advice: `Proteinmu masih ${Math.round(proteinGrams)}g hari ini. Tambahkan telur atau ayam saat makan siang.`,
+          advice: `Proteinmu kurang ${remaining}g lagi. Tambahkan telur atau ayam saat makan siang.`,
           actionLabel: '+ Tambah Makanan',
           onAction: onOpenAddMeal,
         };
@@ -88,38 +88,53 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         onAction: onOpenAddMeal,
       };
     }
-  }, [currentHour, profile.name, proteinGrams, netDeficit, onOpenAddMeal, addWaterGlass]);
+  }, [currentHour, profile.name, proteinGrams, targetProtein, netDeficit, onOpenAddMeal, addWaterGlass]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* 1. Greeting & Status Head */}
+      {/* 1. Greeting Head */}
       <View style={styles.headerBox}>
         <Text style={styles.greetingText}>{timeState.greeting}</Text>
         <Text style={styles.subtitleText}>{timeState.subtitle}</Text>
       </View>
 
-      {/* Target Ringkasan Metric */}
-      <GlassCard style={styles.targetCard}>
-        <Text style={styles.cardHeaderTitle}>Kondisi Hari Ini</Text>
-        <View style={styles.metricGrid}>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{caloriesIn} / {targetCalories}</Text>
-            <Text style={styles.metricLabel}>Kalori (kcal)</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{Math.round(proteinGrams)}g</Text>
-            <Text style={styles.metricLabel}>Protein</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{waterGlasses} / 8</Text>
-            <Text style={styles.metricLabel}>Air (Gelas)</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>{steps.toLocaleString()}</Text>
-            <Text style={styles.metricLabel}>Langkah</Text>
-          </View>
+      {/* Point 1: Hierarchical Metric Display — Primary Dominant Calorie Metric */}
+      <GlassCard style={styles.primaryMetricCard}>
+        <Text style={styles.cardHeaderTitle}>Target Kalori Harian</Text>
+        <View style={styles.primaryCalorieRow}>
+          <Text style={styles.primaryCalorieValue}>{caloriesIn.toLocaleString()}</Text>
+          <Text style={styles.primaryCalorieSub}> / {targetCalories.toLocaleString()} kcal</Text>
+        </View>
+        <View style={styles.progressBarTrack}>
+          <View
+            style={[
+              styles.progressBarFill,
+              { width: `${Math.min(100, Math.round((caloriesIn / targetCalories) * 100))}%` },
+            ]}
+          />
         </View>
       </GlassCard>
+
+      {/* Point 1: 3 Secondary Compact Metrics Below */}
+      <View style={styles.secondaryMetricRow}>
+        <GlassCard style={styles.secondaryCard}>
+          <Dumbbell size={14} color="#A855F7" />
+          <Text style={styles.secondaryValue}>{Math.round(proteinGrams)}/{targetProtein}g</Text>
+          <Text style={styles.secondaryLabel}>Protein</Text>
+        </GlassCard>
+
+        <GlassCard style={styles.secondaryCard}>
+          <Droplets size={14} color="#3B82F6" />
+          <Text style={styles.secondaryValue}>{waterGlasses}/8</Text>
+          <Text style={styles.secondaryLabel}>Air (Gelas)</Text>
+        </GlassCard>
+
+        <GlassCard style={styles.secondaryCard}>
+          <Footprints size={14} color="#10B981" />
+          <Text style={styles.secondaryValue}>{steps.toLocaleString()}</Text>
+          <Text style={styles.secondaryLabel}>Langkah</Text>
+        </GlassCard>
+      </View>
 
       {/* 2. Concise Health Coach Card */}
       <InlineCoachCard
@@ -135,12 +150,14 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         stepCount={steps}
         netDeficit={netDeficit}
         proteinGrams={proteinGrams}
-        onToggleWater={() => addWaterGlass()}
+        targetProteinGrams={targetProtein}
+        todayMealsCount={todayLogs.length}
+        onAddWater={() => addWaterGlass()}
       />
 
-      {/* 4. Living Activity Timeline */}
+      {/* Point 6: Honest Section Header "Makanan Hari Ini" */}
       <View style={styles.timelineSection}>
-        <Text style={styles.sectionTitle}>Aktivitas Hari Ini</Text>
+        <Text style={styles.sectionTitle}>Makanan Hari Ini</Text>
 
         {todayLogs.length === 0 && (
           <GlassCard style={styles.emptyCard}>
@@ -197,35 +214,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.6)',
   },
-  targetCard: {
+  primaryMetricCard: {
     padding: 16,
     borderRadius: 22,
     marginVertical: 4,
   },
   cardHeaderTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.5)',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 12,
+    marginBottom: 6,
   },
-  metricGrid: {
+  primaryCalorieRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
   },
-  metricItem: {
+  primaryCalorieValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  primaryCalorieSub: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  progressBarTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+  },
+  secondaryMetricRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginVertical: 2,
+  },
+  secondaryCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 18,
     alignItems: 'center',
+    gap: 4,
   },
-  metricValue: {
-    fontSize: 16,
+  secondaryValue: {
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  metricLabel: {
-    fontSize: 11,
+  secondaryLabel: {
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 2,
   },
   timelineSection: {
     marginTop: 12,

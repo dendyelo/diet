@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,14 +17,18 @@ import { useTheme } from '../context/ThemeContext';
 import { ActivityLog } from '../types';
 import {
   ParsedActivity,
-  calculateCreditedActivityCalories,
+  calculateNarratedActivityCalories,
   calculateNetActivityCalories,
 } from '../utils/activityCalc';
 
 interface QuickAddActivityModalProps {
   visible: boolean;
   weightKg: number;
-  sensorConnected: boolean;
+  stepBonusCalories: number;
+  existingActivities: Array<{
+    estimatedCalories: number;
+    stepOverlap: ActivityLog['stepOverlap'];
+  }>;
   onClose: () => void;
   onParse: (description: string) => Promise<ParsedActivity>;
   onSave: (activity: Omit<ActivityLog, 'id' | 'timestamp'>) => Promise<void>;
@@ -32,7 +37,8 @@ interface QuickAddActivityModalProps {
 export function QuickAddActivityModal({
   visible,
   weightKg,
-  sensorConnected,
+  stepBonusCalories,
+  existingActivities,
   onClose,
   onParse,
   onSave,
@@ -59,17 +65,22 @@ export function QuickAddActivityModal({
       preview.durationMinutes,
       preview.met
     );
-    const creditedCalories = calculateCreditedActivityCalories(
-      estimatedCalories,
-      preview.stepOverlap,
-      sensorConnected
+    const currentCredit = calculateNarratedActivityCalories(
+      existingActivities,
+      stepBonusCalories
     );
+    const nextCredit = calculateNarratedActivityCalories(
+      [...existingActivities, { estimatedCalories, stepOverlap: preview.stepOverlap }],
+      stepBonusCalories
+    );
+    const creditedCalories = Math.max(0, nextCredit - currentCredit);
     return { estimatedCalories, creditedCalories };
-  }, [preview, sensorConnected, weightKg]);
+  }, [existingActivities, preview, stepBonusCalories, weightKg]);
 
   const analyze = async () => {
     const cleanDescription = description.trim();
     if (!cleanDescription || loading) return;
+    Keyboard.dismiss();
     setLoading(true);
     setError('');
     try {
@@ -122,10 +133,14 @@ export function QuickAddActivityModal({
       >
         <Pressable style={{ flex: 1 }} onPress={onClose}>
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-            <Pressable onPress={(event) => event.stopPropagation()}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={{ width: '100%', height: '100%', justifyContent: 'flex-end' }}
+            >
               <View
                 style={{
-                  maxHeight: '90%',
+                  width: '100%',
+                  height: preview ? '82%' : '62%',
                   paddingHorizontal: spacing.md,
                   paddingTop: spacing.sm,
                   paddingBottom: Math.max(spacing.md, insets.bottom),
@@ -175,9 +190,14 @@ export function QuickAddActivityModal({
                 </View>
 
                 <ScrollView
+                  style={{ flex: 1, minHeight: 0 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ gap: spacing.md }}
+                  keyboardDismissMode="interactive"
+                  contentContainerStyle={{
+                    gap: spacing.md,
+                    paddingBottom: Math.max(spacing.lg, insets.bottom),
+                  }}
                 >
                   <View style={{ gap: spacing.sm }}>
                     <Text style={[typography.overline, { color: colors.textTertiary }]}>
@@ -264,9 +284,9 @@ export function QuickAddActivityModal({
                           kkal ke kebutuhan hari ini
                         </Text>
                       </View>
-                      {sensorConnected && preview.stepOverlap !== 'low' ? (
+                      {calorieEstimate.creditedCalories < calorieEstimate.estimatedCalories ? (
                         <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                          Estimasi awal {calorieEstimate.estimatedCalories} kkal. Sebagian dikurangi karena gerakannya mungkin sudah tercatat sebagai langkah.
+                          Estimasi awal {calorieEstimate.estimatedCalories} kkal. Sebagian dikurangi karena sudah tercermin pada bonus langkah hari ini.
                         </Text>
                       ) : null}
                       <Text style={[typography.caption, { color: colors.textTertiary }]}>

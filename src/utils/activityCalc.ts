@@ -16,7 +16,10 @@ const ACTIVITY_PRESETS: Array<{
   met: number;
   stepOverlap: ActivityStepOverlap;
 }> = [
-  { patterns: /lari|berlari|jogging|treadmill/i, name: 'Lari atau treadmill', met: 8.3, stepOverlap: 'high' },
+  { patterns: /(?:jalan|walking).{0,20}treadmill|treadmill.{0,20}(?:jalan|walking)/i, name: 'Berjalan di treadmill', met: 3.8, stepOverlap: 'high' },
+  { patterns: /(?:lari|berlari|jogging|running).{0,20}treadmill|treadmill.{0,20}(?:lari|berlari|jogging|running)/i, name: 'Lari di treadmill', met: 7, stepOverlap: 'high' },
+  { patterns: /treadmill/i, name: 'Treadmill intensitas sedang', met: 5, stepOverlap: 'high' },
+  { patterns: /lari|berlari|jogging|running/i, name: 'Jogging', met: 7, stepOverlap: 'high' },
   { patterns: /sepak ?bola|futsal|football|soccer/i, name: 'Sepak bola', met: 7, stepOverlap: 'medium' },
   { patterns: /sepeda|bersepeda|cycling/i, name: 'Bersepeda', met: 6.8, stepOverlap: 'low' },
   { patterns: /renang|berenang|swimming/i, name: 'Berenang', met: 6, stepOverlap: 'low' },
@@ -53,7 +56,9 @@ export function parseActivityLocally(text: string): ParsedActivity {
     notes:
       preset.name === 'Aktivitas fisik'
         ? 'Jenis atau intensitas aktivitas belum cukup jelas.'
-        : 'Estimasi lokal berdasarkan jenis dan durasi aktivitas.',
+        : preset.name === 'Treadmill intensitas sedang'
+          ? 'Kecepatan treadmill tidak disebutkan, jadi digunakan intensitas sedang yang konservatif.'
+          : 'Estimasi lokal berdasarkan jenis dan durasi aktivitas.',
     source: 'local',
   };
 }
@@ -78,11 +83,42 @@ export function calculateNetActivityCalories(
 export function calculateCreditedActivityCalories(
   estimatedCalories: number,
   stepOverlap: ActivityStepOverlap,
-  sensorConnected: boolean
+  stepBonusCalories: number
 ): number {
-  if (!sensorConnected) return Math.round(Math.max(0, estimatedCalories));
+  const safeEstimate = Math.round(Math.max(0, estimatedCalories));
+  const overlapFactor =
+    stepOverlap === 'high' ? 1 : stepOverlap === 'medium' ? 0.5 : 0;
+  const actualStepOverlap = Math.min(
+    safeEstimate,
+    Math.max(0, stepBonusCalories) * overlapFactor
+  );
+  return Math.round(safeEstimate - actualStepOverlap);
+}
 
-  const creditFactor =
-    stepOverlap === 'high' ? 0.35 : stepOverlap === 'medium' ? 0.7 : 1;
-  return Math.round(Math.max(0, estimatedCalories) * creditFactor);
+export function calculateNarratedActivityCalories(
+  activities: Array<{
+    estimatedCalories: number;
+    stepOverlap: ActivityStepOverlap;
+  }>,
+  stepBonusCalories: number
+): number {
+  const totalEstimated = activities.reduce(
+    (total, activity) => total + Math.max(0, activity.estimatedCalories),
+    0
+  );
+  const overlapCapacity = activities.reduce((total, activity) => {
+    const factor =
+      activity.stepOverlap === 'high'
+        ? 1
+        : activity.stepOverlap === 'medium'
+          ? 0.5
+          : 0;
+    return total + Math.max(0, activity.estimatedCalories) * factor;
+  }, 0);
+  return Math.round(
+    Math.max(
+      0,
+      totalEstimated - Math.min(Math.max(0, stepBonusCalories), overlapCapacity)
+    )
+  );
 }

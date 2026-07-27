@@ -15,12 +15,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FoodItemBreakdown, MealLog, NutritionData } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { triggerHaptic } from '../utils/haptics';
+import { createMealTimestamp, formatMealTime } from '../utils/mealTimestamp';
 
 interface QuickAddMealModalProps {
   visible: boolean;
   onClose: () => void;
   onSaveMeal: (
-    meal: Omit<MealLog, 'id' | 'timestamp'>
+    meal: Omit<MealLog, 'id' | 'timestamp'>,
+    timestamp: string
   ) => Promise<void> | void;
   recentMeals: MealLog[];
   onParseAI: (text: string) => Promise<AIParsedMeal | null>;
@@ -108,6 +110,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
   const [manualCarbs, setManualCarbs] = useState('');
   const [manualFat, setManualFat] = useState('');
   const [aiPreview, setAIPreview] = useState<AIParsedMeal | null>(null);
+  const [mealTime, setMealTime] = useState(formatMealTime());
   const parseGenerationRef = useRef(0);
   const savingRef = useRef(false);
 
@@ -117,6 +120,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
 
     if (visible) {
       setIsSnack(defaultIsSnack);
+      setMealTime(formatMealTime());
       setFormError('');
       setAIPreview(null);
     }
@@ -166,7 +170,15 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
     setFormError('');
 
     try {
-      await onSaveMeal(meal);
+      const timestamp = createMealTimestamp(mealTime);
+      if (!timestamp) {
+        setFormError(
+          'Waktu tidak valid atau berada di masa depan. Gunakan format HH:MM.'
+        );
+        return;
+      }
+
+      await onSaveMeal(meal, timestamp);
       await triggerHaptic('success');
       ++parseGenerationRef.current;
       resetAfterSave();
@@ -349,9 +361,17 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
               backgroundColor: colors.overlay,
             }}
           >
-            <Pressable onPress={(event) => event.stopPropagation()}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={{
+                width: '100%',
+                height: '100%',
+                justifyContent: 'flex-end',
+              }}
+            >
               <View
                 style={{
+                  height: '88%',
                   maxHeight: '92%',
                   paddingHorizontal: spacing.md,
                   paddingTop: spacing.sm,
@@ -362,6 +382,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                   borderBottomWidth: 0,
                   borderColor: colors.divider,
                   backgroundColor: colors.surface,
+                  overflow: 'hidden',
                 }}
               >
                 <View
@@ -467,6 +488,30 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                       }}
                     />
                   </View>
+                  <View style={{ gap: 7 }}>
+                    <Text style={{ ...typography.caption, color: colors.textSecondary, fontWeight: '600' }}>
+                      Waktu hari ini
+                    </Text>
+                    <TextInput
+                      accessibilityLabel="Waktu makan hari ini format jam dan menit"
+                      value={mealTime}
+                      onChangeText={(text) => {
+                        setMealTime(text);
+                        setFormError('');
+                      }}
+                      placeholder="HH:MM"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                      style={[
+                        fieldStyle,
+                        {
+                          minHeight: 46,
+                          textAlign: 'center',
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
 
                 {formError ? (
@@ -487,9 +532,14 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                 ) : null}
 
                 <ScrollView
+                  style={{ flex: 1, minHeight: 0 }}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xs }}
+                  keyboardDismissMode="interactive"
+                  contentContainerStyle={{
+                    gap: spacing.lg,
+                    paddingBottom: Math.max(spacing.lg, insets.bottom + spacing.sm),
+                  }}
                 >
                   {entryMode === 'ai' ? (
                     <>
@@ -744,7 +794,7 @@ export const QuickAddMealModal: React.FC<QuickAddMealModalProps> = ({
                                   {meal.name}
                                 </Text>
                                 <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-                                  {meal.nutrition.calories} kcal
+                                  {meal.nutrition.calories} kkal
                                 </Text>
                               </TouchableOpacity>
                             ))}

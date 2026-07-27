@@ -34,7 +34,7 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
   const statusText = isCheatDay
     ? 'CHEAT DAY MODE'
     : isDeficit
-    ? `DEFISIT ${absBalance} KCAL`
+    ? `DEFISIT ${absBalance} KKAL`
     : `LEBIH ${absBalance} KKAL`;
 
   // SVG Gauge Calculations
@@ -101,14 +101,14 @@ export const EnergyGauge: React.FC<EnergyGaugeProps> = ({
       <View style={{ flexDirection: 'row', width: '100%', paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.divider, gap: spacing.sm }}>
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ fontSize: 10, color: colors.textTertiary }}>MASUK (MAKAN)</Text>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.warning }}>{caloriesIn} kcal</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.warning }}>{caloriesIn} kkal</Text>
         </View>
 
         <View style={{ width: 1, backgroundColor: colors.divider }} />
 
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={{ fontSize: 10, color: colors.textTertiary }}>KELUAR (BMR+ACT)</Text>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>{caloriesOut} kcal</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>{caloriesOut} kkal</Text>
         </View>
       </View>
     </Surface>

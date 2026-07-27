@@ -7,6 +7,7 @@ const base: HungerDecisionInput = {
   caloriesIn: 900,
   targetCalories: 1800,
   maintenanceCalories: 2300,
+  waterGlasses: 4,
   snackCount: 0,
   fastingHours: 4,
 };
@@ -17,7 +18,7 @@ describe('decideHunger', () => {
 
     expect(result.kind).toBe('none');
     expect(result.status).toBe('TIDAK LAPAR');
-    expect(result.headline).toContain('ruang makan masih ada');
+    expect(result.headline).toContain('tidak perlu makan');
     expect(result.remainingCalories).toBe(900);
   });
 
@@ -25,6 +26,23 @@ describe('decideHunger', () => {
     expect(decideHunger({ ...base, answer: 'unsure', signal: null }).kind).toBe('water');
     expect(decideHunger({ ...base, signal: 'specific_craving' }).kind).toBe('water');
     expect(decideHunger({ ...base, signal: 'emotion' }).kind).toBe('water');
+  });
+
+  it('does not suggest more water when hydration is already met', () => {
+    const result = decideHunger({
+      ...base,
+      answer: 'unsure',
+      signal: null,
+      caloriesIn: 2356,
+      targetCalories: 1526,
+      maintenanceCalories: 2000,
+      waterGlasses: 9,
+    });
+
+    expect(result.kind).toBe('none');
+    expect(result.headline).toBe('Beri jeda sebentar.');
+    expect(result.body).toContain('Air hari ini sudah cukup');
+    expect(result.body).not.toContain('Minum satu gelas');
   });
 
   it('allows a meal when physical hunger has comfortable calorie room', () => {
@@ -77,13 +95,14 @@ describe('decideHunger', () => {
     expect(result.remainingCalories).toBe(-150);
     expect(result.overTargetCalories).toBe(150);
     expect(result.maintenanceRemainingCalories).toBe(350);
-    expect(result.body).toContain('di bawah perkiraan kebutuhan harian');
+    expect(result.body).toContain('di bawah perkiraan kebutuhan sampai malam');
   });
 
   it('can still respond to physical hunger at the diet target when below maintenance', () => {
     const result = decideHunger({ ...base, caloriesIn: 1800 });
 
-    expect(result.kind).toBe('meal');
+    expect(result.kind).toBe('small_meal');
+    expect(result.maxSuggestedCalories).toBe(150);
     expect(result.remainingCalories).toBe(0);
     expect(result.overTargetCalories).toBe(0);
     expect(result.maintenanceRemainingCalories).toBe(500);
@@ -95,7 +114,7 @@ describe('decideHunger', () => {
     expect(result.kind).toBe('water');
     expect(result.calorieZone).toBe('above_maintenance');
     expect(result.overMaintenanceCalories).toBe(50);
-    expect(result.body).toContain('melebihi perkiraan kebutuhan harian');
+    expect(result.body).toContain('melebihi perkiraan kebutuhan sampai malam');
   });
 
   it('sanitizes invalid and negative numbers', () => {

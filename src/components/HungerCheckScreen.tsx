@@ -36,9 +36,12 @@ interface HungerCheckScreenProps {
   caloriesIn: number;
   targetCalories: number;
   maintenanceCalories: number;
+  waterGlasses: number;
   snackCount: number;
   fastingHours: number;
+  hasMealRecorded: boolean;
   onAddWater: () => Promise<void>;
+  onAskCoach: () => void;
   onComplete: (
     result: HungerCheckResult | null,
     nextAction?: 'food' | 'snack'
@@ -103,9 +106,12 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
   caloriesIn,
   targetCalories,
   maintenanceCalories,
+  waterGlasses,
   snackCount,
   fastingHours,
+  hasMealRecorded,
   onAddWater,
+  onAskCoach,
   onComplete,
 }) => {
   const { colors, isDark, radius, typography } = useTheme();
@@ -119,6 +125,16 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
   const [intent, setIntent] = useState<EatingIntent>(null);
   const [decision, setDecision] = useState<HungerDecision | null>(null);
   const [waterAdded, setWaterAdded] = useState(false);
+  const mealGapMinutes = hasMealRecorded
+    ? Math.max(0, Math.floor(fastingHours * 60))
+    : 0;
+  const mealGapHours = Math.floor(mealGapMinutes / 60);
+  const mealGapRemainderMinutes = mealGapMinutes % 60;
+  const mealGapLabel = hasMealRecorded
+    ? `${mealGapHours}j ${mealGapRemainderMinutes
+        .toString()
+        .padStart(2, '0')}m`
+    : '—';
 
   const defaultBudget = Math.max(0, Math.round(targetCalories - caloriesIn));
   const budgetLabel =
@@ -183,6 +199,7 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
         caloriesIn,
         targetCalories,
         maintenanceCalories,
+        waterGlasses,
         snackCount,
         fastingHours,
       });
@@ -200,6 +217,7 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
       maintenanceCalories,
       snackCount,
       targetCalories,
+      waterGlasses,
     ]
   );
 
@@ -328,6 +346,55 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
           </View>
 
           <View style={styles.content}>
+            <View
+              accessibilityLabel={
+                hasMealRecorded
+                  ? `Jeda makan ${mealGapHours} jam ${mealGapRemainderMinutes} menit sejak makanan terakhir.`
+                  : 'Belum ada catatan makanan untuk menghitung jeda.'
+              }
+              style={[
+                styles.mealGapCard,
+                {
+                  borderColor: colors.divider,
+                  backgroundColor: colors.surface,
+                },
+              ]}
+            >
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text
+                  style={[
+                    typography.overline,
+                    {
+                      color: colors.textTertiary,
+                    },
+                  ]}
+                >
+                  JEDA MAKAN
+                </Text>
+                <Text
+                  style={[
+                    typography.caption,
+                    { color: colors.textTertiary },
+                  ]}
+                >
+                  {hasMealRecorded
+                    ? 'Sejak makanan terakhir'
+                    : 'Belum ada makanan hari ini'}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 24,
+                  lineHeight: 29,
+                  fontWeight: '700',
+                  letterSpacing: -0.5,
+                }}
+              >
+                {mealGapLabel}
+              </Text>
+            </View>
+
             <Animated.View
               style={[
                 styles.orbOuter,
@@ -386,6 +453,26 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                     onPress={() => handleAnswer('not_hungry')}
                   />
                 </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Tanya AI coach tentang rasa lapar"
+                  onPress={onAskCoach}
+                  style={({ pressed }) => [
+                    styles.coachButton,
+                    {
+                      borderColor: colors.divider,
+                      backgroundColor: pressed
+                        ? colors.surfacePressed
+                        : colors.surface,
+                      opacity: pressed ? 0.72 : 1,
+                    },
+                  ]}
+                >
+                  <View style={[styles.coachDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                    Tanya coach
+                  </Text>
+                </Pressable>
               </View>
             )}
 
@@ -426,7 +513,7 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                   Kamu ingin apa?
                 </Text>
                 <Text style={[typography.body, styles.supportingText, { color: colors.textSecondary }]}>
-                  Saran mempertimbangkan rasa lapar, rencana makan, dan kebutuhan harianmu.
+                  Saran mempertimbangkan rasa lapar dan batas rencana diet. Sisa kalori bukan kuota yang harus dihabiskan.
                 </Text>
                 <View style={styles.primaryChoices}>
                   <ChoiceButton
@@ -618,11 +705,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  coachButton: {
+    minHeight: 40,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 13,
+    borderWidth: 1,
+    borderRadius: 999,
+    marginTop: 16,
+  },
+  coachDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+  },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: 18,
+  },
+  mealGapCard: {
+    width: '100%',
+    maxWidth: 380,
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 18,
+    marginBottom: 24,
   },
   orbOuter: {
     width: 154,
@@ -631,7 +747,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 34,
+    marginBottom: 28,
   },
   orb: {
     width: 112,

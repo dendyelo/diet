@@ -16,8 +16,8 @@ export const ACTIVITY_STEP_BASELINES: Record<ActivityLevel, number> = {
   sedentary: 3000,
   light: 5000,
   moderate: 7500,
-  active: 10000,
-  very_active: 12500,
+  active: 9000,
+  very_active: 11000,
 };
 
 export const ACTIVITY_STEP_GOALS: Record<ActivityLevel, number> = {
@@ -29,16 +29,16 @@ export const ACTIVITY_STEP_GOALS: Record<ActivityLevel, number> = {
 };
 
 export const BODY_TYPE_MULTIPLIERS: Record<BodyType, number> = {
-  easy_gain: 0.93,
+  easy_gain: 0.95,
   normal: 1.0,
-  hard_gain: 1.07,
+  hard_gain: 1.05,
 };
 
 export const BODY_TYPE_INFO: Record<BodyType, { label: string; emoji: string; desc: string; color: string }> = {
   easy_gain: {
     label: 'Mudah Naik Berat (Lambat)',
     emoji: '🐢',
-    desc: 'Metabolisme cenderung efisien menyimpan lemak. Target kalori disesuaikan presisi.',
+    desc: 'Berat badan cenderung mudah naik. Menurunkan perkiraan kebutuhan harian sedikit, tanpa mengubah BMR.',
     color: '#F59E0B',
   },
   normal: {
@@ -50,14 +50,15 @@ export const BODY_TYPE_INFO: Record<BodyType, { label: string; emoji: string; de
   hard_gain: {
     label: 'Susah Naik Berat (Cepat)',
     emoji: '⚡',
-    desc: 'Metabolisme cenderung cepat membakar kalori (NEAT tinggi).',
+    desc: 'Berat badan cenderung sulit naik. Menaikkan perkiraan kebutuhan harian sedikit, tanpa mengubah BMR.',
     color: '#60A5FA',
   },
 };
 
 /**
  * Calculate Basal Metabolic Rate (BMR) for 24 hours using Mifflin-St Jeor Formula
- * Fine-tuned with personalized Body Type Metabolic Adjustment.
+ * Body type is intentionally not used as a metabolic multiplier because it is
+ * not a measured physiological input.
  */
 export function calculateBMR(profile: UserProfile): number {
   let weightKg = Number(profile.weightKg);
@@ -79,10 +80,7 @@ export function calculateBMR(profile: UserProfile): number {
   const baseBMR = 10 * weightKg + 6.25 * heightCm - 5 * age;
   const rawBMR = Math.round(gender === 'male' ? baseBMR + 5 : baseBMR - 161);
 
-  const bodyMultiplier = BODY_TYPE_MULTIPLIERS[profile.bodyType || 'normal'] || 1.0;
-  const adjustedBMR = Math.round(rawBMR * bodyMultiplier);
-
-  return Math.min(2800, Math.max(900, adjustedBMR));
+  return Math.min(2800, Math.max(900, rawBMR));
 }
 
 /**
@@ -101,12 +99,39 @@ export function calculateElapsedBMR(dailyBMR: number, dateObj: Date = new Date()
 }
 
 /**
- * Calculate Total Daily Energy Expenditure (TDEE) based on activity level
+ * Calculate conservative baseline daily expenditure. Deliberate movement is
+ * added from actual steps and narrated activities instead of a profile
+ * multiplier, preventing the same exercise from being counted twice.
  */
 export function calculateTDEE(profile: UserProfile): number {
   const bmr = calculateBMR(profile);
-  const multiplier = ACTIVITY_MULTIPLIERS[profile.activityLevel || 'light'] || 1.375;
-  return Math.round(bmr * multiplier);
+  const activityLevel = profile.activityLevel || 'light';
+  const bodyType = profile.bodyType || 'normal';
+  return Math.round(
+    bmr *
+      ACTIVITY_MULTIPLIERS[activityLevel] *
+      BODY_TYPE_MULTIPLIERS[bodyType]
+  );
+}
+
+export function calculateEffectiveDeficit(
+  profile: UserProfile,
+  maintenanceCalories: number
+): number {
+  if (
+    profile.isCheatDay ||
+    Number(profile.targetWeightKg) >= Number(profile.weightKg)
+  ) {
+    return 0;
+  }
+
+  const requested = Number.isFinite(Number(profile.targetDeficitKcal))
+    ? Math.round(Number(profile.targetDeficitKcal))
+    : 500;
+  const safeRequested = Math.min(1000, Math.max(100, requested));
+  const safeMaintenance = Math.max(0, Math.round(maintenanceCalories));
+
+  return Math.min(safeRequested, Math.max(0, safeMaintenance - 1200));
 }
 
 /**
@@ -114,8 +139,20 @@ export function calculateTDEE(profile: UserProfile): number {
  */
 export function calculateTargetCalories(profile: UserProfile): number {
   const tdee = calculateTDEE(profile);
-  const deficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
+  const deficit = calculateEffectiveDeficit(profile, tdee);
   return Math.max(1200, tdee - deficit);
+}
+
+export function calculateAdjustedTargetCalories(
+  profile: UserProfile,
+  adjustedMaintenance: number
+): number {
+  const safeMaintenance = Math.max(
+    calculateTDEE(profile),
+    Math.round(Number(adjustedMaintenance) || 0)
+  );
+  const deficit = calculateEffectiveDeficit(profile, safeMaintenance);
+  return Math.max(1200, safeMaintenance - deficit);
 }
 
 /**
@@ -230,7 +267,10 @@ export function calculateEnergyBalance(
     )
   );
   const netBalance = totalCaloriesOut - totalCaloriesIn;
-  const targetDeficit = profile.isCheatDay ? 0 : (profile.targetDeficitKcal || 500);
+  const targetDeficit = calculateEffectiveDeficit(
+    profile,
+    adjustedMaintenance
+  );
 
   const isDeficit = netBalance >= 0;
   const percentageToGoal = targetDeficit <= 0

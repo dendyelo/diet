@@ -4,6 +4,7 @@ import { loadMealLogs, saveMealLogs } from '../services/storageService';
 import { useProfile } from './ProfileContext';
 import { getLocalDateString, isSameLocalDay, getLatestMealTimestamp, msUntilMidnight } from '../utils/date';
 import { createLocalId } from '../utils/id';
+import { shouldMealEndFast } from '../utils/fasting';
 
 interface MealContextType {
   mealLogs: MealLog[];
@@ -27,7 +28,7 @@ interface MealContextType {
 const MealContext = createContext<MealContextType | undefined>(undefined);
 
 export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { updateProfile } = useProfile();
+  const { profile, updateProfile } = useProfile();
   const [mealLogs, setMealLogs] = useState<MealLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [todayStr, setTodayStr] = useState<string>(getLocalDateString());
@@ -88,7 +89,12 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const latestTimestamp = getLatestMealTimestamp(nextLogs);
     await saveMealLogs(nextLogs);
-    await updateProfile({ lastMealTimestamp: latestTimestamp });
+    await updateProfile({
+      lastMealTimestamp: latestTimestamp,
+      ...(shouldMealEndFast(profile.fastingStartedAt, timestamp)
+        ? { fastingStartedAt: null }
+        : {}),
+    });
   };
 
   const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {

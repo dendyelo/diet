@@ -486,6 +486,23 @@ describe('AI Service Comprehensive Suite', () => {
     expect(response?.followUps).toEqual(['Masih lapar setelah jeda 10 menit?']);
   });
 
+  test('structured coach does not add water after hydration target is met', async () => {
+    const response = await sendStructuredAICoachChatQuery(
+      'Apakah saya perlu minum lagi?',
+      'Budi',
+      {
+        ...mockUserContext,
+        waterGlasses: 9,
+      },
+      'valid_key'
+    );
+
+    expect(response?.recommendedAction).toBe('none');
+    expect(response?.message).toContain('sudah terpenuhi');
+    expect(response?.message).toContain('jika memang haus');
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   test('structured coach keeps Gemini useful for a non-decision nutrition question', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

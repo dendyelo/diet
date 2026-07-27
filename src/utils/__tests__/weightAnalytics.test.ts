@@ -115,6 +115,7 @@ describe('weightAnalytics', () => {
 
     it('groups multiple logs on the same day to the latest entry', () => {
       const now = new Date();
+      now.setHours(12, 0, 0, 0);
       const log1: WeightLog = {
         id: 'w1', weightKg: 70,
         recordedAt: new Date(now.getTime() - 3600000).toISOString(), // 1hr ago
@@ -155,6 +156,7 @@ describe('weightAnalytics', () => {
     it('uses only one weight per day (latest) to avoid bias', () => {
       // Two logs on day 0, only latest should count
       const now = new Date();
+      now.setHours(12, 0, 0, 0);
       const logs = [
         makeLog(80, 1), // yesterday: 80
         { id: 'early', weightKg: 60, recordedAt: new Date(now.getTime() - 3600000).toISOString() },
@@ -216,6 +218,7 @@ describe('weightAnalytics', () => {
 
     it('groups multiple logs per day to latest entry', () => {
       const now = new Date();
+      now.setHours(12, 0, 0, 0);
       const log1: WeightLog = {
         id: 'w1', weightKg: 70,
         recordedAt: new Date(now.getTime() - 3600000).toISOString(),

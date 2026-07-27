@@ -9,7 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 
-type QuickAction = 'food' | 'activity' | 'water' | 'weight' | 'fasting';
+type QuickAction = 'food' | 'activity' | 'water' | 'weight';
 
 interface QuickActionMenuProps {
   visible: boolean;
@@ -22,7 +22,6 @@ const ACTIONS: { action: QuickAction; label: string; detail: string }[] = [
   { action: 'activity', label: 'Aktivitas', detail: 'Ceritakan ke AI' },
   { action: 'water', label: 'Air minum', detail: 'Tambah satu gelas' },
   { action: 'weight', label: 'Berat badan', detail: 'Perbarui progres' },
-  { action: 'fasting', label: 'Puasa', detail: 'Mulai atau akhiri' },
 ];
 
 export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({

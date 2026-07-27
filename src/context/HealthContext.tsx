@@ -10,15 +10,20 @@ import {
   saveActivityLogs,
 } from '../services/storageService';
 import { getTodayStepCount, subscribeStepCount } from '../services/healthSync';
-import { calculateEnergyBalance } from '../utils/calorieCalc';
+import {
+  calculateActivitySummary,
+  calculateEnergyBalance,
+} from '../utils/calorieCalc';
 import { getLocalDateString, msUntilMidnight } from '../utils/date';
 import { ActivityLog } from '../types';
+import { calculateNarratedActivityCalories } from '../utils/activityCalc';
+import { calculateMealGapSeconds } from '../utils/fasting';
 
 interface FastingState {
   elapsedSeconds: number;
   fastingHours: number;
-  isFastingTargetReached: boolean;
   hasMealRecorded: boolean;
+  isFastingActive: boolean;
 }
 
 interface EnergyState {
@@ -52,6 +57,7 @@ interface HealthContextType {
   stepTrackingStatus: 'checking' | 'connected' | 'unavailable';
   stepTrackingMessage: string;
   elapsedSeconds: number;
+  hoursSinceLastMeal: number;
   fastingState: FastingState;
   energy: EnergyState;
   activityLogs: ActivityLog[];
@@ -84,7 +90,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [stepTrackingMessage, setStepTrackingMessage] = useState(
     'Menghubungkan sensor langkah…'
   );
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [currentTimeMs, setCurrentTimeMs] = useState<number>(Date.now());
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState<boolean>(false);
   const [hydratedHealthDate, setHydratedHealthDate] = useState<string | null>(null);
 
@@ -159,24 +165,11 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [profile.lastMealTimestamp]);
 
-  // Real-time Fasting Clock Timer tick (Every 1 second)
+  // One shared clock keeps fasting, time-since-meal, and accrued energy current.
   useEffect(() => {
-    const updateClock = () => {
-      if (!profile.lastMealTimestamp) {
-        setElapsedSeconds(0);
-        return;
-      }
-      const lastTime = new Date(profile.lastMealTimestamp).getTime();
-      const now = new Date().getTime();
-      const diffInSec = Math.max(0, Math.floor((now - lastTime) / 1000));
-      setElapsedSeconds(diffInSec);
-    };
-
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-
+    const interval = setInterval(() => setCurrentTimeMs(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [profile.lastMealTimestamp]);
+  }, []);
 
   // Start sensor sync only after the matching day's stored base has hydrated.
   useEffect(() => {
@@ -278,12 +271,11 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const resetFastingTimer = async (timestamp?: string | null) => {
     const newTime = timestamp === null ? null : timestamp || new Date().toISOString();
-    await updateProfile({ lastMealTimestamp: newTime });
+    await updateProfile({ fastingStartedAt: newTime });
   };
 
   const freshStartToday = async () => {
     setShowWelcomeBackModal(false);
-    await resetFastingTimer(new Date().toISOString());
   };
 
   const dismissWelcomeBackModal = () => {
@@ -292,23 +284,39 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const steps = sensorSteps + manualSteps;
   const hasMealRecorded = profile.lastMealTimestamp !== null && profile.lastMealTimestamp !== undefined;
-  const fastingHours = hasMealRecorded ? Math.floor(elapsedSeconds / 3600) : 0;
+  const lastMealTimestampMs = hasMealRecorded
+    ? new Date(profile.lastMealTimestamp!).getTime()
+    : Number.NaN;
+  const hasValidLastMeal =
+    hasMealRecorded && Number.isFinite(lastMealTimestampMs);
+  const elapsedSeconds = calculateMealGapSeconds(
+    profile.lastMealTimestamp,
+    currentTimeMs
+  );
+  const fastingHours = Math.floor(elapsedSeconds / 3600);
+  const hoursSinceLastMeal = hasMealRecorded
+    ? Math.max(
+        0,
+        (currentTimeMs - new Date(profile.lastMealTimestamp!).getTime()) / 3600000
+      )
+    : 0;
   const fastingState: FastingState = {
-    elapsedSeconds: hasMealRecorded ? elapsedSeconds : 0,
+    elapsedSeconds,
     fastingHours,
-    isFastingTargetReached: hasMealRecorded && fastingHours >= (profile.fastingTargetHours || 16),
     hasMealRecorded,
+    isFastingActive: hasValidLastMeal,
   };
 
-  const loggedActivityCalories = activityLogs.reduce(
-    (total, item) => total + item.creditedCalories,
-    0
+  const currentStepActivity = calculateActivitySummary(profile, steps);
+  const loggedActivityCalories = calculateNarratedActivityCalories(
+    activityLogs,
+    currentStepActivity.activityBonusCalories
   );
   const energy = calculateEnergyBalance(
     profile,
     totalCaloriesIn,
     steps,
-    new Date(),
+    new Date(currentTimeMs),
     loggedActivityCalories
   );
 
@@ -322,6 +330,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         stepTrackingStatus,
         stepTrackingMessage,
         elapsedSeconds,
+        hoursSinceLastMeal,
         fastingState,
         energy,
         activityLogs,

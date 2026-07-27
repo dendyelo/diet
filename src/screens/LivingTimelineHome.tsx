@@ -19,7 +19,7 @@ import {
   calculateTargetCalories,
   calculateTargetProtein,
 } from '../utils/calorieCalc';
-import { formatElapsedTime, getFastingStage } from '../utils/habitAnalytics';
+import { formatElapsedTime } from '../utils/habitAnalytics';
 import { MealLog } from '../types';
 import { HungerCheckResult } from '../components/HungerCheckScreen';
 import { triggerHaptic } from '../utils/haptics';
@@ -123,6 +123,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
   } = useMeals();
   const {
     fastingState,
+    hoursSinceLastMeal,
     steps,
     stepTrackingStatus,
     stepTrackingMessage,
@@ -146,12 +147,9 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
   );
   const maintenanceCalories = energy.adjustedMaintenance;
   const caloriesIn = totalCaloriesIn || 0;
+  const caloriesOutSoFar = Math.round(energy.totalCaloriesOut);
   const remainingCalories = targetCalories - caloriesIn;
   const overTargetCalories = Math.max(0, -remainingCalories);
-  const overMaintenanceCalories = Math.max(
-    0,
-    caloriesIn - maintenanceCalories
-  );
   const calorieZone =
     caloriesIn > maintenanceCalories
       ? 'above_maintenance'
@@ -161,7 +159,10 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
   const calorieChartMax = Math.max(
     1,
     maintenanceCalories,
-    caloriesIn > maintenanceCalories ? Math.round(caloriesIn * 1.08) : 0
+    caloriesIn > maintenanceCalories ? Math.round(caloriesIn * 1.08) : 0,
+    caloriesOutSoFar > maintenanceCalories
+      ? Math.round(caloriesOutSoFar * 1.08)
+      : 0
   );
   const plannedProgress = Math.min(
     100,
@@ -183,6 +184,18 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
     100,
     Math.max(0, (maintenanceCalories / calorieChartMax) * 100)
   );
+  const caloriesOutMarkerPosition = Math.min(
+    100,
+    Math.max(0, (caloriesOutSoFar / calorieChartMax) * 100)
+  );
+  const targetLabelPosition = Math.min(
+    94,
+    Math.max(6, targetMarkerPosition)
+  );
+  const caloriesOutLabelPosition = Math.min(
+    94,
+    Math.max(6, caloriesOutMarkerPosition)
+  );
   const proteinGrams = useMemo(
     () =>
       todayLogs.reduce(
@@ -193,7 +206,8 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
   );
 
   const elapsedSeconds = fastingState.elapsedSeconds || 0;
-  const fastingStage = getFastingStage(elapsedSeconds);
+  const hoursSinceLastMealBucket =
+    Math.floor(Math.max(0, hoursSinceLastMeal) * 4) / 4;
   const fastingFormatted = formatElapsedTime(elapsedSeconds);
 
   const liveCheckInDecision = useMemo(() => {
@@ -206,16 +220,18 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
       caloriesIn,
       targetCalories,
       maintenanceCalories,
+      waterGlasses,
       snackCount,
-      fastingHours: fastingState.fastingHours || 0,
+      fastingHours: hoursSinceLastMealBucket,
     });
   }, [
     caloriesIn,
-    fastingState.fastingHours,
+    hoursSinceLastMealBucket,
     lastCheckIn,
     maintenanceCalories,
     snackCount,
     targetCalories,
+    waterGlasses,
   ]);
 
   const currentRecommendation = useMemo(() => {
@@ -253,8 +269,8 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
 
     return {
       eyebrow: 'SARAN SEKARANG',
-      title: 'Cek rasa lapar, bukan hanya angka.',
-      detail: 'Masih ada ruang dalam rencana makan, tetapi bukan kewajiban untuk menghabiskannya.',
+      title: 'Pertahankan pola dietmu.',
+      detail: 'Kamu masih dalam batas rencana. Tidak perlu menghabiskan sisa kalori—makan berikutnya saat lapar.',
       action: 'check' as const,
     };
   }, [
@@ -278,27 +294,29 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
   const calorieSummary = useMemo(() => {
     if (calorieZone === 'above_maintenance') {
       return {
-        label: 'KEBUTUHAN HARIAN TERLEWATI',
-        description: `${overMaintenanceCalories.toLocaleString('id-ID')} kkal melebihi perkiraan kebutuhan tubuh.`,
+        label: 'ASUPAN DI ATAS KEBUTUHAN',
+        description: `Kamu makan ${caloriesIn.toLocaleString('id-ID')} kkal dan tubuh sudah membakar ${caloriesOutSoFar.toLocaleString('id-ID')} kkal. Asupanmu ${overTargetCalories.toLocaleString('id-ID')} kkal di atas batas diet ${targetCalories.toLocaleString('id-ID')} kkal.`,
       };
     }
 
     if (calorieZone === 'above_plan') {
       return {
-        label: 'RENCANA MAKAN TERLEWATI',
-        description: `${overTargetCalories.toLocaleString('id-ID')} kkal di atas rencana, tetapi masih di bawah perkiraan kebutuhan tubuh.`,
+        label: 'BATAS DIET TERLEWATI',
+        description: `Kamu makan ${caloriesIn.toLocaleString('id-ID')} kkal dan tubuh sudah membakar ${caloriesOutSoFar.toLocaleString('id-ID')} kkal. Asupanmu ${overTargetCalories.toLocaleString('id-ID')} kkal di atas batas diet ${targetCalories.toLocaleString('id-ID')} kkal.`,
       };
     }
 
     return {
-      label: 'KALORI HARI INI',
-      description: `${Math.max(0, remainingCalories).toLocaleString('id-ID')} kkal tersisa dari rencana makan.`,
+      label: 'MASIH DALAM BATAS DIET',
+      description: `Kamu makan ${caloriesIn.toLocaleString('id-ID')} kkal dan tubuh sudah membakar ${caloriesOutSoFar.toLocaleString('id-ID')} kkal. Asupanmu masih ${Math.max(0, remainingCalories).toLocaleString('id-ID')} kkal di bawah batas diet ${targetCalories.toLocaleString('id-ID')} kkal.`,
     };
   }, [
+    caloriesIn,
+    caloriesOutSoFar,
     calorieZone,
-    overMaintenanceCalories,
     overTargetCalories,
     remainingCalories,
+    targetCalories,
   ]);
 
   const activityCopy = useMemo(() => {
@@ -307,7 +325,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
         headline: 'Target langkah tercapai.',
         detail:
           energy.activityBonusCalories > 0
-            ? `${energy.bonusSteps.toLocaleString('id-ID')} langkah tambahan meningkatkan kebutuhan energi sekitar ${energy.activityBonusCalories.toLocaleString('id-ID')} kkal.`
+            ? `${energy.bonusSteps.toLocaleString('id-ID')} langkah tambahan membakar sekitar ${energy.activityBonusCalories.toLocaleString('id-ID')} kkal tanpa mengubah batas diet.`
             : `Kamu sudah mencapai sasaran ${energy.stepGoal.toLocaleString('id-ID')} langkah hari ini.`,
       };
     }
@@ -315,7 +333,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
     if (steps <= energy.baselineSteps) {
       return {
         headline: 'Aktivitas sedang terkumpul.',
-        detail: 'Langkah akan tercatat otomatis dan ikut menyesuaikan kebutuhan energi hari ini.',
+        detail: 'Langkah tercatat otomatis sebagai energi keluar dan tidak menaikkan batas diet.',
       };
     }
 
@@ -384,73 +402,101 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
           <Text style={[typography.body, styles.heroDescription, { color: colors.textSecondary }]}>
             {calorieSummary.description}
           </Text>
-          <View
-            accessibilityLabel={`Progress kalori. ${caloriesIn.toLocaleString('id-ID')} dimakan, rencana ${targetCalories.toLocaleString('id-ID')}, kebutuhan sekitar ${maintenanceCalories.toLocaleString('id-ID')} kilokalori.`}
-            style={[
-              styles.progressTrack,
-              { backgroundColor: colors.surfaceElevated },
-            ]}
-          >
-            <View
+          <View style={styles.calorieChart}>
+            <Text
               style={[
-                styles.progressFill,
+                typography.caption,
+                styles.markerValue,
                 {
-                  backgroundColor: colors.primary,
-                  width: `${plannedProgress}%`,
+                  color: colors.textSecondary,
+                  left: `${targetLabelPosition}%`,
                 },
               ]}
-            />
-            {abovePlanProgress > 0 ? (
-              <View
-                style={[
-                  styles.progressZone,
-                  {
-                    left: `${abovePlanStart}%`,
-                    width: `${abovePlanProgress}%`,
-                    backgroundColor: colors.warning,
-                  },
-                ]}
-              />
-            ) : null}
-            {aboveNeedProgress > 0 ? (
-              <View
-                style={[
-                  styles.progressZone,
-                  {
-                    left: `${aboveNeedStart}%`,
-                    width: `${aboveNeedProgress}%`,
-                    backgroundColor: colors.danger,
-                  },
-                ]}
-              />
-            ) : null}
-            <View
-              style={[
-                styles.targetMarker,
-                {
-                  backgroundColor: colors.textSecondary,
-                  left: `${targetMarkerPosition}%`,
-                },
-              ]}
-            />
-            {caloriesIn > maintenanceCalories ? (
-              <View
-                style={[
-                  styles.needMarker,
-                  {
-                    backgroundColor: colors.danger,
-                    left: `${needMarkerPosition}%`,
-                  },
-                ]}
-              />
-            ) : null}
-          </View>
-          <View style={styles.calorieLegend}>
-            <Text style={[typography.caption, { color: colors.textTertiary }]}>
-              Rencana {targetCalories.toLocaleString('id-ID')}
+            >
+              {targetCalories.toLocaleString('id-ID')}
             </Text>
-            <Text style={[typography.caption, styles.legendRight, { color: colors.textTertiary }]}>
-              Kebutuhan ±{maintenanceCalories.toLocaleString('id-ID')}
+            <View
+              accessibilityLabel={`Posisi rencana diet. ${caloriesIn.toLocaleString('id-ID')} dimakan, ${caloriesOutSoFar.toLocaleString('id-ID')} energi keluar sejauh ini, batas rencana ${targetCalories.toLocaleString('id-ID')}, kebutuhan sekitar ${maintenanceCalories.toLocaleString('id-ID')} kilokalori.`}
+              style={[
+                styles.progressTrack,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: colors.primary,
+                    width: `${plannedProgress}%`,
+                  },
+                ]}
+              />
+              {abovePlanProgress > 0 ? (
+                <View
+                  style={[
+                    styles.progressZone,
+                    {
+                      left: `${abovePlanStart}%`,
+                      width: `${abovePlanProgress}%`,
+                      backgroundColor: colors.warning,
+                    },
+                  ]}
+                />
+              ) : null}
+              {aboveNeedProgress > 0 ? (
+                <View
+                  style={[
+                    styles.progressZone,
+                    {
+                      left: `${aboveNeedStart}%`,
+                      width: `${aboveNeedProgress}%`,
+                      backgroundColor: colors.danger,
+                    },
+                  ]}
+                />
+              ) : null}
+              <View
+                style={[
+                  styles.targetMarker,
+                  {
+                    backgroundColor: colors.textSecondary,
+                    left: `${targetMarkerPosition}%`,
+                  },
+                ]}
+              />
+              {caloriesIn > maintenanceCalories ? (
+                <View
+                  style={[
+                    styles.needMarker,
+                    {
+                      backgroundColor: colors.danger,
+                      left: `${needMarkerPosition}%`,
+                    },
+                  ]}
+                />
+              ) : null}
+              <View
+                style={[
+                  styles.caloriesOutMarker,
+                  {
+                    backgroundColor: colors.info,
+                    left: `${caloriesOutMarkerPosition}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text
+              style={[
+                typography.caption,
+                styles.markerValue,
+                styles.caloriesOutValue,
+                {
+                  color: colors.info,
+                  left: `${caloriesOutLabelPosition}%`,
+                },
+              ]}
+            >
+              {caloriesOutSoFar.toLocaleString('id-ID')}
             </Text>
           </View>
           {caloriesIn > targetCalories ? (
@@ -657,7 +703,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
                       {activity.name}
                     </Text>
                     <Text style={[typography.caption, { color: colors.textTertiary }]}>
-                      {activity.durationMinutes} menit · +{activity.creditedCalories} kkal
+                      {activity.durationMinutes} menit · estimasi {activity.estimatedCalories} kkal
                     </Text>
                   </View>
                   <Pressable
@@ -704,17 +750,17 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
           >
             <View style={styles.fastingCopy}>
               <Text style={[typography.overline, { color: colors.textTertiary }]}>
-                PUASA
+                JEDA MAKAN
               </Text>
               <Text style={[typography.h3, { color: colors.textPrimary }]}>
-                {fastingState.hasMealRecorded
+                {fastingState.isFastingActive
                   ? `${fastingFormatted.hours} jam ${fastingFormatted.minutes} menit`
-                  : 'Belum dimulai'}
+                  : 'Belum ada makanan'}
               </Text>
               <Text style={[typography.caption, { color: colors.textTertiary }]}>
-                {fastingState.hasMealRecorded
-                  ? fastingStage.name
-                  : 'Dimulai otomatis setelah makanan pertama dicatat.'}
+                {fastingState.isFastingActive
+                  ? 'Dihitung otomatis sejak makanan terakhir. Makan berikutnya tetap mengikuti rasa lapar.'
+                  : 'Catat makanan untuk memulai hitungan otomatis.'}
               </Text>
             </View>
             <Text style={[typography.caption, { color: colors.textTertiary }]}>
@@ -871,13 +917,29 @@ const styles = StyleSheet.create({
     fontSize: 48,
     lineHeight: 54,
   },
+  calorieChart: {
+    position: 'relative',
+    marginTop: 18,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
   progressTrack: {
     position: 'relative',
     width: '100%',
     height: 5,
     borderRadius: 3,
     overflow: 'hidden',
-    marginTop: 18,
+  },
+  markerValue: {
+    position: 'absolute',
+    top: 0,
+    width: 84,
+    marginLeft: -42,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  caloriesOutValue: {
+    top: 29,
   },
   progressFill: {
     height: '100%',
@@ -902,18 +964,16 @@ const styles = StyleSheet.create({
     height: 11,
     borderRadius: 1,
   },
+  caloriesOutMarker: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 3,
+    borderRadius: 2,
+    transform: [{ translateX: -1.5 }],
+  },
   heroDescription: {
     marginTop: 2,
-  },
-  calorieLegend: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  legendRight: {
-    flexShrink: 1,
-    textAlign: 'right',
   },
   zoneLegend: {
     marginTop: 9,

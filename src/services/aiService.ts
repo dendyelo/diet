@@ -742,7 +742,7 @@ export async function parseActivityWithAI(
         'Tentukan nama, durasi, intensitas dalam MET, dan potensi tumpang tindih dengan sensor langkah. ' +
         'Gunakan MET realistis dari Compendium of Physical Activities. Jangan menghitung kalori; aplikasi akan menghitungnya dari berat badan. ' +
         'stepOverlap high untuk berjalan, treadmill, atau lari; medium untuk olahraga lapangan; low untuk sepeda, renang, yoga, atau latihan kekuatan. ' +
-        'Jika durasi atau intensitas tidak jelas, gunakan asumsi konservatif dan confidence low.',
+        'Jangan menyamakan treadmill dengan berlari tanpa informasi kecepatan. Jika durasi atau intensitas tidak jelas, gunakan asumsi konservatif dan confidence low.',
       contents: [
         {
           role: 'user',
@@ -846,10 +846,10 @@ function buildCalorieOnlyDecisionCopy(
   }
 
   return {
-    headline: 'Cek sinyal laparmu.',
+    headline: 'Kamu masih dalam rencana diet.',
     body:
-      `Masih ada sekitar ${Math.round(remainingCalories).toLocaleString('id-ID')} kkal dalam target hari ini. ` +
-      'Sebelum memilih makanan, rasakan apakah laparnya fisik, keinginan spesifik, atau emosi.',
+      `Asupan masih sekitar ${Math.round(remainingCalories).toLocaleString('id-ID')} kkal di bawah batas rencana hari ini; angka itu bukan kuota yang perlu dihabiskan. ` +
+      'Makan berikutnya berdasarkan rasa lapar dan pola yang ingin dijaga.',
     action: 'checkin',
   };
 }
@@ -871,6 +871,7 @@ function buildDailyDecisionCopy(input: DailyInsightInput): LocalDecisionCopy {
     caloriesIn: input.caloriesIn,
     targetCalories: input.targetCalories,
     maintenanceCalories: input.maintenanceCalories,
+    waterGlasses: input.waterGlasses,
     snackCount: input.snackCount,
     fastingHours: input.fastingHours,
   });
@@ -924,11 +925,17 @@ function buildDailyNutritionCopy(input: DailyInsightInput): Pick<
     };
   }
 
-  return {
-    headline: 'Catatan hari ini cukup terarah.',
-    body:
-      'Protein dan hidrasi sudah mendekati target. Pertahankan pencatatan sederhana dan ikuti sinyal lapar.',
-  };
+  return input.waterGlasses >= 8
+    ? {
+        headline: 'Kebutuhan air sudah terpenuhi.',
+        body:
+          'Protein dan air minum hari ini sudah memenuhi sasaran. Tidak perlu menambah air hanya karena asupan melewati rencana; ikuti rasa haus dan sinyal lapar.',
+      }
+    : {
+        headline: 'Catatan hari ini cukup terarah.',
+        body:
+          'Protein sudah mendekati target. Air minum masih dapat ditambah secara bertahap sesuai rasa haus.',
+      };
 }
 
 function compactDailyInput(input: DailyInsightInput): DailyInsightInput {
@@ -983,8 +990,10 @@ export async function generateDailyInsight(
       'Anda adalah Coach HabitDiet yang ringkas, empatik, dan tidak menghakimi. ' +
       'Data kalori adalah panduan, bukan diagnosis lapar. Jangan melarang makan, mendiagnosis, ' +
       'menyebut makanan baik/buruk, atau menyuruh olahraga untuk membayar makanan. ' +
+      'remainingCalories adalah jarak ke batas rencana diet, bukan kuota atau anjuran untuk menambah makanan. ' +
       'Keputusan hunger check lokal adalah guardrail dan tidak boleh dibantah. ' +
       'Jangan mengulang keputusan hunger check. Fokuskan insight pada protein, hidrasi, atau pola catatan makan. ' +
+      'Jika waterGlasses sudah 8 atau lebih, nyatakan kebutuhan air sudah terpenuhi dan jangan menyarankan tambahan air. ' +
       'Gunakan istilah sederhana: "rencana makan" untuk targetCalories dan "perkiraan kebutuhan harian" untuk maintenanceCalories. Jangan gunakan istilah maintenance, TDEE, atau surplus pada jawaban pengguna. ' +
       'maintenanceCalories adalah perkiraan kebutuhan sampai akhir hari, sedangkan caloriesOutSoFar adalah energi yang bertambah seiring waktu. ' +
       'Berikan satu insight spesifik dan satu pertanyaan lanjutan, semuanya dalam Bahasa Indonesia.',
@@ -1154,6 +1163,17 @@ function buildCoachDecisionCopy(
 ): LocalDecisionCopy & { followUps: string[] } {
   if (topic === 'drink') {
     const waterGlasses = Math.round(parseNumber(userContext.waterGlasses, 0));
+    if (waterGlasses >= 8) {
+      return {
+        headline: 'Kebutuhan air hari ini sudah terpenuhi.',
+        body:
+          `Kamu sudah mencatat ${waterGlasses.toLocaleString('id-ID')} gelas. ` +
+          'Tidak perlu menambah air karena angka kalori; minumlah lagi jika memang haus.',
+        action: 'none',
+        followUps: ['Apakah kamu sedang haus atau lapar?'],
+      };
+    }
+
     return {
       headline: 'Boleh minum satu gelas air.',
       body:
@@ -1201,6 +1221,7 @@ function buildCoachDecisionCopy(
     caloriesIn,
     targetCalories,
     maintenanceCalories: userContext.maintenanceCalories,
+    waterGlasses: userContext.waterGlasses,
     snackCount: userContext.snackCount,
     fastingHours: userContext.fastingHours,
   });
@@ -1255,6 +1276,7 @@ export async function sendStructuredAICoachChatQuery(
       'Anda adalah Coach HabitDiet: hangat, praktis, ringkas, dan paham makanan Indonesia. ' +
       'Gunakan hanya konteks pengguna yang diberikan untuk angka pribadi. ' +
       'Target kalori adalah panduan, bukan izin moral untuk makan. Hormati rasa lapar fisik dan jangan menyarankan kompensasi olahraga. ' +
+      'Sisa kalori adalah jarak ke batas rencana diet, bukan kuota yang harus dipenuhi. Fokus pada konsistensi pola, protein, hidrasi, dan rasa lapar. ' +
       'Bedakan perkiraan kebutuhan sampai akhir hari dari caloriesOutSoFar yang baru terkumpul sampai saat ini. Jangan gunakan istilah maintenance, TDEE, atau surplus pada jawaban pengguna. ' +
       'Jangan mendiagnosis atau mengganti tenaga kesehatan. Untuk gejala berat, menetap, pingsan, nyeri dada, atau gangguan makan, arahkan mencari bantuan profesional. ' +
       'Jawab dalam Bahasa Indonesia maksimal 3 paragraf pendek. Pertahankan konteks percakapan sebelumnya.',

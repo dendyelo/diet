@@ -15,7 +15,14 @@ import { useAI, useProfile, useTheme } from '../context/AppContext';
 import type { ThemeMode } from '../context/ThemeContext';
 import type { ColorTokens } from '../theme/colors';
 import type { ActivityLevel, BodyType } from '../types';
-import { BODY_TYPE_INFO, calculateBMR, calculateTDEE } from '../utils/calorieCalc';
+import {
+  ACTIVITY_MULTIPLIERS,
+  BODY_TYPE_INFO,
+  BODY_TYPE_MULTIPLIERS,
+  calculateBMR,
+  calculateEffectiveDeficit,
+  calculateTDEE,
+} from '../utils/calorieCalc';
 
 const THEME_OPTIONS: ReadonlyArray<TextOption<ThemeMode>> = [
   { value: 'system', label: 'Sistem' },
@@ -48,6 +55,13 @@ const BODY_TYPE_OPTIONS: ReadonlyArray<TextOption<BodyType>> = [
   { value: 'easy_gain', label: 'Mudah naik' },
   { value: 'normal', label: 'Seimbang' },
   { value: 'hard_gain', label: 'Sulit naik' },
+];
+
+const DEFICIT_OPTIONS: ReadonlyArray<TextOption<string>> = [
+  { value: '250', label: 'Ringan · 250' },
+  { value: '500', label: 'Standar · 500' },
+  { value: '750', label: 'Tinggi · 750' },
+  { value: '1000', label: 'Maks · 1.000' },
 ];
 
 interface TextOption<T extends string> {
@@ -226,13 +240,11 @@ export const ProfileScreen: React.FC = () => {
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile.activityLevel || 'light');
   const [bodyType, setBodyType] = useState<BodyType>(profile.bodyType || 'normal');
   const [targetDeficit, setTargetDeficit] = useState<string>(profile.targetDeficitKcal.toString());
-  const [fastingTarget, setFastingTarget] = useState<string>(
-    (profile.fastingTargetHours || 16).toString()
-  );
   const [apiKeyInput, setApiKeyInput] = useState<string>(userApiKey);
   const [isTestingKey, setIsTestingKey] = useState<boolean>(false);
   const [savedMsg, setSavedMsg] = useState<string>('');
   const [isDataExpanded, setIsDataExpanded] = useState<boolean>(false);
+  const [isTargetExpanded, setIsTargetExpanded] = useState<boolean>(false);
   const [isAIExpanded, setIsAIExpanded] = useState<boolean>(false);
 
   useEffect(() => {
@@ -245,11 +257,7 @@ export const ProfileScreen: React.FC = () => {
   const parsedTargetWeight = Math.max(30, Math.min(250, parseFloat(targetWeight) || 65));
   const parsedTargetDeficit = Math.max(
     100,
-    Math.min(1500, parseInt(targetDeficit, 10) || 500)
-  );
-  const parsedFastingTarget = Math.max(
-    8,
-    Math.min(24, parseInt(fastingTarget, 10) || 16)
+    Math.min(1000, parseInt(targetDeficit, 10) || 500)
   );
 
   const updatedProfileObj = {
@@ -263,11 +271,12 @@ export const ProfileScreen: React.FC = () => {
     activityLevel,
     bodyType,
     targetDeficitKcal: parsedTargetDeficit,
-    fastingTargetHours: parsedFastingTarget,
   };
 
   const bmr = calculateBMR(updatedProfileObj);
   const tdee = calculateTDEE(updatedProfileObj);
+  const effectiveDeficit = calculateEffectiveDeficit(updatedProfileObj, tdee);
+  const previewCalorieTarget = tdee - effectiveDeficit;
   const initial = name.trim().charAt(0).toUpperCase() || 'S';
 
   const showMessage = (message: string, duration = 3000) => {
@@ -304,9 +313,25 @@ export const ProfileScreen: React.FC = () => {
     showMessage('API key dihapus.');
   };
 
-  const handleSaveProfile = async () => {
-    await updateProfile(updatedProfileObj);
-    showMessage('Data dan target diperbarui.');
+  const handleSaveData = async () => {
+    await updateProfile({
+      name,
+      age: parsedAge,
+      gender,
+      heightCm: parsedHeight,
+      weightKg: parsedWeight,
+      activityLevel,
+      bodyType,
+    });
+    showMessage('Data tubuh diperbarui.');
+  };
+
+  const handleSaveTargets = async () => {
+    await updateProfile({
+      targetWeightKg: parsedTargetWeight,
+      targetDeficitKcal: parsedTargetDeficit,
+    });
+    showMessage('Target dan rencana diperbarui.');
   };
 
   const sectionLabelStyle = {
@@ -427,7 +452,7 @@ export const ProfileScreen: React.FC = () => {
                 }}
               >
                 {bmr}
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}> kcal</Text>
+                <Text style={{ ...typography.caption, color: colors.textTertiary }}> kkal</Text>
               </Text>
             </View>
 
@@ -447,7 +472,7 @@ export const ProfileScreen: React.FC = () => {
                 }}
               >
                 {tdee}
-                <Text style={{ ...typography.caption, color: colors.textTertiary }}> kcal</Text>
+                <Text style={{ ...typography.caption, color: colors.textTertiary }}> kkal</Text>
               </Text>
             </View>
           </View>
@@ -486,13 +511,13 @@ export const ProfileScreen: React.FC = () => {
             activeOpacity={0.7}
             onPress={() => setIsDataExpanded((current) => !current)}
             accessibilityRole="button"
-            accessibilityLabel="Data dan target"
+            accessibilityLabel="Data tubuh"
             accessibilityState={{ expanded: isDataExpanded }}
           >
             <View style={{ flex: 1, gap: 3 }}>
-              <Text style={sectionLabelStyle}>Data & target</Text>
+              <Text style={sectionLabelStyle}>Data tubuh</Text>
               <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-                Tubuh, aktivitas, dan sasaran harian
+                Identitas, ukuran, dan pola aktivitas
               </Text>
             </View>
             <Text
@@ -560,30 +585,15 @@ export const ProfileScreen: React.FC = () => {
                   </View>
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <View style={{ flex: 1 }}>
-                    <ProfileField
-                      label="Berat kini (kg)"
-                      value={weight}
-                      onChangeText={setWeight}
-                      colors={colors}
-                      radiusValue={radius.md}
-                      keyboardType="decimal-pad"
-                      returnKeyType="done"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ProfileField
-                      label="Berat yang ingin dicapai (kg)"
-                      value={targetWeight}
-                      onChangeText={setTargetWeight}
-                      colors={colors}
-                      radiusValue={radius.md}
-                      keyboardType="decimal-pad"
-                      returnKeyType="done"
-                    />
-                  </View>
-                </View>
+                <ProfileField
+                  label="Berat kini (kg)"
+                  value={weight}
+                  onChangeText={setWeight}
+                  colors={colors}
+                  radiusValue={radius.md}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                />
 
                 <View style={{ gap: 9 }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
@@ -598,7 +608,7 @@ export const ProfileScreen: React.FC = () => {
                     accessibilityLabel="Pilih aktivitas harian"
                   />
                   <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
-                    {ACTIVITY_DESCRIPTIONS[activityLevel]}
+                    {ACTIVITY_DESCRIPTIONS[activityLevel]} Pilihan ini membentuk perkiraan kebutuhan harian yang terkumpul bertahap sepanjang hari. Langkah di atas baseline dan aktivitas tercatat menjadi tambahan.
                   </Text>
                 </View>
 
@@ -615,33 +625,8 @@ export const ProfileScreen: React.FC = () => {
                     accessibilityLabel="Pilih respons tubuh"
                   />
                   <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
-                    {BODY_TYPE_INFO[bodyType].desc}
+                    {BODY_TYPE_INFO[bodyType].desc} Penyesuaiannya sekitar 5% dan ikut terkumpul bertahap sepanjang hari.
                   </Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <View style={{ flex: 1 }}>
-                    <ProfileField
-                      label="Defisit (kcal)"
-                      value={targetDeficit}
-                      onChangeText={setTargetDeficit}
-                      colors={colors}
-                      radiusValue={radius.md}
-                      keyboardType="number-pad"
-                      returnKeyType="done"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ProfileField
-                      label="Puasa (jam)"
-                      value={fastingTarget}
-                      onChangeText={setFastingTarget}
-                      colors={colors}
-                      radiusValue={radius.md}
-                      keyboardType="number-pad"
-                      returnKeyType="done"
-                    />
-                  </View>
                 </View>
 
                 <TouchableOpacity
@@ -653,12 +638,246 @@ export const ProfileScreen: React.FC = () => {
                     backgroundColor: colors.primary,
                   }}
                   activeOpacity={0.78}
-                  onPress={handleSaveProfile}
+                  onPress={handleSaveData}
                   accessibilityRole="button"
-                  accessibilityLabel="Simpan data dan target"
+                  accessibilityLabel="Simpan data tubuh"
                 >
                   <Text style={{ color: colors.onPrimary, fontSize: 14, fontWeight: '700' }}>
-                    Simpan perubahan
+                    Simpan data tubuh
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
+        </Surface>
+
+        <Surface
+          style={{
+            padding: 0,
+            marginVertical: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              minHeight: 72,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+            activeOpacity={0.7}
+            onPress={() => setIsTargetExpanded((current) => !current)}
+            accessibilityRole="button"
+            accessibilityLabel="Target dan rencana"
+            accessibilityState={{ expanded: isTargetExpanded }}
+          >
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={sectionLabelStyle}>Target & rencana</Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Berat tujuan, batas diet, dan timer puasa
+              </Text>
+            </View>
+            <Text
+              style={{
+                color: colors.textTertiary,
+                fontSize: 22,
+                lineHeight: 24,
+                fontWeight: '300',
+              }}
+            >
+              {isTargetExpanded ? '⌄' : '›'}
+            </Text>
+          </TouchableOpacity>
+
+          {isTargetExpanded ? (
+            <>
+              <View style={{ height: 1, backgroundColor: colors.divider }} />
+              <View style={{ padding: spacing.md, gap: spacing.lg }}>
+                <ProfileField
+                  label="Berat yang ingin dicapai (kg)"
+                  value={targetWeight}
+                  onChangeText={setTargetWeight}
+                  colors={colors}
+                  radiusValue={radius.md}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                />
+
+                <View
+                  style={{
+                    padding: spacing.md,
+                    gap: spacing.md,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderColor: colors.divider,
+                    backgroundColor: colors.surfaceElevated,
+                  }}
+                >
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ ...typography.overline, color: colors.textTertiary }}>
+                      ASAL NILAI KEBUTUHAN
+                    </Text>
+                    <Text style={{ ...typography.h3, color: colors.textPrimary }}>
+                      Sekitar {tdee.toLocaleString('id-ID')} kkal per hari
+                    </Text>
+                    <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
+                      Perkiraan dasar dihitung dari data tubuh, aktivitas yang dipilih, dan respons tubuh.
+                    </Text>
+                  </View>
+
+                  <View
+                    accessibilityLabel={`BMR ${bmr}, dikali aktivitas ${ACTIVITY_MULTIPLIERS[activityLevel]}, dikali respons tubuh ${BODY_TYPE_MULTIPLIERS[bodyType]}, hasil kebutuhan ${tdee} kilokalori`}
+                    style={{
+                      padding: 12,
+                      gap: 10,
+                      borderRadius: radius.sm,
+                      backgroundColor: colors.surface,
+                    }}
+                  >
+                    {[
+                      ['BMR dari tubuh', `${bmr.toLocaleString('id-ID')} kkal`],
+                      [
+                        `Aktivitas ${ACTIVITY_OPTIONS.find((option) => option.value === activityLevel)?.label || ''}`,
+                        `× ${ACTIVITY_MULTIPLIERS[activityLevel]}`,
+                      ],
+                      [
+                        `Respons ${BODY_TYPE_OPTIONS.find((option) => option.value === bodyType)?.label || ''}`,
+                        `× ${BODY_TYPE_MULTIPLIERS[bodyType].toFixed(2)}`,
+                      ],
+                      ['Perkiraan kebutuhan', `${tdee.toLocaleString('id-ID')} kkal`],
+                    ].map(([label, value], index) => (
+                      <View
+                        key={label}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: spacing.sm,
+                          paddingTop: index === 3 ? 10 : 0,
+                          borderTopWidth: index === 3 ? 1 : 0,
+                          borderTopColor: colors.divider,
+                        }}
+                      >
+                        <Text style={{ ...typography.caption, color: colors.textSecondary }}>
+                          {label}
+                        </Text>
+                        <Text
+                          style={{
+                            ...typography.caption,
+                            color: index === 3 ? colors.textPrimary : colors.textTertiary,
+                            fontWeight: index === 3 ? '700' : '600',
+                          }}
+                        >
+                          {value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
+                    BMR berasal dari berat, tinggi, usia, dan jenis kelamin. Pada halaman Hari ini, kebutuhan dapat naik lagi dari langkah di atas baseline atau aktivitas yang benar-benar dicatat.
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    padding: spacing.md,
+                    gap: spacing.md,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderColor: colors.divider,
+                    backgroundColor: colors.surfaceElevated,
+                  }}
+                >
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ ...typography.overline, color: colors.primaryText }}>
+                      RENCANA DIET
+                    </Text>
+                    <Text style={{ ...typography.h3, color: colors.textPrimary }}>
+                      Batas makan {previewCalorieTarget.toLocaleString('id-ID')} kkal
+                    </Text>
+                    <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
+                      Pilih seberapa jauh batas makan berada di bawah perkiraan kebutuhan harian.
+                    </Text>
+                  </View>
+
+                  <TextChoiceGroup
+                    value={targetDeficit}
+                    options={DEFICIT_OPTIONS}
+                    onChange={setTargetDeficit}
+                    colors={colors}
+                    radiusValue={radius.full}
+                    accessibilityLabel="Pilih tingkat defisit kalori"
+                  />
+
+                  <View
+                    accessibilityLabel={`Perkiraan kebutuhan ${tdee} dikurangi defisit efektif ${effectiveDeficit}, batas diet ${previewCalorieTarget} kilokalori`}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 12,
+                      borderRadius: radius.sm,
+                      backgroundColor: colors.surface,
+                    }}
+                  >
+                    {[
+                      ['Kebutuhan', tdee],
+                      ['Dikurangi', effectiveDeficit],
+                      ['Batas diet', previewCalorieTarget],
+                    ].map(([label, value], index) => (
+                      <React.Fragment key={label as string}>
+                        {index > 0 ? (
+                          <Text style={{ color: colors.textTertiary, fontSize: 18 }}>
+                            {index === 1 ? '−' : '='}
+                          </Text>
+                        ) : null}
+                        <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                          <Text
+                            style={{
+                              color: colors.textPrimary,
+                              fontSize: 15,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {(value as number).toLocaleString('id-ID')}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              color: colors.textTertiary,
+                              fontSize: 10,
+                              fontWeight: '600',
+                            }}
+                          >
+                            {label as string}
+                          </Text>
+                        </View>
+                      </React.Fragment>
+                    ))}
+                  </View>
+
+                  <Text style={{ ...typography.caption, color: colors.textTertiary, lineHeight: 17 }}>
+                    Angka ini menjadi batas rencana diet, bukan jumlah yang wajib dihabiskan. Pilihan 500 berarti batas makan sekitar 500 kkal di bawah kebutuhan.
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={{
+                    minHeight: 48,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: radius.md,
+                    backgroundColor: colors.primary,
+                  }}
+                  activeOpacity={0.78}
+                  onPress={handleSaveTargets}
+                  accessibilityRole="button"
+                  accessibilityLabel="Simpan target dan rencana"
+                >
+                  <Text style={{ color: colors.onPrimary, fontSize: 14, fontWeight: '700' }}>
+                    Simpan target & rencana
                   </Text>
                 </TouchableOpacity>
               </View>

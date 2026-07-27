@@ -14,6 +14,7 @@ export interface HungerDecisionInput {
   caloriesIn: number;
   targetCalories: number;
   maintenanceCalories?: number;
+  waterGlasses?: number;
   snackCount?: number;
   fastingHours?: number;
 }
@@ -45,14 +46,14 @@ const calorieContext = (
   overMaintenanceCalories: number
 ) => {
   if (calorieZone === 'above_maintenance') {
-    return `Asupan hari ini sekitar ${overMaintenanceCalories.toLocaleString('id-ID')} kkal melebihi perkiraan kebutuhan harian.`;
+    return `Asupan hari ini sekitar ${overMaintenanceCalories.toLocaleString('id-ID')} kkal melebihi perkiraan kebutuhan sampai malam.`;
   }
 
   if (calorieZone === 'above_plan') {
-    return `Rencana makan terlewati sekitar ${overTargetCalories.toLocaleString('id-ID')} kkal, tetapi masih sekitar ${maintenanceRemainingCalories.toLocaleString('id-ID')} kkal di bawah perkiraan kebutuhan harian.`;
+    return `Rencana makan terlewati sekitar ${overTargetCalories.toLocaleString('id-ID')} kkal, tetapi masih sekitar ${maintenanceRemainingCalories.toLocaleString('id-ID')} kkal di bawah perkiraan kebutuhan sampai malam.`;
   }
 
-  return `Masih ada sekitar ${remainingCalories.toLocaleString('id-ID')} kkal dalam rencana makan hari ini.`;
+  return `Asupan masih sekitar ${remainingCalories.toLocaleString('id-ID')} kkal di bawah batas rencana diet hari ini. Angka ini tidak perlu dihabiskan.`;
 };
 
 /**
@@ -69,6 +70,8 @@ export function decideHunger(input: HungerDecisionInput): HungerDecision {
     safeNumber(input.maintenanceCalories ?? targetCalories, targetCalories)
   );
   const snackCount = Math.floor(safeNumber(input.snackCount ?? 0));
+  const waterGlasses = Math.floor(safeNumber(input.waterGlasses ?? 0));
+  const hydrationMet = waterGlasses >= 8;
   const fastingHours = safeNumber(input.fastingHours ?? 0);
   const remainingCalories = Math.round(targetCalories - caloriesIn);
   const overTargetCalories = Math.max(0, -remainingCalories);
@@ -86,10 +89,7 @@ export function decideHunger(input: HungerDecisionInput): HungerDecision {
       : caloriesIn > targetCalories
         ? 'above_plan'
         : 'within_plan';
-  const availableCalories =
-    remainingCalories > 0
-      ? remainingCalories
-      : maintenanceRemainingCalories;
+  const availableCalories = Math.max(0, remainingCalories);
   const comfortThreshold = Math.round(Math.max(250, targetCalories * 0.15));
   const context = calorieContext(
     calorieZone,
@@ -107,6 +107,21 @@ export function decideHunger(input: HungerDecisionInput): HungerDecision {
     calorieZone,
     comfortThreshold,
   };
+  const pauseInsteadOfWater = (
+    status: string,
+    headline: string,
+    body: string,
+    maxSuggestedCalories?: number
+  ): HungerDecision => ({
+    kind: hydrationMet ? 'none' : 'water',
+    status,
+    headline: hydrationMet ? 'Beri jeda sebentar.' : headline,
+    body: hydrationMet
+      ? `${context} Air hari ini sudah cukup. Beri jeda 10 menit tanpa menambah minum, lalu rasakan kembali apakah laparnya masih ada.`
+      : body,
+    ...sharedContext,
+    ...(maxSuggestedCalories ? { maxSuggestedCalories } : {}),
+  });
 
   if (input.answer === 'not_hungry') {
     return {
@@ -114,7 +129,7 @@ export function decideHunger(input: HungerDecisionInput): HungerDecision {
       status: 'TIDAK LAPAR',
       headline:
         calorieZone === 'within_plan'
-          ? 'Belum lapar—ruang makan masih ada.'
+          ? 'Belum lapar—tidak perlu makan.'
           : 'Belum lapar, jadi tidak perlu dipaksa.',
       body: `Kamu tidak harus makan sekarang. ${context} Check-in lagi saat lapar muncul.`,
       ...sharedContext,
@@ -126,36 +141,39 @@ export function decideHunger(input: HungerDecisionInput): HungerDecision {
     input.signal === 'specific_craving' ||
     input.signal === 'emotion'
   ) {
-    return {
-      kind: 'water',
-      status: 'JEDA',
-      headline: 'Coba minum dulu.',
-      body: `${context} Minum satu gelas air, beri jeda 10 menit, lalu rasakan kembali.`,
-      ...sharedContext,
-    };
+    return pauseInsteadOfWater(
+      'JEDA',
+      'Coba minum dulu.',
+      `${context} Minum satu gelas air, beri jeda 10 menit, lalu rasakan kembali.`
+    );
   }
 
   if (input.signal !== 'physical') {
-    return {
-      kind: 'water',
-      status: 'CEK LAGI',
-      headline: 'Ambil jeda sebentar.',
-      body: `${context} Tarik napas, minum air, lalu pilih berdasarkan sinyal tubuhmu.`,
-      ...sharedContext,
-    };
+    return pauseInsteadOfWater(
+      'CEK LAGI',
+      'Ambil jeda sebentar.',
+      `${context} Tarik napas, minum air, lalu pilih berdasarkan sinyal tubuhmu.`
+    );
   }
 
-  if (calorieZone === 'above_maintenance' || availableCalories <= 0) {
+  if (calorieZone === 'above_maintenance') {
+    return pauseInsteadOfWater(
+      'PERKIRAAN HARIAN TERLEWATI',
+      'Mulai dengan satu gelas air.',
+      `${context} Jika 10 menit lagi kamu masih lapar secara fisik, pilih makanan kecil yang mengenyangkan dan tetap catat.`,
+      150
+    );
+  }
+
+  if (calorieZone === 'above_plan' || availableCalories <= 0) {
+    const maxSuggestedCalories = 150;
     return {
-      kind: 'water',
-      status:
-        calorieZone === 'above_maintenance'
-          ? 'KEBUTUHAN HARIAN TERLEWATI'
-          : 'KEBUTUHAN HARIAN TERCAPAI',
-      headline: 'Mulai dengan satu gelas air.',
-      body: `${context} Jika 10 menit lagi kamu masih lapar secara fisik, pilih makanan kecil yang mengenyangkan dan tetap catat.`,
+      kind: input.intent === 'snack' ? 'snack' : 'small_meal',
+      status: 'LAPAR FISIK',
+      headline: 'Masih lapar? Pilih porsi kecil.',
+      body: `${context} Rencana makan tetap menjadi panduan. Jika laparnya fisik, pilih porsi kecil tinggi protein atau serat sekitar ${maxSuggestedCalories} kkal, lalu berhenti saat cukup.`,
       ...sharedContext,
-      maxSuggestedCalories: 200,
+      maxSuggestedCalories,
     };
   }
 
@@ -176,23 +194,19 @@ export function decideHunger(input: HungerDecisionInput): HungerDecision {
     return {
       kind: 'snack',
       status: 'SNACK OK',
-      headline: 'Ada ruang untuk ngemil.',
-      body: `${context} Jaga porsinya sekitar ${maxSuggestedCalories.toLocaleString('id-ID')} kkal dan makan perlahan.`,
+      headline: 'Jika lapar, ngemil secukupnya.',
+      body: `${context} Jika laparnya fisik, jaga porsi sekitar ${maxSuggestedCalories.toLocaleString('id-ID')} kkal dan makan perlahan.`,
       ...sharedContext,
       maxSuggestedCalories,
     };
   }
 
-  if (availableCalories < comfortThreshold || calorieZone === 'above_plan') {
+  if (availableCalories < comfortThreshold) {
     const maxSuggestedCalories = Math.min(availableCalories, 300);
     return {
       kind: 'small_meal',
-      status:
-        calorieZone === 'above_plan' ? 'DI ATAS RENCANA' : 'MAKAN RINGAN',
-      headline:
-        calorieZone === 'above_plan'
-          ? 'Masih lapar? Pilih porsi kecil.'
-          : 'Masih ada sedikit ruang.',
+      status: 'MAKAN RINGAN',
+      headline: 'Pilih porsi yang cukup.',
       body: `${context} Pilih porsi kecil tinggi protein atau serat, sekitar ${maxSuggestedCalories.toLocaleString('id-ID')} kkal.`,
       ...sharedContext,
       maxSuggestedCalories,

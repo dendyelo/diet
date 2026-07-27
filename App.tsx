@@ -44,7 +44,7 @@ import {
 } from './src/components/HungerCheckScreen';
 import { triggerHaptic } from './src/utils/haptics';
 import {
-  calculateTargetCalories,
+  calculateAdjustedTargetCalories,
   calculateTargetProtein,
 } from './src/utils/calorieCalc';
 import { decideHunger } from './src/utils/hungerDecision';
@@ -127,11 +127,12 @@ const MainNavigator: React.FC = () => {
     waterGlasses,
     steps,
     fastingState,
+    hoursSinceLastMeal,
     energy,
     addWaterGlass,
-    resetFastingTimer,
     stepTrackingStatus,
     addActivityLog,
+    activityLogs,
   } = useHealth();
   const { weightLogs, addWeightLog } = useWeight();
   const {
@@ -143,7 +144,10 @@ const MainNavigator: React.FC = () => {
   } = useAI();
   const { colors, isDark, typography } = useTheme();
 
-  const targetCalories = calculateTargetCalories(profile);
+  const targetCalories = calculateAdjustedTargetCalories(
+    profile,
+    energy.adjustedMaintenance
+  );
   const targetProtein = calculateTargetProtein(profile);
   const maintenanceCalories = energy.adjustedMaintenance;
   const aiMaintenanceCalories =
@@ -161,6 +165,8 @@ const MainNavigator: React.FC = () => {
     [todayLogs]
   );
   const stepsBucket = Math.floor((steps || 0) / 1000);
+  const hoursSinceLastMealBucket =
+    Math.floor(Math.max(0, hoursSinceLastMeal) * 4) / 4;
   const recentMealContext = useMemo(
     () =>
       todayLogs.slice(0, 5).map((meal) => ({
@@ -181,28 +187,31 @@ const MainNavigator: React.FC = () => {
       caloriesIn: totalCaloriesIn || 0,
       targetCalories,
       maintenanceCalories,
+      waterGlasses: waterGlasses || 0,
       snackCount: snackCount || 0,
-      fastingHours: fastingState.fastingHours || 0,
+      fastingHours: hoursSinceLastMealBucket,
     });
   }, [
-    fastingState.fastingHours,
+    hoursSinceLastMealBucket,
     lastCheckIn,
     maintenanceCalories,
     snackCount,
     targetCalories,
     totalCaloriesIn,
+    waterGlasses,
   ]);
+  const hungerDecisionKind = liveHungerDecision?.kind ?? null;
   const hungerContext = useMemo(
     () =>
-      lastCheckIn && liveHungerDecision
+      lastCheckIn && hungerDecisionKind
         ? {
             answer: lastCheckIn.answer,
             signal: lastCheckIn.signal,
             intent: lastCheckIn.intent,
-            decisionKind: liveHungerDecision.kind,
+            decisionKind: hungerDecisionKind,
           }
         : null,
-    [lastCheckIn, liveHungerDecision]
+    [hungerDecisionKind, lastCheckIn]
   );
   const dailyInsightInput = useMemo(
     () => ({
@@ -348,7 +357,7 @@ const MainNavigator: React.FC = () => {
   };
 
   const handleSelectQuickAction = (
-    action: 'food' | 'activity' | 'water' | 'weight' | 'fasting'
+    action: 'food' | 'activity' | 'water' | 'weight'
   ) => {
     triggerHaptic('light');
     switch (action) {
@@ -363,25 +372,6 @@ const MainNavigator: React.FC = () => {
         break;
       case 'weight':
         setShowAddWeight(true);
-        break;
-      case 'fasting':
-        if (fastingState.elapsedSeconds > 0) {
-          const hours = (fastingState.elapsedSeconds / 3600).toFixed(1);
-          Alert.alert(
-            'Akhiri sesi puasa?',
-            `Sesi ini sudah berjalan ${hours} jam.`,
-            [
-              { text: 'Batal', style: 'cancel' },
-              {
-                text: 'Akhiri',
-                style: 'destructive',
-                onPress: () => resetFastingTimer(null),
-              },
-            ]
-          );
-        } else {
-          resetFastingTimer(new Date().toISOString());
-        }
         break;
     }
   };
@@ -509,13 +499,13 @@ const MainNavigator: React.FC = () => {
         visible={showQuickFoodLogger}
         defaultIsSnack={quickLoggerIsSnack}
         onClose={() => setShowQuickFoodLogger(false)}
-        onSaveMeal={(meal) =>
+        onSaveMeal={(meal, timestamp) =>
           addMealLog(
             meal.name,
             meal.isSnack,
             meal.nutrition,
             meal.trigger,
-            undefined,
+            timestamp,
             meal.source,
             meal.itemsBreakdown
           )
@@ -537,7 +527,10 @@ const MainNavigator: React.FC = () => {
       <QuickAddActivityModal
         visible={showAddActivity}
         weightKg={profile.weightKg}
-        sensorConnected={stepTrackingStatus === 'connected'}
+        stepBonusCalories={
+          stepTrackingStatus === 'connected' ? energy.activityBonusCalories : 0
+        }
+        existingActivities={activityLogs}
         onClose={() => setShowAddActivity(false)}
         onParse={parseActivity}
         onSave={addActivityLog}
@@ -584,9 +577,17 @@ const MainNavigator: React.FC = () => {
           caloriesIn={totalCaloriesIn || 0}
           targetCalories={targetCalories}
           maintenanceCalories={maintenanceCalories}
+          waterGlasses={waterGlasses || 0}
           snackCount={snackCount || 0}
-          fastingHours={fastingState.fastingHours || 0}
+          fastingHours={hoursSinceLastMeal}
+          hasMealRecorded={fastingState.hasMealRecorded}
           onAddWater={addWaterGlass}
+          onAskCoach={() => {
+            setShowHungerCheck(false);
+            openAICoach(
+              'Bantu saya memahami rasa lapar dan menentukan langkah berikutnya.'
+            );
+          }}
           onComplete={handleCheckInComplete}
         />
       )}

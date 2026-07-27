@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealLog, FoodItemBreakdown } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { createMealTimestamp, formatMealTime } from '../utils/mealTimestamp';
 
 interface EditMealModalProps {
   visible: boolean;
@@ -36,6 +37,7 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [items, setItems] = useState<FoodItemBreakdown[]>([]);
+  const [mealTime, setMealTime] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
       setCarbs(String(log.nutrition.carbsGrams));
       setFat(String(log.nutrition.fatGrams));
       setItems(log.itemsBreakdown ? log.itemsBreakdown.map((item) => ({ ...item })) : []);
+      setMealTime(formatMealTime(new Date(log.timestamp)));
       setError('');
     }
   }, [log]);
@@ -113,6 +116,13 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
       setError('Makro harus berupa angka 0 atau lebih.');
       return;
     }
+    const timestamp = createMealTimestamp(mealTime);
+    if (!timestamp) {
+      setError(
+        'Waktu tidak valid atau berada di masa depan. Gunakan format HH:MM.'
+      );
+      return;
+    }
 
     const cleanItems = items
       .map((item) => ({ name: item.name.trim(), calories: item.calories }))
@@ -121,6 +131,7 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
     onSaveUpdate(log.id, {
       name: name.trim(),
       isSnack,
+      timestamp,
       nutrition: {
         calories: parsedCalories,
         proteinGrams: parsedProtein,
@@ -207,7 +218,7 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
                         marginTop: 3,
                       }}
                     >
-                      Koreksi nama, jenis, atau nutrisi.
+                      Koreksi waktu, nama, jenis, atau nutrisi.
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -293,6 +304,25 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
                         );
                       })}
                     </View>
+                  </View>
+
+                  <View style={{ gap: spacing.sm }}>
+                    <Text style={{ ...typography.overline, color: colors.textTertiary }}>
+                      WAKTU HARI INI
+                    </Text>
+                    <TextInput
+                      accessibilityLabel="Edit waktu makan hari ini format jam dan menit"
+                      style={[fieldStyle, { textAlign: 'center' }]}
+                      value={mealTime}
+                      onChangeText={(text) => {
+                        setMealTime(text);
+                        setError('');
+                      }}
+                      placeholder="HH:MM"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType="numbers-and-punctuation"
+                      maxLength={5}
+                    />
                   </View>
 
                   <View style={{ gap: spacing.sm }}>
@@ -430,7 +460,7 @@ export const EditMealModal: React.FC<EditMealModalProps> = ({
                               onChangeText={(text) => handleItemCalorieChange(index, text)}
                             />
                             <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-                              kcal
+                              kkal
                             </Text>
                             <TouchableOpacity
                               accessibilityRole="button"

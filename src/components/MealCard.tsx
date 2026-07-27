@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { MealLog } from '../types';
 import { TRIGGER_OPTIONS } from '../utils/habitAnalytics';
@@ -13,6 +13,7 @@ interface MealCardProps {
 
 export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => {
   const { colors, spacing, radius, typography } = useTheme();
+  const [itemsExpanded, setItemsExpanded] = useState(false);
   const triggerInfo = log.trigger
     ? TRIGGER_OPTIONS.find((trigger) => trigger.type === log.trigger)
     : null;
@@ -20,8 +21,10 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
     hour: '2-digit',
     minute: '2-digit',
   });
-  const visibleItems = log.itemsBreakdown?.slice(0, 3) ?? [];
-  const hiddenItemCount = Math.max(0, (log.itemsBreakdown?.length ?? 0) - visibleItems.length);
+  const allItems = log.itemsBreakdown ?? [];
+  const visibleItems = itemsExpanded ? allItems : allItems.slice(0, 3);
+  const hiddenItemCount = Math.max(0, allItems.length - 3);
+  const canToggleItems = hiddenItemCount > 0;
 
   return (
     <Surface
@@ -81,7 +84,7 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
         >
           {log.nutrition.calories}
         </Text>
-        <Text style={{ ...typography.caption, color: colors.textTertiary }}>kcal</Text>
+        <Text style={{ ...typography.caption, color: colors.textTertiary }}>kkal</Text>
       </View>
 
       <Text
@@ -96,7 +99,18 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
       </Text>
 
       {visibleItems.length > 0 ? (
-        <View
+        <TouchableOpacity
+          accessibilityRole={canToggleItems ? 'button' : undefined}
+          accessibilityLabel={
+            canToggleItems
+              ? itemsExpanded
+                ? 'Sembunyikan rincian item makanan'
+                : `Tampilkan ${hiddenItemCount} item makanan lainnya`
+              : undefined
+          }
+          activeOpacity={canToggleItems ? 0.65 : 1}
+          disabled={!canToggleItems}
+          onPress={() => setItemsExpanded((expanded) => !expanded)}
           style={{
             marginTop: spacing.md,
             paddingTop: spacing.sm,
@@ -117,16 +131,18 @@ export const MealCard: React.FC<MealCardProps> = ({ log, onEdit, onDelete }) => 
                 {item.name}
               </Text>
               <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-                {item.calories} kcal
+                {item.calories} kkal
               </Text>
             </View>
           ))}
           {hiddenItemCount > 0 ? (
-            <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-              +{hiddenItemCount} item lain
-            </Text>
+            itemsExpanded ? null : (
+              <Text style={{ ...typography.caption, color: colors.primary }}>
+                +{hiddenItemCount} item lain
+              </Text>
+            )
           ) : null}
-        </View>
+        </TouchableOpacity>
       ) : null}
 
       <View

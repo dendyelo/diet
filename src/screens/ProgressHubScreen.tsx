@@ -307,7 +307,7 @@ export const ProgressHubScreen: React.FC = () => {
 
               <Surface style={{ marginVertical: 0, paddingHorizontal: spacing.lg, paddingVertical: 0 }}>
                 {[
-                  ['Rata-rata hari tercatat', `${weeklySummary.avgDailyCalories} kcal`],
+                  ['Rata-rata hari tercatat', `${weeklySummary.avgDailyCalories} kkal`],
                   ['Hidrasi hari ini', `${weeklySummary.waterCompliancePct}%`],
                   ['Target protein', `${weeklySummary.proteinCompliancePct}%`],
                 ].map(([label, value], index) => (

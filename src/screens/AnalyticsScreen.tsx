@@ -1,22 +1,18 @@
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
-import { useProfile, useMeals, useHealth, useTheme } from '../context/AppContext';
+import { useMeals, useHealth, useTheme } from '../context/AppContext';
 import { calculateTriggerStats } from '../utils/habitAnalytics';
 import { Surface } from '../components/Surface';
 
 export const AnalyticsScreen: React.FC = () => {
-  const { profile } = useProfile();
   const { mealLogs, snackCount } = useMeals();
   const { waterGlasses, steps, fastingState } = useHealth();
   const { colors, spacing, radius, typography } = useTheme();
 
   const triggerStats = calculateTriggerStats(mealLogs || []);
-  const fastingTargetHours = profile?.fastingTargetHours || 16;
-  const isTargetFastingReached = (fastingState?.fastingHours || 0) >= fastingTargetHours;
   const fastingHours = fastingState?.fastingHours || 0;
-  const fastingProgress = Math.min(
-    100,
-    Math.max(0, Math.round((fastingHours / Math.max(1, fastingTargetHours)) * 100))
+  const fastingMinutes = Math.floor(
+    ((fastingState?.elapsedSeconds || 0) % 3600) / 60
   );
 
   return (
@@ -34,13 +30,13 @@ export const AnalyticsScreen: React.FC = () => {
         <View style={{ gap: spacing.xs }}>
           <Text style={{ ...typography.h1, color: colors.textPrimary }}>Pola</Text>
           <Text style={{ ...typography.body, color: colors.textTertiary }}>
-            Lihat hubungan antara puasa, hidrasi, dan keinginan ngemil.
+            Lihat hubungan antara jeda makan, hidrasi, dan keinginan ngemil.
           </Text>
         </View>
 
         <Surface style={{ marginVertical: 0, padding: spacing.lg, gap: spacing.lg }}>
           <View style={{ gap: spacing.xs }}>
-            <Text style={{ ...typography.body, color: colors.textTertiary }}>Puasa saat ini</Text>
+            <Text style={{ ...typography.body, color: colors.textTertiary }}>Jeda sejak makan terakhir</Text>
             <Text
               style={{
                 fontSize: 54,
@@ -51,41 +47,13 @@ export const AnalyticsScreen: React.FC = () => {
               }}
             >
               {fastingHours}
-              <Text style={{ fontSize: 20, color: colors.textTertiary }}> jam</Text>
-            </Text>
-            <Text style={{ ...typography.caption, color: isTargetFastingReached ? colors.primaryText : colors.textTertiary }}>
-              {isTargetFastingReached
-                ? 'Target hari ini tercapai'
-                : `${Math.max(0, fastingTargetHours - fastingHours)} jam menuju target`}
-            </Text>
-          </View>
-
-          <View style={{ gap: spacing.sm }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
-                Target {fastingTargetHours} jam
+              <Text style={{ fontSize: 20, color: colors.textTertiary }}>
+                 jam {fastingMinutes} menit
               </Text>
-              <Text style={{ ...typography.caption, color: colors.textSecondary }}>
-                {fastingProgress}%
-              </Text>
-            </View>
-            <View
-              style={{
-                height: 3,
-                backgroundColor: colors.surfaceElevated,
-                borderRadius: radius.full,
-                overflow: 'hidden',
-              }}
-            >
-              <View
-                style={{
-                  height: '100%',
-                  width: `${fastingProgress}%`,
-                  borderRadius: radius.full,
-                  backgroundColor: colors.primary,
-                }}
-              />
-            </View>
+            </Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+              Dihitung otomatis dari waktu asupan terbaru.
+            </Text>
           </View>
 
           <View style={{ borderTopWidth: 1, borderTopColor: colors.divider }}>

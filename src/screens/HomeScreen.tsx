@@ -35,7 +35,7 @@ export const HomeScreen: React.FC = () => {
 
   const todayLogs = (mealLogs || []).filter((log) => log.timestamp && isSameLocalDay(log.timestamp));
   const elapsedSeconds = fastingState?.elapsedSeconds || 0;
-  const hasMealRecorded = fastingState?.hasMealRecorded ?? true;
+  const hasMealRecorded = fastingState?.isFastingActive ?? false;
 
   const handleAddSnackSubmit = async (
     name: string,

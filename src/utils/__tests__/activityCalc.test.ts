@@ -1,6 +1,7 @@
 import {
   calculateCreditedActivityCalories,
   calculateNetActivityCalories,
+  calculateNarratedActivityCalories,
   extractDurationMinutes,
   parseActivityLocally,
 } from '../activityCalc';
@@ -15,7 +16,7 @@ describe('activityCalc', () => {
   it('uses conservative local presets when AI is unavailable', () => {
     expect(parseActivityLocally('berlari 30 menit')).toMatchObject({
       durationMinutes: 30,
-      met: 8.3,
+      met: 7,
       stepOverlap: 'high',
     });
     expect(parseActivityLocally('bermain sepakbola 1 jam')).toMatchObject({
@@ -29,9 +30,17 @@ describe('activityCalc', () => {
     expect(calculateNetActivityCalories(70, 60, 8)).toBe(515);
   });
 
-  it('reduces step-based credit when a step sensor is connected', () => {
-    expect(calculateCreditedActivityCalories(500, 'high', true)).toBe(175);
-    expect(calculateCreditedActivityCalories(500, 'low', true)).toBe(500);
-    expect(calculateCreditedActivityCalories(500, 'high', false)).toBe(500);
+  it('deducts only step calories that actually became a bonus', () => {
+    expect(calculateCreditedActivityCalories(500, 'high', 325)).toBe(175);
+    expect(calculateCreditedActivityCalories(500, 'low', 325)).toBe(500);
+    expect(calculateCreditedActivityCalories(500, 'high', 0)).toBe(500);
+  });
+
+  it('deducts the same step bonus only once across multiple activities', () => {
+    const activities = [
+      { estimatedCalories: 400, stepOverlap: 'high' as const },
+      { estimatedCalories: 300, stepOverlap: 'high' as const },
+    ];
+    expect(calculateNarratedActivityCalories(activities, 200)).toBe(500);
   });
 });

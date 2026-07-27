@@ -19,6 +19,7 @@ interface DailyMissionCardProps {
   waterGlasses: number;
   stepCount: number;
   netDeficit: number;
+  targetDeficit?: number;
   proteinGrams: number;
   targetProteinGrams: number;
   todayMealsCount: number;
@@ -29,6 +30,7 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
   waterGlasses,
   stepCount,
   netDeficit,
+  targetDeficit = 500,
   proteinGrams,
   targetProteinGrams,
   todayMealsCount,
@@ -36,7 +38,8 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
 }) => {
   const { colors, spacing, radius, typography } = useTheme();
 
-  const isDeficitAchieved = todayMealsCount > 0 && netDeficit >= 0;
+  const isDeficitAchieved =
+    todayMealsCount > 0 && netDeficit >= targetDeficit;
 
   const missions: DailyMissionItem[] = [
     {
@@ -53,7 +56,7 @@ export const DailyMissionCard: React.FC<DailyMissionCardProps> = ({
       id: 'deficit',
       title: todayMealsCount === 0
         ? 'Defisit kalori terjaga (Belum ada makanan)'
-        : `Keseimbangan kalori (${netDeficit >= 0 ? `Kurang ${netDeficit}` : `Lebih ${Math.abs(netDeficit)}`} kkal)`,
+        : `Defisit sementara ${Math.max(0, netDeficit)} / ${targetDeficit} kkal`,
       isCompleted: isDeficitAchieved,
     },
     {

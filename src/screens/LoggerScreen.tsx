@@ -46,7 +46,7 @@ export const LoggerScreen: React.FC<LoggerScreenProps> = ({ onDone }) => {
       setFoodText('');
 
       const sourceLabel = result.isOnlineAI ? 'Gemini AI' : 'Smart Culinary Engine lokal';
-      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kcal) berhasil dicatat melalui ${sourceLabel}.`);
+      setSuccessMsg(`✓ "${result.name}" (${result.nutrition.calories} kkal) berhasil dicatat melalui ${sourceLabel}.`);
     } catch (error: any) {
       setErrorMsg(error.message || 'Gagal memproses kalori makanan.');
     } finally {
@@ -69,7 +69,7 @@ export const LoggerScreen: React.FC<LoggerScreenProps> = ({ onDone }) => {
       fatGrams: f,
     });
 
-    setSuccessMsg(`✓ "${manualName}" (${kcal} kcal) berhasil dicatat secara manual.`);
+    setSuccessMsg(`✓ "${manualName}" (${kcal} kkal) berhasil dicatat secara manual.`);
     setManualName('');
   };
 
@@ -175,7 +175,7 @@ export const LoggerScreen: React.FC<LoggerScreenProps> = ({ onDone }) => {
                 onChangeText={setManualName}
               />
 
-              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Kalori (kcal)</Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>Kalori (kkal)</Text>
               <TextInput
                 style={{ backgroundColor: colors.surfaceElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 14, paddingVertical: 10, color: colors.primaryText, fontSize: 14, fontWeight: 'bold' }}
                 keyboardType="number-pad"

@@ -70,6 +70,7 @@ export const useApp = () => {
     stepTrackingStatus: healthCtx.stepTrackingStatus,
     stepTrackingMessage: healthCtx.stepTrackingMessage,
     elapsedSeconds: healthCtx.elapsedSeconds,
+    hoursSinceLastMeal: healthCtx.hoursSinceLastMeal,
     fastingState: healthCtx.fastingState,
     energy: healthCtx.energy,
     activityLogs: healthCtx.activityLogs,

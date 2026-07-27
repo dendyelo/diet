@@ -21,10 +21,11 @@ export interface UserProfile {
   targetWeightKg: number;
   activityLevel: ActivityLevel;
   bodyType: BodyType; // easy_gain | normal | hard_gain
-  targetDeficitKcal: number; // e.g. 500 kcal
+  targetDeficitKcal: number; // e.g. 500 kkal
   bedtimeHour: number; // 24-hr format, e.g. 23 (11 PM)
   fastingTargetHours: number; // e.g. 16 hours
   lastMealTimestamp?: string | null; // ISO String or null if no meals recorded
+  fastingStartedAt?: string | null; // intentional fasting session, separate from last meal
   isCheatDay: boolean;
 }
 

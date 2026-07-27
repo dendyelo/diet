@@ -31,7 +31,8 @@ export const DEFAULT_PROFILE: UserProfile = {
   targetDeficitKcal: 500,
   bedtimeHour: 23,
   fastingTargetHours: 16,
-  lastMealTimestamp: new Date().toISOString(),
+  lastMealTimestamp: null,
+  fastingStartedAt: null,
   isCheatDay: false,
 };
 

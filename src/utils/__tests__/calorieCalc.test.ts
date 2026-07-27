@@ -3,6 +3,8 @@ import {
   calculateElapsedBMR,
   calculateTDEE,
   calculateTargetCalories,
+  calculateAdjustedTargetCalories,
+  calculateEffectiveDeficit,
   calculateStepCalories,
   calculateActivitySummary,
   calculateEnergyBalance,
@@ -33,14 +35,20 @@ describe('Calorie Calculation Utility Suite', () => {
     expect(bmr).toBeLessThanOrEqual(1700);
   });
 
-  test('calculateBMR applies body type multipliers correctly', () => {
+  test('body response adjusts TDEE slightly without changing BMR', () => {
     const normalBMR = calculateBMR({ ...MOCK_MALE_PROFILE, bodyType: 'normal' });
     const easyGainBMR = calculateBMR({ ...MOCK_MALE_PROFILE, bodyType: 'easy_gain' });
     const hardGainBMR = calculateBMR({ ...MOCK_MALE_PROFILE, bodyType: 'hard_gain' });
 
-    expect(easyGainBMR).toBeLessThan(normalBMR);
-    expect(hardGainBMR).toBeGreaterThan(normalBMR);
-    expect(easyGainBMR).toBe(Math.round(normalBMR * BODY_TYPE_MULTIPLIERS.easy_gain));
+    expect(easyGainBMR).toBe(normalBMR);
+    expect(hardGainBMR).toBe(normalBMR);
+    expect(
+      calculateTDEE({ ...MOCK_MALE_PROFILE, bodyType: 'easy_gain' })
+    ).toBeLessThan(calculateTDEE(MOCK_MALE_PROFILE));
+    expect(
+      calculateTDEE({ ...MOCK_MALE_PROFILE, bodyType: 'hard_gain' })
+    ).toBeGreaterThan(calculateTDEE(MOCK_MALE_PROFILE));
+    expect(BODY_TYPE_MULTIPLIERS.easy_gain).toBe(0.95);
   });
 
   test('calculateElapsedBMR pro-rates 24-hour BMR correctly for noon (12:00 PM)', () => {
@@ -130,6 +138,51 @@ describe('Calorie Calculation Utility Suite', () => {
     expect(noonEnergy.elapsedMaintenanceProgressPct).toBe(50);
   });
 
+  test('profile activity changes projected TDEE but accrues over time', () => {
+    const noon = new Date();
+    noon.setHours(12, 0, 0, 0);
+    const sedentaryProfile = {
+      ...MOCK_MALE_PROFILE,
+      activityLevel: 'sedentary' as const,
+    };
+    const activeProfile = {
+      ...MOCK_MALE_PROFILE,
+      activityLevel: 'active' as const,
+    };
+    const sedentary = calculateEnergyBalance(
+      sedentaryProfile,
+      0,
+      0,
+      noon
+    );
+    const active = calculateEnergyBalance(activeProfile, 0, 0, noon);
+
+    expect(active.adjustedMaintenance).toBeGreaterThan(
+      sedentary.adjustedMaintenance
+    );
+    expect(active.totalCaloriesOut).toBeGreaterThan(
+      sedentary.totalCaloriesOut
+    );
+    expect(active.totalCaloriesOut).toBeLessThan(active.adjustedMaintenance);
+    expect(active.elapsedMaintenanceProgressPct).toBe(50);
+  });
+
+  test('body response adjustment also accrues instead of being burned instantly', () => {
+    const sixAM = new Date();
+    sixAM.setHours(6, 0, 0, 0);
+    const hardGain = calculateEnergyBalance(
+      { ...MOCK_MALE_PROFILE, bodyType: 'hard_gain' },
+      0,
+      0,
+      sixAM
+    );
+
+    expect(hardGain.totalCaloriesOut).toBeLessThan(
+      hardGain.adjustedMaintenance
+    );
+    expect(hardGain.elapsedMaintenanceProgressPct).toBe(25);
+  });
+
   test('confirmed narrated activity increases today’s energy need', () => {
     const noon = new Date();
     noon.setHours(12, 0, 0, 0);
@@ -158,5 +211,39 @@ describe('Calorie Calculation Utility Suite', () => {
 
     expect(normalTarget).toBe(calculateTDEE(MOCK_MALE_PROFILE) - 500);
     expect(cheatDayTarget).toBe(calculateTDEE(MOCK_MALE_PROFILE));
+  });
+
+  test('activity raises the eating plan while preserving the selected deficit', () => {
+    const baselineMaintenance = calculateTDEE(MOCK_MALE_PROFILE);
+    const activeMaintenance = baselineMaintenance + 420;
+
+    expect(
+      calculateAdjustedTargetCalories(MOCK_MALE_PROFILE, activeMaintenance)
+    ).toBe(activeMaintenance - MOCK_MALE_PROFILE.targetDeficitKcal);
+  });
+
+  test('caps an excessive deficit and reports the effective value', () => {
+    const profile = { ...MOCK_MALE_PROFILE, targetDeficitKcal: 1500 };
+    const maintenance = calculateTDEE(profile);
+    const expectedEffectiveDeficit = Math.min(1000, maintenance - 1200);
+
+    expect(calculateEffectiveDeficit(profile, maintenance)).toBe(
+      expectedEffectiveDeficit
+    );
+    expect(calculateTargetCalories(profile)).toBe(
+      maintenance - expectedEffectiveDeficit
+    );
+  });
+
+  test('does not apply a deficit for a maintain or gain goal', () => {
+    const profile = {
+      ...MOCK_MALE_PROFILE,
+      targetWeightKg: MOCK_MALE_PROFILE.weightKg,
+    };
+
+    expect(
+      calculateEffectiveDeficit(profile, calculateTDEE(profile))
+    ).toBe(0);
+    expect(calculateTargetCalories(profile)).toBe(calculateTDEE(profile));
   });
 });

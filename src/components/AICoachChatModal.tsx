@@ -77,6 +77,7 @@ const DATA_KEYWORDS = [
 const FOOD_KEYWORDS = [
   'kalori',
   'kcal',
+  'kkal',
   'nutrisi',
   'gizi',
   'makan',
@@ -233,11 +234,11 @@ export const AICoachChatModal: React.FC<AICoachChatModalProps> = ({
         const breakdown =
           parsed.itemsBreakdown && parsed.itemsBreakdown.length > 1
             ? `\n\n${parsed.itemsBreakdown
-                .map((item) => `${item.name} · ±${item.calories} kcal`)
+                .map((item) => `${item.name} · ±${item.calories} kkal`)
                 .join('\n')}`
             : '';
         appendCoachMessage(
-          `${parsed.name}\n±${parsed.nutrition.calories} kcal · P ${parsed.nutrition.proteinGrams} g · K ${parsed.nutrition.carbsGrams} g · L ${parsed.nutrition.fatGrams} g${breakdown}`,
+          `${parsed.name}\n±${parsed.nutrition.calories} kkal · P ${parsed.nutrition.proteinGrams} g · K ${parsed.nutrition.carbsGrams} g · L ${parsed.nutrition.fatGrams} g${breakdown}`,
           parsed.isOnlineAI ? 'Gemini' : 'Estimasi lokal'
         );
         setFollowUpPrompts([

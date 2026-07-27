@@ -97,6 +97,8 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const waterGlassesRef = useRef<number>(waterGlasses);
   const manualStepsRef = useRef<number>(manualSteps);
   const sensorStepsRef = useRef<number>(sensorSteps);
+  const activityLogsRef = useRef<ActivityLog[]>(activityLogs);
+  const activityMutationQueueRef = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     waterGlassesRef.current = waterGlasses;
   }, [waterGlasses]);
@@ -106,6 +108,9 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     sensorStepsRef.current = sensorSteps;
   }, [sensorSteps]);
+  useEffect(() => {
+    activityLogsRef.current = activityLogs;
+  }, [activityLogs]);
 
   // Efficient Midnight Date Rollover Timeout
   useEffect(() => {
@@ -142,6 +147,7 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       manualStepsRef.current = stepRecord.manualSteps;
       setSensorSteps(stepRecord.sensorSteps);
       setManualSteps(stepRecord.manualSteps);
+      activityLogsRef.current = loadedActivities;
       setActivityLogs(loadedActivities);
       setHydratedHealthDate(todayStr);
     }
@@ -258,15 +264,25 @@ export const HealthProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
     };
-    const nextLogs = [nextLog, ...activityLogs];
-    setActivityLogs(nextLogs);
-    await saveActivityLogs(todayStr, nextLogs);
+    const run = activityMutationQueueRef.current.then(async () => {
+      const nextLogs = [nextLog, ...activityLogsRef.current];
+      activityLogsRef.current = nextLogs;
+      setActivityLogs(nextLogs);
+      await saveActivityLogs(todayStr, nextLogs);
+    });
+    activityMutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   const deleteActivityLog = async (id: string) => {
-    const nextLogs = activityLogs.filter((item) => item.id !== id);
-    setActivityLogs(nextLogs);
-    await saveActivityLogs(todayStr, nextLogs);
+    const run = activityMutationQueueRef.current.then(async () => {
+      const nextLogs = activityLogsRef.current.filter((item) => item.id !== id);
+      activityLogsRef.current = nextLogs;
+      setActivityLogs(nextLogs);
+      await saveActivityLogs(todayStr, nextLogs);
+    });
+    activityMutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   const resetFastingTimer = async (timestamp?: string | null) => {

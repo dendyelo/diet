@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  ReactNode,
+} from 'react';
 import { WeightLog } from '../types';
 import { loadWeightLogs, saveWeightLogs } from '../services/storageService';
 import { useProfile } from './ProfileContext';
@@ -44,11 +51,14 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { updateProfile } = useProfile();
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const weightLogsRef = useRef<WeightLog[]>([]);
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     async function initWeightLogs() {
       setIsLoading(true);
       const loaded = await loadWeightLogs();
+      weightLogsRef.current = loaded;
       setWeightLogs(loaded);
       setIsLoading(false);
     }
@@ -70,20 +80,21 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       note: note?.trim() || undefined,
     };
 
-    let nextLogs: WeightLog[] = [];
-    setWeightLogs((prevLogs) => {
-      nextLogs = [newLog, ...prevLogs];
-      return nextLogs;
-    });
+    const run = mutationQueueRef.current.then(async () => {
+      const nextLogs = [newLog, ...weightLogsRef.current];
+      weightLogsRef.current = nextLogs;
+      setWeightLogs(nextLogs);
 
-    await saveWeightLogs(nextLogs);
-    await syncProfileWeight(nextLogs);
+      await saveWeightLogs(nextLogs);
+      await syncProfileWeight(nextLogs);
+    });
+    mutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   const updateWeightLog = async (id: string, updatedFields: WeightLogUpdate) => {
-    let nextLogs: WeightLog[] = [];
-    setWeightLogs((prevLogs) => {
-      nextLogs = prevLogs.map((log) => {
+    const run = mutationQueueRef.current.then(async () => {
+      const nextLogs = weightLogsRef.current.map((log) => {
         if (log.id !== id) return log;
 
         const updated = { ...log };
@@ -104,11 +115,14 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
         return updated;
       });
-      return nextLogs;
-    });
+      weightLogsRef.current = nextLogs;
+      setWeightLogs(nextLogs);
 
-    await saveWeightLogs(nextLogs);
-    await syncProfileWeight(nextLogs);
+      await saveWeightLogs(nextLogs);
+      await syncProfileWeight(nextLogs);
+    });
+    mutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   /**
@@ -116,24 +130,23 @@ export const WeightProvider: React.FC<{ children: ReactNode }> = ({ children }) 
    * (cannot delete the only remaining log).
    */
   const deleteWeightLog = async (id: string): Promise<boolean> => {
-    // Read current state synchronously via a ref-like check
-    let blocked = false;
-    let nextLogs: WeightLog[] = [];
+    let deleted = false;
+    const run = mutationQueueRef.current.then(async () => {
+      if (weightLogsRef.current.length <= 1) return;
 
-    setWeightLogs((prevLogs) => {
-      if (prevLogs.length <= 1) {
-        blocked = true;
-        return prevLogs; // no state change
-      }
-      nextLogs = prevLogs.filter((log) => log.id !== id);
-      return nextLogs;
+      const nextLogs = weightLogsRef.current.filter((log) => log.id !== id);
+      if (nextLogs.length === weightLogsRef.current.length) return;
+
+      deleted = true;
+      weightLogsRef.current = nextLogs;
+      setWeightLogs(nextLogs);
+
+      await saveWeightLogs(nextLogs);
+      await syncProfileWeight(nextLogs);
     });
-
-    if (blocked) return false;
-
-    await saveWeightLogs(nextLogs);
-    await syncProfileWeight(nextLogs);
-    return true;
+    mutationQueueRef.current = run.catch(() => undefined);
+    await run;
+    return deleted;
   };
 
   return (

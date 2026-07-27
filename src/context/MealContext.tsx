@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  ReactNode,
+} from 'react';
 import { MealLog, TriggerType, NutritionData, FoodItemBreakdown } from '../types';
 import { loadMealLogs, saveMealLogs } from '../services/storageService';
 import { useProfile } from './ProfileContext';
@@ -32,6 +39,8 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [mealLogs, setMealLogs] = useState<MealLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [todayStr, setTodayStr] = useState<string>(getLocalDateString());
+  const mealLogsRef = useRef<MealLog[]>([]);
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Efficient Midnight Date Rollover Timeout
   useEffect(() => {
@@ -52,6 +61,7 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     async function initMealLogs() {
       setIsLoading(true);
       const loaded = await loadMealLogs();
+      mealLogsRef.current = loaded;
       setMealLogs(loaded);
       setIsLoading(false);
     }
@@ -81,49 +91,55 @@ export const MealProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       itemsBreakdown,
     };
 
-    let nextLogs: MealLog[] = [];
-    setMealLogs((prevLogs) => {
-      nextLogs = [newLog, ...prevLogs];
-      return nextLogs;
-    });
+    const run = mutationQueueRef.current.then(async () => {
+      const nextLogs = [newLog, ...mealLogsRef.current];
+      mealLogsRef.current = nextLogs;
+      setMealLogs(nextLogs);
 
-    const latestTimestamp = getLatestMealTimestamp(nextLogs);
-    await saveMealLogs(nextLogs);
-    await updateProfile({
-      lastMealTimestamp: latestTimestamp,
-      ...(shouldMealEndFast(profile.fastingStartedAt, timestamp)
-        ? { fastingStartedAt: null }
-        : {}),
+      const latestTimestamp = getLatestMealTimestamp(nextLogs);
+      await saveMealLogs(nextLogs);
+      await updateProfile({
+        lastMealTimestamp: latestTimestamp,
+        ...(shouldMealEndFast(profile.fastingStartedAt, timestamp)
+          ? { fastingStartedAt: null }
+          : {}),
+      });
     });
+    mutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   const updateMealLog = async (id: string, updatedFields: Partial<MealLog>) => {
-    let nextLogs: MealLog[] = [];
-    setMealLogs((prevLogs) => {
-      nextLogs = prevLogs.map((log) => {
+    const run = mutationQueueRef.current.then(async () => {
+      const nextLogs = mealLogsRef.current.map((log) => {
         if (log.id === id) {
           return { ...log, ...updatedFields };
         }
         return log;
       });
-      return nextLogs;
-    });
+      mealLogsRef.current = nextLogs;
+      setMealLogs(nextLogs);
 
-    const latestTimestamp = getLatestMealTimestamp(nextLogs);
-    await saveMealLogs(nextLogs);
-    await updateProfile({ lastMealTimestamp: latestTimestamp });
+      const latestTimestamp = getLatestMealTimestamp(nextLogs);
+      await saveMealLogs(nextLogs);
+      await updateProfile({ lastMealTimestamp: latestTimestamp });
+    });
+    mutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   const deleteMealLog = async (id: string) => {
-    let nextLogs: MealLog[] = [];
-    setMealLogs((prevLogs) => {
-      nextLogs = prevLogs.filter((m) => m.id !== id);
-      return nextLogs;
-    });
+    const run = mutationQueueRef.current.then(async () => {
+      const nextLogs = mealLogsRef.current.filter((m) => m.id !== id);
+      mealLogsRef.current = nextLogs;
+      setMealLogs(nextLogs);
 
-    const latestTimestamp = getLatestMealTimestamp(nextLogs);
-    await saveMealLogs(nextLogs);
-    await updateProfile({ lastMealTimestamp: latestTimestamp });
+      const latestTimestamp = getLatestMealTimestamp(nextLogs);
+      await saveMealLogs(nextLogs);
+      await updateProfile({ lastMealTimestamp: latestTimestamp });
+    });
+    mutationQueueRef.current = run.catch(() => undefined);
+    await run;
   };
 
   const todayLogs = mealLogs.filter((log) => log.timestamp && isSameLocalDay(log.timestamp, todayStr));

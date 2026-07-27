@@ -25,8 +25,8 @@ describe('AI Service Comprehensive Suite', () => {
   });
 
   // --- 1. Connection Status & Utility Tests ---
-  test('configures all 11 requested models as the fallback chain', () => {
-    expect(GEMINI_MODELS).toHaveLength(11);
+  test('configures all 14 requested models as the fallback chain', () => {
+    expect(GEMINI_MODELS).toHaveLength(14);
     expect(GEMINI_MODELS).toEqual(
       expect.arrayContaining([
         'gemini-2.5-flash',
@@ -38,8 +38,11 @@ describe('AI Service Comprehensive Suite', () => {
         'gemini-3-flash-preview',
         'gemini-flash-latest',
         'gemini-flash-lite-latest',
-        'gemma-4-31b-it',
+        'gemini-2.5-pro',
+        'gemini-3.5-pro',
+        'gemini-pro-latest',
         'gemma-4-26b-a4b-it',
+        'gemma-4-31b-it',
       ])
     );
     expect(MAX_FALLBACK_ATTEMPTS).toBe(GEMINI_MODELS.length);
@@ -275,7 +278,7 @@ describe('AI Service Comprehensive Suite', () => {
 
     const reply = await sendAICoachChatQuery('halo', 'Budi', mockUserContext, 'valid_key');
     expect(reply).toBeNull();
-    expect(global.fetch).toHaveBeenCalledTimes(11);
+    expect(global.fetch).toHaveBeenCalledTimes(14);
   });
 
   test('sendAICoachChatQuery returns null on empty response payload', async () => {

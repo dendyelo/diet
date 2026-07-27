@@ -148,6 +148,9 @@ export const GEMINI_MODELS = [
   'gemini-flash-lite-latest',
   'gemini-3.1-flash-lite-preview',
   'gemini-3-flash-preview',
+  'gemini-2.5-pro',
+  'gemini-3.5-pro',
+  'gemini-pro-latest',
   'gemma-4-26b-a4b-it',
   'gemma-4-31b-it',
 ] as const;

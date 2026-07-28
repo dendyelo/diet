@@ -21,8 +21,8 @@ export const Surface: React.FC<SurfaceProps> = ({
         {
           backgroundColor: variant === 'subtle' ? colors.surfaceElevated : colors.surface,
           borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: variant === 'subtle' ? colors.divider : colors.border,
+          borderWidth: 0,
+          borderColor: 'transparent',
           padding: spacing.md,
         },
         style,

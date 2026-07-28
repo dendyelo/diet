@@ -61,7 +61,7 @@ const Metric: React.FC<{
   const { colors, typography } = useTheme();
 
   return (
-    <View style={styles.metric}>
+    <View style={[styles.metric, { backgroundColor: colors.surface }]}>
       <Text style={[typography.h2, { color: colors.textPrimary }]} numberOfLines={1}>
         {value}
       </Text>
@@ -73,7 +73,7 @@ const Metric: React.FC<{
           style={[
             styles.metricFill,
             {
-              backgroundColor: colors.primary,
+              backgroundColor: colors.success,
               width: `${Math.min(100, Math.max(0, progress))}%`,
             },
           ]}
@@ -380,7 +380,7 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
               },
             ]}
           >
-            <View style={[styles.liveDot, { backgroundColor: colors.primary }]} />
+            <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
             <Text style={[typography.caption, { color: colors.textSecondary }]}>
               Check-in
             </Text>
@@ -531,7 +531,6 @@ export const LivingTimelineHome: React.FC<LivingTimelineHomeProps> = ({
             label="Protein"
             progress={(proteinGrams / Math.max(1, targetProtein)) * 100}
           />
-          <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
           <Metric
             value={`${waterGlasses} / 8`}
             label="Gelas air"
@@ -872,7 +871,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 20,
-    gap: 18,
+    gap: 14,
   },
   header: {
     flexDirection: 'row',
@@ -885,9 +884,9 @@ const styles = StyleSheet.create({
   },
   checkButton: {
     minHeight: 44,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 13,
+    borderWidth: 0,
+    borderRadius: 999,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -899,7 +898,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   energyHero: {
-    padding: 20,
+    padding: 24,
+    borderRadius: 24,
   },
   heroTopline: {
     flexDirection: 'row',
@@ -926,9 +926,8 @@ const styles = StyleSheet.create({
   progressTrack: {
     position: 'relative',
     width: '100%',
-    height: 5,
-    borderRadius: 3,
-    overflow: 'hidden',
+    height: 8,
+    borderRadius: 4,
   },
   markerValue: {
     position: 'absolute',
@@ -966,8 +965,8 @@ const styles = StyleSheet.create({
   },
   caloriesOutMarker: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
+    top: -5,
+    height: 18,
     width: 3,
     borderRadius: 2,
     transform: [{ translateX: -1.5 }],
@@ -989,24 +988,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   metricStrip: {
-    minHeight: 92,
+    minHeight: 96,
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    alignItems: 'stretch',
+    padding: 0,
+    gap: 10,
+    backgroundColor: 'transparent',
   },
   metric: {
     flex: 1,
-    paddingHorizontal: 14,
+    padding: 16,
+    borderRadius: 18,
     gap: 3,
-  },
-  metricDivider: {
-    width: 1,
-    height: 48,
   },
   metricTrack: {
     width: '100%',
-    height: 3,
+    height: 4,
     marginTop: 7,
     overflow: 'hidden',
     borderRadius: 2,
@@ -1016,7 +1013,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   recommendation: {
-    padding: 20,
+    padding: 24,
+    borderRadius: 24,
   },
   recommendationTitle: {
     marginTop: 8,
@@ -1030,8 +1028,8 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     minHeight: 46,
-    borderRadius: 14,
-    paddingHorizontal: 16,
+    borderRadius: 999,
+    paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

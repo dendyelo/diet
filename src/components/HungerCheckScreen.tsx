@@ -60,6 +60,7 @@ interface ChoiceButtonProps {
   selected: boolean;
   onPress: () => void;
   align?: 'left' | 'center';
+  subtitle?: string;
 }
 
 const ChoiceButton: React.FC<ChoiceButtonProps> = ({
@@ -67,8 +68,9 @@ const ChoiceButton: React.FC<ChoiceButtonProps> = ({
   selected,
   onPress,
   align = 'center',
+  subtitle,
 }) => {
-  const { colors, radius, typography } = useTheme();
+  const { colors, isDark, radius, typography } = useTheme();
 
   return (
     <Pressable
@@ -79,25 +81,55 @@ const ChoiceButton: React.FC<ChoiceButtonProps> = ({
         styles.choice,
         align === 'left' ? styles.stackedChoice : styles.inlineChoice,
         {
-          borderRadius: radius.sm,
-          borderColor: selected ? colors.primary : colors.divider,
-          backgroundColor: selected ? colors.primarySubtle : colors.surface,
-          opacity: pressed ? 0.68 : 1,
+          borderRadius: radius.md,
+          borderColor: selected
+            ? colors.primary
+            : isDark
+            ? 'rgba(255, 255, 255, 0.10)'
+            : 'rgba(0, 0, 0, 0.08)',
+          backgroundColor: selected
+            ? colors.primarySubtle
+            : colors.surface,
+          shadowColor: isDark ? '#000000' : '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isDark ? 0.2 : 0.04,
+          shadowRadius: 6,
+          elevation: isDark ? 0 : 2,
+          opacity: pressed ? 0.75 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}
     >
-      <Text
-        style={[
-          typography.bodyMedium,
-          {
-            color: selected ? colors.primaryText : colors.textPrimary,
-            textAlign: align,
-            fontWeight: '500',
-          },
-        ]}
-      >
-        {label}
-      </Text>
+      <View style={[styles.choiceContent, align === 'left' && styles.choiceContentLeft]}>
+        <View style={align === 'left' ? { flex: 1 } : undefined}>
+          <Text
+            style={[
+              typography.bodyMedium,
+              {
+                color: selected ? colors.primaryText : colors.textPrimary,
+                textAlign: align,
+                fontWeight: selected ? '700' : '600',
+              },
+            ]}
+          >
+            {label}
+          </Text>
+          {subtitle && (
+            <Text
+              style={[
+                typography.caption,
+                {
+                  color: colors.textSecondary,
+                  textAlign: align,
+                  marginTop: 2,
+                },
+              ]}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
+      </View>
     </Pressable>
   );
 };
@@ -325,8 +357,8 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
   };
 
   const gradientColors = isDark
-    ? (['#0B0D0E', '#101711', '#0B0D0E'] as const)
-    : (['#F5F5F2', '#EDF4E6', '#F2F4F1'] as const);
+    ? (['#000000', '#09090B', '#111113'] as const)
+    : (['#F2F2F7', '#FFFFFF', '#F2F2F7'] as const);
 
   return (
     <Animated.View
@@ -355,8 +387,13 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
               style={[
                 styles.mealGapCard,
                 {
-                  borderColor: colors.divider,
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
                   backgroundColor: colors.surface,
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isDark ? 0.2 : 0.03,
+                  shadowRadius: 6,
+                  elevation: isDark ? 0 : 2,
                 },
               ]}
             >
@@ -374,7 +411,7 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                 <Text
                   style={[
                     typography.caption,
-                    { color: colors.textTertiary },
+                    { color: colors.textSecondary },
                   ]}
                 >
                   {hasMealRecorded
@@ -401,10 +438,10 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                 {
                   backgroundColor: isDark
                     ? 'rgba(201, 244, 122, 0.07)'
-                    : 'rgba(123, 224, 180, 0.16)',
+                    : 'rgba(16, 185, 129, 0.08)',
                   borderColor: isDark
                     ? 'rgba(201, 244, 122, 0.13)'
-                    : 'rgba(8, 122, 87, 0.10)',
+                    : 'rgba(16, 185, 129, 0.20)',
                   transform: [{ scale: orbScale }],
                 },
               ]}
@@ -413,7 +450,7 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                 colors={
                   isDark
                     ? (['#D9FF91', '#6AAE70'] as const)
-                    : (['#9CE6BD', '#087A57'] as const)
+                    : (['#34D399', '#059669'] as const)
                 }
                 start={{ x: 0.2, y: 0 }}
                 end={{ x: 0.8, y: 1 }}
@@ -422,7 +459,7 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                 <View
                   style={[
                     styles.orbCore,
-                    { backgroundColor: isDark ? '#182018' : '#F8FFF9' },
+                    { backgroundColor: isDark ? '#182018' : '#FFFFFF' },
                   ]}
                 />
               </LinearGradient>
@@ -460,17 +497,16 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                   style={({ pressed }) => [
                     styles.coachButton,
                     {
-                      borderColor: colors.divider,
+                      borderColor: 'rgba(59, 130, 246, 0.25)',
                       backgroundColor: pressed
-                        ? colors.surfacePressed
-                        : colors.surface,
+                        ? 'rgba(59, 130, 246, 0.12)'
+                        : 'rgba(59, 130, 246, 0.06)',
                       opacity: pressed ? 0.72 : 1,
                     },
                   ]}
                 >
-                  <View style={[styles.coachDot, { backgroundColor: colors.primary }]} />
-                  <Text style={[typography.caption, { color: colors.textSecondary }]}>
-                    Tanya coach
+                  <Text style={[typography.caption, { color: colors.primaryText, fontWeight: '600' }]}>
+                    Tanya AI Coach
                   </Text>
                 </Pressable>
               </View>
@@ -482,23 +518,26 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                   Yang paling terasa?
                 </Text>
                 <Text style={[typography.body, styles.supportingText, { color: colors.textSecondary }]}>
-                  Tidak ada jawaban yang salah.
+                  Tidak ada jawaban yang salah. Kesadaran sinyal membantu hasil jangka panjang.
                 </Text>
                 <View style={styles.stackedChoices}>
                   <ChoiceButton
                     label="Perut kosong atau energi turun"
+                    subtitle="Lapar fisik nyata"
                     selected={signal === 'physical'}
                     onPress={() => handleSignal('physical')}
                     align="left"
                   />
                   <ChoiceButton
                     label="Ingin rasa tertentu"
+                    subtitle="Spesifik makanan manis/gurih"
                     selected={signal === 'specific_craving'}
                     onPress={() => handleSignal('specific_craving')}
                     align="left"
                   />
                   <ChoiceButton
                     label="Bosan atau sedang stres"
+                    subtitle="Lapar emosional"
                     selected={signal === 'emotion'}
                     onPress={() => handleSignal('emotion')}
                     align="left"
@@ -517,12 +556,12 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
                 </Text>
                 <View style={styles.primaryChoices}>
                   <ChoiceButton
-                    label="Makan"
+                    label="Makan Utama"
                     selected={intent === 'meal'}
                     onPress={() => handleIntent('meal')}
                   />
                   <ChoiceButton
-                    label="Ngemil"
+                    label="Ngemil Ringan"
                     selected={intent === 'snack'}
                     onPress={() => handleIntent('snack')}
                   />
@@ -667,8 +706,17 @@ export const HungerCheckScreen: React.FC<HungerCheckScreenProps> = ({
             style={({ pressed }) => [
               styles.swipeArea,
               {
-                borderColor: colors.divider,
-                backgroundColor: pressed ? colors.surfacePressed : colors.surface,
+                borderColor: isDark
+                  ? 'rgba(255, 255, 255, 0.08)'
+                  : 'rgba(0, 0, 0, 0.08)',
+                backgroundColor: pressed
+                  ? colors.surfacePressed
+                  : colors.surface,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: isDark ? 0.2 : 0.04,
+                shadowRadius: 8,
+                elevation: isDark ? 0 : 2,
               },
             ]}
           >
@@ -803,6 +851,24 @@ const styles = StyleSheet.create({
   },
   stackedChoice: {
     width: '100%',
+  },
+  choiceContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  choiceContentLeft: {
+    justifyContent: 'flex-start',
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusPill: {
     minHeight: 28,

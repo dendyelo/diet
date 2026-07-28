@@ -70,7 +70,7 @@ const BottomTabButton: React.FC<BottomTabButtonProps> = ({
   icon,
 }) => {
   const { colors, typography } = useTheme();
-  const color = active ? colors.textPrimary : colors.textTertiary;
+  const color = active ? colors.primary : colors.textTertiary;
 
   return (
     <Pressable
@@ -80,7 +80,7 @@ const BottomTabButton: React.FC<BottomTabButtonProps> = ({
       onPress={onPress}
       style={({ pressed }) => [
         styles.tabButton,
-        active && { backgroundColor: colors.surfaceElevated },
+        active && { backgroundColor: colors.primarySubtle },
         { opacity: pressed ? 0.58 : 1 },
       ]}
     >
@@ -607,13 +607,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navSafeArea: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 20,
   },
   navBar: {
-    height: 64,
-    borderWidth: 1,
-    borderRadius: 22,
-    paddingHorizontal: 6,
+    height: 76,
+    borderWidth: 0,
+    borderRadius: 30,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -621,19 +621,19 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    height: 48,
+    height: 52,
     minWidth: 48,
     paddingHorizontal: 10,
-    borderRadius: 16,
+    borderRadius: 999,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
   },
   addButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 2,

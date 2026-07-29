@@ -53,15 +53,31 @@ const Metric: React.FC<{
   value: string;
   label: string;
   progress: number;
+  onPress?: () => void;
+  accessibilityLabel?: string;
 }> = ({
   value,
   label,
   progress,
+  onPress,
+  accessibilityLabel,
 }) => {
-  const { colors, typography } = useTheme();
+  const { colors, isDark, typography } = useTheme();
 
-  return (
-    <View style={[styles.metric, { backgroundColor: colors.surface }]}>
+  const content = (
+    <View
+      style={[
+        styles.metric,
+        {
+          backgroundColor: colors.surface,
+          borderColor: isDark
+            ? 'rgba(255, 255, 255, 0.08)'
+            : 'rgba(0, 0, 0, 0.06)',
+          borderWidth: 1,
+          borderRadius: 14,
+        },
+      ]}
+    >
       <Text style={[typography.h2, { color: colors.textPrimary }]} numberOfLines={1}>
         {value}
       </Text>
@@ -81,6 +97,21 @@ const Metric: React.FC<{
       </View>
     </View>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || label}
+        onPress={onPress}
+        style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.72 : 1 }]}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={{ flex: 1 }}>{content}</View>;
 };
 
 const DetailRow: React.FC<{ label: string; value: string }> = ({

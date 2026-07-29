@@ -406,6 +406,7 @@ class _DietHomeState extends State<DietHome> with WidgetsBindingObserver {
                   'Angka membantu memberi konteks. Tubuhmu tetap menentukan kapan perlu makan.',
               meals: controller.todayMeals,
               activities: controller.activities,
+              cardOrder: controller.dashboardOrder,
               aiHeadline: controller.dailyInsight?.headline,
               aiBody: controller.insightLoading
                   ? 'Membaca perubahan terbaru…'
@@ -420,6 +421,8 @@ class _DietHomeState extends State<DietHome> with WidgetsBindingObserver {
             onDeleteMeal: (meal) => unawaited(_confirmDeleteMeal(meal)),
             onDeleteActivity: (activity) =>
                 unawaited(_confirmDeleteActivity(activity)),
+            onCardOrderChanged: (order) =>
+                unawaited(controller.saveDashboardOrder(order)),
           ),
           ProgressScreen(
             data: ProgressScreenData(

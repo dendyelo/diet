@@ -33,6 +33,14 @@ void main() {
             guidanceBody: 'Catat makanan saat kamu benar-benar makan.',
             meals: const [],
             activities: const [],
+            cardOrder: const [
+              'energy',
+              'mealGap',
+              'signals',
+              'focus',
+              'activity',
+              'journal',
+            ],
           ),
           onOpenCheckIn: () {},
           onAddMeal: () {},
@@ -42,6 +50,7 @@ void main() {
           onEditMeal: (_) {},
           onDeleteMeal: (_) {},
           onDeleteActivity: (_) {},
+          onCardOrderChanged: (_) {},
         ),
       ),
     );
@@ -53,6 +62,9 @@ void main() {
     expect(find.text('766 kkal'), findsOneWidget);
     expect(find.text('1.705 kkal'), findsOneWidget);
     expect(find.text('3 jam 18 menit'), findsOneWidget);
+    expect(find.byType(ReorderableListView), findsOneWidget);
+    expect(find.text('Aktivitas'), findsOneWidget);
+    expect(find.text('Jurnal makan'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

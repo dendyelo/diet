@@ -24,6 +24,7 @@ class TodayScreenData {
     required this.guidanceBody,
     required this.meals,
     required this.activities,
+    required this.cardOrder,
     this.aiHeadline,
     this.aiBody,
   });
@@ -44,6 +45,7 @@ class TodayScreenData {
   final String guidanceBody;
   final List<MealLog> meals;
   final List<ActivityLog> activities;
+  final List<String> cardOrder;
   final String? aiHeadline;
   final String? aiBody;
 }
@@ -59,6 +61,7 @@ class TodayScreen extends StatefulWidget {
     required this.onEditMeal,
     required this.onDeleteMeal,
     required this.onDeleteActivity,
+    required this.onCardOrderChanged,
     super.key,
   });
 
@@ -71,6 +74,7 @@ class TodayScreen extends StatefulWidget {
   final ValueChanged<MealLog> onEditMeal;
   final ValueChanged<MealLog> onDeleteMeal;
   final ValueChanged<ActivityLog> onDeleteActivity;
+  final ValueChanged<List<String>> onCardOrderChanged;
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
@@ -141,6 +145,154 @@ class _TodayScreenState extends State<TodayScreen> {
     final balanceColor = balance >= 0 ? AppColors.activity : AppColors.warning;
     final focusHeadline = data.aiHeadline ?? data.guidanceHeadline;
     final focusBody = data.aiBody ?? data.guidanceBody;
+    final dashboardCards = <String, Widget>{
+      'energy': _SpatialEnergyCard(
+        balance: balance,
+        balanceColor: balanceColor,
+        caloriesIn: data.caloriesIn,
+        caloriesOut: data.caloriesOut,
+        dietLimit: data.dietLimit,
+        projectedBurn: data.projectedBurn,
+        caloriesInLabel: _number(data.caloriesIn),
+        caloriesOutLabel: _number(data.caloriesOut),
+        dietLimitLabel: _number(data.dietLimit),
+      ),
+      'mealGap': _MealGapCard(label: _duration(data.mealGap)),
+      'signals': _DailySignalsCard(
+        proteinLabel: '${_number(data.proteinGrams)} / ${data.proteinTarget}g',
+        proteinProgress: proteinProgress,
+        waterLabel: '${data.waterGlasses} / 8 gelas',
+        waterProgress: waterProgress,
+        stepsLabel: _number(data.steps),
+        stepProgress: stepProgress,
+        onAddWater: widget.onAddWater,
+      ),
+      'focus': GlassSurface(
+        tint: AppColors.hydration,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              data.aiHeadline == null && data.aiBody == null
+                  ? data.guidanceLabel.toUpperCase()
+                  : 'AI · FOKUS SEKARANG',
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppColors.hydration),
+            ),
+            const SizedBox(height: 9),
+            Text(focusHeadline, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 6),
+            Text(focusBody, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.tonal(
+                  onPressed: widget.onOpenCheckIn,
+                  child: const Text('Check-in lagi'),
+                ),
+                TextButton(
+                  onPressed: widget.onAskCoach,
+                  child: const Text('Tanya coach'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      'activity': GlassSurface(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 8, 4),
+              child: _SectionHeader(
+                title: 'Aktivitas',
+                action: 'Ceritakan',
+                onAction: widget.onAddActivity,
+              ),
+            ),
+            const Divider(),
+            _ActivitySummary(
+              steps: _number(data.steps),
+              activityCalories: data.activities.fold<int>(
+                0,
+                (sum, item) => sum + item.creditedCalories,
+              ),
+            ),
+            if (data.activities.isNotEmpty)
+              const Divider(indent: 18, endIndent: 18),
+            for (final activity in data.activities)
+              _ActivityRow(
+                activity: activity,
+                onDelete: () => widget.onDeleteActivity(activity),
+              ),
+          ],
+        ),
+      ),
+      'journal': GlassSurface(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 8, 4),
+              child: _SectionHeader(
+                title: 'Jurnal makan',
+                action: 'Tambah',
+                onAction: widget.onAddMeal,
+              ),
+            ),
+            const Divider(),
+            if (data.meals.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Belum ada asupan',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Catat saat kamu makan. Batas diet adalah panduan, bukan angka yang harus dihabiskan.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              )
+            else
+              for (var index = 0; index < data.meals.length; index++) ...[
+                if (index > 0) const Divider(indent: 18, endIndent: 18),
+                _MealJournalCard(
+                  meal: data.meals[index],
+                  expanded: _expandedMeals.contains(data.meals[index].id),
+                  clock: _clock(data.meals[index].timestamp),
+                  onToggle: () {
+                    final meal = data.meals[index];
+                    setState(() {
+                      if (!_expandedMeals.add(meal.id)) {
+                        _expandedMeals.remove(meal.id);
+                      }
+                    });
+                  },
+                  onEdit: () => widget.onEditMeal(data.meals[index]),
+                  onDelete: () => widget.onDeleteMeal(data.meals[index]),
+                ),
+              ],
+          ],
+        ),
+      ),
+    };
+    final orderedCardIds = data.cardOrder
+        .where(dashboardCards.containsKey)
+        .toList(growable: false);
 
     return AmbientBackground(
       child: CustomScrollView(
@@ -157,143 +309,41 @@ class _TodayScreenState extends State<TodayScreen> {
                     onCheckIn: widget.onOpenCheckIn,
                   ),
                   const SizedBox(height: 22),
-                  _SpatialEnergyCard(
-                    balance: balance,
-                    balanceColor: balanceColor,
-                    caloriesIn: data.caloriesIn,
-                    caloriesOut: data.caloriesOut,
-                    dietLimit: data.dietLimit,
-                    projectedBurn: data.projectedBurn,
-                    caloriesInLabel: _number(data.caloriesIn),
-                    caloriesOutLabel: _number(data.caloriesOut),
-                    dietLimitLabel: _number(data.dietLimit),
-                  ),
-                  const SizedBox(height: 14),
-                  _MealGapCard(label: _duration(data.mealGap)),
-                  const SizedBox(height: 14),
-                  _DailySignalsCard(
-                    proteinLabel:
-                        '${_number(data.proteinGrams)} / ${data.proteinTarget}g',
-                    proteinProgress: proteinProgress,
-                    waterLabel: '${data.waterGlasses} / 8 gelas',
-                    waterProgress: waterProgress,
-                    stepsLabel: _number(data.steps),
-                    stepProgress: stepProgress,
-                    onAddWater: widget.onAddWater,
-                  ),
-                  const SizedBox(height: 14),
-                  GlassSurface(
-                    tint: AppColors.hydration,
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          data.aiHeadline == null && data.aiBody == null
-                              ? data.guidanceLabel.toUpperCase()
-                              : 'AI · FOKUS SEKARANG',
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(color: AppColors.hydration),
-                        ),
-                        const SizedBox(height: 9),
-                        Text(
-                          focusHeadline,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          focusBody,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            FilledButton.tonal(
-                              onPressed: widget.onOpenCheckIn,
-                              child: const Text('Check-in lagi'),
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: true,
+                    itemCount: orderedCardIds.length,
+                    proxyDecorator: (child, index, animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        child: child,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: 1 + animation.value * 0.018,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: child,
                             ),
-                            TextButton(
-                              onPressed: widget.onAskCoach,
-                              child: const Text('Tanya coach'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          );
+                        },
+                      );
+                    },
+                    onReorderItem: (oldIndex, newIndex) {
+                      final next = List<String>.from(orderedCardIds);
+                      final moved = next.removeAt(oldIndex);
+                      next.insert(newIndex, moved);
+                      widget.onCardOrderChanged(next);
+                    },
+                    itemBuilder: (context, index) {
+                      final id = orderedCardIds[index];
+                      return Padding(
+                        key: ValueKey('dashboard-card-$id'),
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: dashboardCards[id]!,
+                      );
+                    },
                   ),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: 'Aktivitas',
-                    action: 'Ceritakan',
-                    onAction: widget.onAddActivity,
-                  ),
-                  const SizedBox(height: 12),
-                  GlassSurface(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        _ActivitySummary(
-                          steps: _number(data.steps),
-                          activityCalories: data.activities.fold<int>(
-                            0,
-                            (sum, item) => sum + item.creditedCalories,
-                          ),
-                        ),
-                        if (data.activities.isNotEmpty)
-                          const Divider(indent: 18, endIndent: 18),
-                        for (final activity in data.activities)
-                          _ActivityRow(
-                            activity: activity,
-                            onDelete: () => widget.onDeleteActivity(activity),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: 'Jurnal makan',
-                    action: 'Tambah',
-                    onAction: widget.onAddMeal,
-                  ),
-                  const SizedBox(height: 12),
-                  if (data.meals.isEmpty)
-                    GlassSurface(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Belum ada asupan',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Catat saat kamu makan. Batas diet adalah panduan, bukan angka yang harus dihabiskan.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    for (final meal in data.meals)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _MealJournalCard(
-                          meal: meal,
-                          expanded: _expandedMeals.contains(meal.id),
-                          clock: _clock(meal.timestamp),
-                          onToggle: () {
-                            setState(() {
-                              if (!_expandedMeals.add(meal.id)) {
-                                _expandedMeals.remove(meal.id);
-                              }
-                            });
-                          },
-                          onEdit: () => widget.onEditMeal(meal),
-                          onDelete: () => widget.onDeleteMeal(meal),
-                        ),
-                      ),
                   const SizedBox(height: 140),
                 ],
               ),
@@ -370,11 +420,11 @@ class _SpatialEnergyCard extends StatelessWidget {
                     rings: [
                       RingProgress(
                         value: outputProgress,
-                        color: AppColors.activity,
+                        color: AppColors.diet,
                       ),
                       RingProgress(
                         value: intakeProgress,
-                        color: AppColors.diet,
+                        color: AppColors.activity,
                       ),
                     ],
                     semanticsLabel:
@@ -409,13 +459,13 @@ class _SpatialEnergyCard extends StatelessWidget {
                         _EnergyStat(
                           label: 'Masuk',
                           value: '$caloriesInLabel kkal',
-                          color: AppColors.diet,
+                          color: AppColors.activity,
                         ),
                         const SizedBox(height: 12),
                         _EnergyStat(
                           label: 'Keluar',
                           value: '$caloriesOutLabel kkal',
-                          color: AppColors.activity,
+                          color: AppColors.diet,
                         ),
                         const SizedBox(height: 12),
                         _EnergyStat(
@@ -429,14 +479,6 @@ class _SpatialEnergyCard extends StatelessWidget {
                 ],
               );
             },
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Cincin hijau: keluar · merah muda: masuk',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textTertiary,
-              fontSize: 11.5,
-            ),
           ),
         ],
       ),
@@ -899,55 +941,57 @@ class _MealJournalCard extends StatelessWidget {
         : meal.itemsBreakdown.take(1).toList();
     final hiddenCount = meal.itemsBreakdown.length - visibleItems.length;
 
-    return GlassSurface(
-      padding: EdgeInsets.zero,
-      onTap: onToggle,
+    return Material(
+      color: Colors.transparent,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 10, 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        meal.isSnack ? 'SNACK · $clock' : 'MAKAN · $clock',
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: meal.isSnack
-                                  ? AppColors.warning
-                                  : AppColors.diet,
-                            ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        meal.name,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${meal.nutrition.calories} kkal · '
-                        '${meal.nutrition.proteinGrams.round()}g protein',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+          InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 10, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meal.isSnack ? 'SNACK · $clock' : 'MAKAN · $clock',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: meal.isSnack
+                                    ? AppColors.warning
+                                    : AppColors.diet,
+                              ),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          meal.name,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${meal.nutrition.calories} kkal · '
+                          '${meal.nutrition.proteinGrams.round()}g protein',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Pilihan jurnal',
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(value: 'delete', child: Text('Hapus')),
                     ],
                   ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Pilihan jurnal',
-                  onSelected: (value) {
-                    if (value == 'edit') onEdit();
-                    if (value == 'delete') onDelete();
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    PopupMenuItem(value: 'delete', child: Text('Hapus')),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           if (meal.itemsBreakdown.isNotEmpty) ...[

@@ -103,6 +103,33 @@ void main() {
       expect(await storage.loadWaterGlasses(day), 5);
     });
 
+    test('dashboard order is sanitized and persists', () async {
+      final preferences = FakeKeyValueStore();
+      final storage = await AppStorage.initialize(
+        preferences: preferences,
+        apiKeys: ApiKeyVault(store: FakeSecureValueStore()),
+      );
+
+      await storage.saveDashboardOrder(const [
+        'journal',
+        'energy',
+        'unknown',
+        'journal',
+      ]);
+
+      final order = await storage.loadDashboardOrder();
+      expect(order.take(2), const ['journal', 'energy']);
+      expect(order.toSet(), {
+        'energy',
+        'mealGap',
+        'signals',
+        'focus',
+        'activity',
+        'journal',
+      });
+      expect(order, hasLength(6));
+    });
+
     test(
       'only valid provider metadata is persisted outside secure storage',
       () async {

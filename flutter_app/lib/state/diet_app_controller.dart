@@ -50,6 +50,14 @@ class DietAppController extends ChangeNotifier {
   List<AiProviderConfig> _aiProviders = const <AiProviderConfig>[
     defaultGoogleAiStudioConfig,
   ];
+  List<String> _dashboardOrder = const <String>[
+    'energy',
+    'mealGap',
+    'signals',
+    'focus',
+    'activity',
+    'journal',
+  ];
   String _selectedAiProviderId = defaultGoogleAiStudioConfig.id;
   final Set<String> _configuredAiProviderIds = <String>{};
   final Map<String, int> _waterHistory = <String, int>{};
@@ -93,6 +101,7 @@ class DietAppController extends ChangeNotifier {
   String? get activeAiModel => _ai.activeModel;
   String? get activeAiProviderId => _ai.activeProviderId;
   List<AiProviderConfig> get aiProviders => List.unmodifiable(_aiProviders);
+  List<String> get dashboardOrder => List.unmodifiable(_dashboardOrder);
   String get selectedAiProviderId => _selectedAiProviderId;
   bool get hasApiKey => _hasApiKey;
   Set<String> get configuredAiProviderIds =>
@@ -191,6 +200,7 @@ class DietAppController extends ChangeNotifier {
         _storage.loadWaterGlasses(_now),
         _storage.loadSteps(_now),
         _storage.loadAiProviderConfigs(),
+        _storage.loadDashboardOrder(),
       ]);
       _profile = results[0] as UserProfile;
       _meals = List<MealLog>.from(results[1] as List<MealLog>);
@@ -201,6 +211,7 @@ class DietAppController extends ChangeNotifier {
       _aiProviders = List<AiProviderConfig>.from(
         results[6] as List<AiProviderConfig>,
       );
+      _dashboardOrder = List<String>.from(results[7] as List<String>);
       _selectedAiProviderId = _aiProviders
           .firstWhere(
             (provider) => provider.enabled,
@@ -232,6 +243,12 @@ class DietAppController extends ChangeNotifier {
       _initializing = false;
       notifyListeners();
     }
+  }
+
+  Future<void> saveDashboardOrder(List<String> order) async {
+    _dashboardOrder = List<String>.from(order);
+    notifyListeners();
+    await _storage.saveDashboardOrder(_dashboardOrder);
   }
 
   void recordHungerCheck({

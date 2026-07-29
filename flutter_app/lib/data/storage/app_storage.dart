@@ -27,6 +27,7 @@ final class AppStorage {
   static const _mealsKey = 'habitdiet.meals';
   static const _weightsKey = 'habitdiet.weights';
   static const _aiProvidersKey = 'habitdiet.ai.providers';
+  static const _dashboardOrderKey = 'habitdiet.dashboard.order';
   static const _waterPrefix = 'habitdiet.day.water.';
   static const _stepsPrefix = 'habitdiet.day.steps.';
   static const _activitiesPrefix = 'habitdiet.day.activities.';
@@ -246,6 +247,51 @@ final class AppStorage {
         _aiProvidersKey,
         _listEnvelope(clean.map((item) => item.toJson())),
       ),
+    );
+  }
+
+  Future<List<String>> loadDashboardOrder() async {
+    const defaults = <String>[
+      'energy',
+      'mealGap',
+      'signals',
+      'focus',
+      'activity',
+      'journal',
+    ];
+    final raw = await _preferences.getString(_dashboardOrderKey);
+    if (raw == null) return defaults;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return defaults;
+      final order = <String>[];
+      for (final id in decoded.whereType<String>()) {
+        if (defaults.contains(id) && !order.contains(id)) order.add(id);
+      }
+      for (final id in defaults) {
+        if (!order.contains(id)) order.add(id);
+      }
+      return order.take(defaults.length).toList(growable: false);
+    } on FormatException {
+      return defaults;
+    }
+  }
+
+  Future<void> saveDashboardOrder(List<String> order) {
+    const allowed = <String>{
+      'energy',
+      'mealGap',
+      'signals',
+      'focus',
+      'activity',
+      'journal',
+    };
+    final clean = order.where(allowed.contains).toSet().toList();
+    for (final id in allowed) {
+      if (!clean.contains(id)) clean.add(id);
+    }
+    return _enqueue(
+      () => _preferences.setString(_dashboardOrderKey, jsonEncode(clean)),
     );
   }
 
